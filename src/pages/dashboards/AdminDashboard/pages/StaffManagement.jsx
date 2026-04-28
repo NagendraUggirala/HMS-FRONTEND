@@ -9,13 +9,19 @@ import {
 } from '../../../../config/api'
 import { apiFetch } from '../../../../services/apiClient'
 
-const ROLE_OPTIONS = [ 'NURSE', 'RECEPTIONIST', 'LAB_TECH', 'PHARMACIST']
+const ROLE_OPTIONS = ['DOCTOR', 'NURSE', 'RECEPTIONIST', 'LAB_TECH', 'PHARMACIST']
 const SHIFT_OPTIONS = ['Morning (7AM-3PM)', 'Evening (3PM-11PM)', 'Night (11PM-7AM)', 'Flexible', 'Part-time']
 
 // ========== ROLE CONFIGURATION - Scalable & Dynamic ==========
 // Add new roles here without changing UI logic
 const ROLE_CONFIG = {
-  
+  DOCTOR: {
+    label: 'Doctor',
+    pluralLabel: 'Medical team',
+    color: 'blue',
+    icon: 'fas fa-user-md',
+    description: 'Medical professionals responsible for diagnosing and treating patients'
+  },
   NURSE: {
     label: 'Nurses',
     pluralLabel: 'Nursing team',
@@ -44,7 +50,7 @@ const ROLE_CONFIG = {
     icon: 'fas fa-pills',
     description: 'Pharmacy staff'
   },
- 
+
   CLEANER: {
     label: 'Cleaners',
     pluralLabel: 'Housekeeping',
@@ -321,22 +327,22 @@ const StaffManagement = () => {
   const stats = useMemo(() => {
     // Always show Total Staff
     const baseStats = [
-      { 
-        label: 'Total Staff', 
-        value: staff.length, 
-        color: 'blue', 
-        icon: 'fas fa-users', 
-        change: 'Hospital users' 
+      {
+        label: 'Total Staff',
+        value: staff.length,
+        color: 'blue',
+        icon: 'fas fa-users',
+        change: 'Hospital users'
       }
     ]
-    
+
     // Get unique roles present in current staff data
     const availableRoles = new Set(staff.map(s => s.role))
-    
+
     // Generate KPI cards dynamically for each available role
     availableRoles.forEach((role) => {
       const config = ROLE_CONFIG[role]
-      
+
       if (config) {
         baseStats.push({
           label: config.label,
@@ -356,7 +362,7 @@ const StaffManagement = () => {
         })
       }
     })
-    
+
     return baseStats
   }, [staff])
 
@@ -373,7 +379,7 @@ const StaffManagement = () => {
             </h2>
             <p className="text-gray-500 mt-1">Manage hospital staff users using backend APIs</p>
           </div>
-          <button 
+          <button
             onClick={openModal}
             className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-center gap-2 font-medium"
           >
@@ -388,16 +394,16 @@ const StaffManagement = () => {
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <i className="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-            <input 
-              type="text" 
-              placeholder="Search staff by name, role, email or phone..." 
+            <input
+              type="text"
+              placeholder="Search staff by name, role, email or phone..."
               className="pl-12 pr-4 py-3 w-full border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <div className="flex gap-2">
-            <select 
+            <select
               className="px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
@@ -405,7 +411,7 @@ const StaffManagement = () => {
               <option value="">All Roles</option>
               {ROLE_OPTIONS.map((role) => <option key={role} value={role}>{toDisplayRole(role)}</option>)}
             </select>
-            <select 
+            <select
               className="px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -451,12 +457,12 @@ const StaffManagement = () => {
             amber: { bg: 'bg-amber-50', text: 'text-amber-700', iconBg: 'bg-amber-100', iconColor: 'text-amber-500' },
             gray: { bg: 'bg-gray-50', text: 'text-gray-700', iconBg: 'bg-gray-100', iconColor: 'text-gray-500' },
           }
-          
+
           const config = colorConfigs[color] || colorConfigs.blue
 
           return (
-            <div 
-              key={label} 
+            <div
+              key={label}
               className={`${config.bg} p-6 rounded-2xl shadow-sm border border-gray-300 hover:shadow-md transition-all duration-300`}
             >
               <div className="flex items-center justify-between mb-4">
@@ -469,7 +475,7 @@ const StaffManagement = () => {
               </div>
               <div className={`text-4xl font-bold ${config.text} mb-2`}>{value}</div>
               <div className="text-gray-600">{label}</div>
-          
+
             </div>
           )
         })}
@@ -487,9 +493,9 @@ const StaffManagement = () => {
       {/* Staff Grid - Compact Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredStaff.map(staffMember => (
-          <StaffCard 
-            key={staffMember.id} 
-            staffMember={staffMember} 
+          <StaffCard
+            key={staffMember.id}
+            staffMember={staffMember}
             onDetails={() => handleGetDetails(staffMember)}
             onToggleStatus={() => handleToggleStatus(staffMember)}
             onResetPassword={() => handleResetPassword(staffMember)}
@@ -505,7 +511,7 @@ const StaffManagement = () => {
           </div>
           <h3 className="text-xl font-semibold text-gray-700 mb-2">No staff members found</h3>
           <p className="text-gray-500 mb-6">Try adjusting your search or filter criteria</p>
-          <button 
+          <button
             onClick={() => { setSearchTerm(''); setRoleFilter(''); setStatusFilter(''); }}
             className="text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center gap-2 mx-auto"
           >
@@ -544,9 +550,9 @@ const StaffCard = ({ staffMember, onDetails, onToggleStatus, onResetPassword, ac
     Active: { color: 'text-green-600', bg: 'bg-green-100', border: 'border-green-200', icon: 'fas fa-check-circle' },
     Inactive: { color: 'text-red-600', bg: 'bg-red-100', border: 'border-red-200', icon: 'fas fa-pause-circle' }
   }
-  
+
   const status = statusConfig[staffMember.status] || statusConfig.Active
-  
+
   const roleConfig = {
     DOCTOR: { bg: 'bg-blue-50', text: 'text-blue-600', icon: 'fas fa-user-md' },
     NURSE: { bg: 'bg-teal-50', text: 'text-teal-600', icon: 'fas fa-user-nurse' },
@@ -554,9 +560,9 @@ const StaffCard = ({ staffMember, onDetails, onToggleStatus, onResetPassword, ac
     LAB_TECH: { bg: 'bg-green-50', text: 'text-green-600', icon: 'fas fa-microscope' },
     PHARMACIST: { bg: 'bg-orange-50', text: 'text-orange-600', icon: 'fas fa-pills' }
   }
-  
+
   const roleStyle = roleConfig[staffMember.role] || { bg: 'bg-gray-50', text: 'text-gray-600', icon: 'fas fa-user' }
-  
+
   return (
     <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
       <div className="flex items-center gap-3 mb-4">
@@ -576,7 +582,7 @@ const StaffCard = ({ staffMember, onDetails, onToggleStatus, onResetPassword, ac
           <p className="text-xs text-gray-500">{staffMember.id}</p>
         </div>
       </div>
-      
+
       <div className="space-y-3 text-sm text-gray-600 mb-4">
         <div className="flex justify-between">
           <span className="font-medium text-gray-700">Role:</span>
@@ -591,7 +597,7 @@ const StaffCard = ({ staffMember, onDetails, onToggleStatus, onResetPassword, ac
           <span className="text-gray-900">{staffMember.phone || '-'}</span>
         </div>
       </div>
-      
+
       <div className="flex items-center justify-between pt-4 border-t">
         <span className={`px-3 py-1 rounded-full text-xs font-medium ${roleStyle.bg} ${roleStyle.text}`}>
           <i className={`${roleStyle.icon} mr-1`}></i>
@@ -628,22 +634,22 @@ const StaffCard = ({ staffMember, onDetails, onToggleStatus, onResetPassword, ac
 }
 
 // StaffFormModal component
-const StaffFormModal = ({ 
-  isOpen, 
-  onClose, 
-  title, 
-  onSubmit, 
-  formData, 
-  onInputChange, 
-  submitText, 
+const StaffFormModal = ({
+  isOpen,
+  onClose,
+  title,
+  onSubmit,
+  formData,
+  onInputChange,
+  submitText,
   submitIcon,
   onCancel,
   fieldErrors,
   submitLoading
 }) => (
   <Modal isOpen={isOpen} onClose={onClose} title={title} size="lg">
-    <StaffForm 
-      formData={formData} 
+    <StaffForm
+      formData={formData}
       onInputChange={onInputChange}
       onCancel={onCancel}
       onSubmit={onSubmit}
@@ -761,7 +767,7 @@ const StaffForm = ({ formData, onInputChange, onCancel, onSubmit, submitText, su
             </div>
           </div>
         ))}
-        
+
         <div className="relative">
           <label className="block text-sm font-medium text-gray-700 mb-2">Joining Date *</label>
           <div className="relative">
