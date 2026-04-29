@@ -63,21 +63,14 @@ const DataTable = ({
             <tr className='text-center'>
               {selectable && (
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
-                  <input
-                    type="checkbox"
-                    checked={selectedRows.size === data.length && data.length > 0}
-                    onChange={handleSelectAll}
-                    className="rounded border-gray-300 px-2 text-blue-600 focus:ring-blue-500"
-                  />
+                  <input type="checkbox" checked={selectedRows.size === data.length && data.length > 0}
+                    onChange={handleSelectAll} className="rounded border-gray-300 px-2 text-blue-600 focus:ring-blue-500" />
                 </th>
               )}
               {columns.map(column => (
-                <th
-                  key={column.key}
-                  className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                  onClick={() => column.sortable && handleSort(column.key)}
-                >
-                  <div className="flex items-center gap-1">
+                <th key={column.key} className={`px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100
+                  ${column.className || ''}`} onClick={() => column.sortable && handleSort(column.key)}>
+                  <div className="flex items-center gap-1 justify-center">
                     {column.title}
                     {column.sortable && (
                       <i className={`fas fa-sort text-gray-400 text-xs ${
@@ -91,18 +84,11 @@ const DataTable = ({
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {sortedData.map((row, index) => (
-              <tr
-                key={index}
-                className={`hover:bg-gray-50 transition-colors ${
-                  onRowClick ? 'cursor-pointer' : ''
-                } ${selectedRows.has(index) ? 'bg-blue-50' : ''}`}
-                onClick={() => onRowClick?.(row)}
-              >
+              <tr key={index} className={`hover:bg-gray-50 transition-colors
+                ${onRowClick ? 'cursor-pointer' : ''} ${selectedRows.has(index) ? 'bg-blue-50' : ''}`} onClick={() => onRowClick?.(row)}>
                 {selectable && (
-                  <td className="px-6 py-2 whitespace-nowrap">
-                    <input
-                      type="checkbox"
-                      checked={selectedRows.has(index)}
+                  <td className="px-6 py-2 whitespace-nowrap text-center">
+                    <input type="checkbox" checked={selectedRows.has(index)}
                       onChange={(e) => {
                         e.stopPropagation()
                         handleSelectRow(index, row)
@@ -112,7 +98,7 @@ const DataTable = ({
                   </td>
                 )}
                 {columns.map(column => (
-                  <td key={column.key} className="px-6 py-2 whitespace-nowrap text-sm text-gray-900">
+                  <td key={column.key} className={`px-6 py-2 whitespace-nowrap text-sm text-gray-900 text-center ${column.className || ''}`}>
                     {column.render ? column.render(row[column.key], row) : row[column.key]}
                   </td>
                 ))}

@@ -129,10 +129,7 @@ const LabOverview = () => {
           <p className="font-semibold text-gray-900 mb-2">{label}</p>
           {payload.map((entry, index) => (
             <div key={index} className="flex items-center gap-2 mb-1">
-              <div 
-                className="w-3 h-3 rounded-full" 
-                style={{ backgroundColor: entry.color || entry.fill }}
-              ></div>
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color || entry.fill }} ></div>
               <span className="text-sm text-gray-600">{entry.name}:</span>
               <span className="text-sm font-semibold ml-auto">{entry.value}</span>
             </div>
@@ -199,21 +196,16 @@ const LabOverview = () => {
 
   // Equipment performance data
   const equipmentPerformance = dashboardData.equipmentPerformance || []
-
   // Daily trends data
   const dailyTrends = dashboardData.dailyTrends || []
-
   // Test category data for pie chart
   const testCategoryData = dashboardData.testCategoryData || []
-
   // Turnaround data for radar chart
   const turnaroundData = dashboardData.turnaroundData || []
-
   // Test volume data for combo chart
   const testVolumeData = dashboardData.testVolumeData || []
 
   if (loading) return <LoadingSpinner />
-
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -250,10 +242,8 @@ const LabOverview = () => {
               </p>
             </div>
           </div>
-          <button 
-            onClick={() => handleQuickAction('equipment-tracking')}
-            className="text-yellow-600 hover:text-yellow-800 text-sm font-medium whitespace-nowrap"
-          >
+          <button onClick={() => handleQuickAction('equipment-tracking')}
+            className="text-yellow-600 hover:text-yellow-800 text-sm font-medium whitespace-nowrap" >
             View all →
           </button>
         </div>
@@ -280,11 +270,7 @@ const LabOverview = () => {
             {/* Mini bar chart visualization */}
             <div className="flex items-end gap-1 h-14">
               {[7, 10, 8, 12, 9, 6, 11].map((height, index) => (
-                <div 
-                  key={index}
-                  className="w-1.5 rounded-t-lg bg-gradient-to-t from-blue-400 to-blue-300"
-                  style={{ height: `${height * 3}px` }}
-                ></div>
+                <div key={index} className="w-1.5 rounded-t-lg bg-gradient-to-t from-blue-400 to-blue-300" style={{ height: `${height * 3}px` }}></div>
               ))}
             </div>
           </div>
@@ -335,23 +321,9 @@ const LabOverview = () => {
             {/* Progress circle */}
             <div className="relative h-14 w-14">
               <svg className="w-full h-full" viewBox="0 0 36 36">
-                <path
-                  d="M18 2.0845
-                    a 15.9155 15.9155 0 0 1 0 31.831
-                    a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  stroke="#e5e7eb"
-                  strokeWidth="3"
-                />
-                <path
-                  d="M18 2.0845
-                    a 15.9155 15.9155 0 0 1 0 31.831
-                    a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  stroke="#10b981"
-                  strokeWidth="3"
-                  strokeDasharray={`${(dashboardData.stats.completedTests / dashboardData.stats.totalTests) * 100}, 100`}
-                />
+                <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#e5e7eb" strokeWidth="3"/>
+                <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#10b981" strokeWidth="3"
+                  strokeDasharray={`${(dashboardData.stats.completedTests / dashboardData.stats.totalTests) * 100}, 100`}/>
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-green-600 font-bold text-sm">
@@ -381,28 +353,14 @@ const LabOverview = () => {
             {/* Warning triangle */}
             <div className="relative h-12 w-12">
               <svg width="48" height="48" viewBox="0 0 48 48">
-                <path 
-                  d="M24 4 L44 44 L4 44 Z" 
-                  fill="url(#redGradient)" 
-                  stroke="#ef4444" 
-                  strokeWidth="2"
-                />
+                <path d="M24 4 L44 44 L4 44 Z" fill="url(#redGradient)" stroke="#ef4444" strokeWidth="2"/>
                 <defs>
                   <linearGradient id="redGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" stopColor="#fecaca" />
                     <stop offset="100%" stopColor="#fee2e2" />
                   </linearGradient>
                 </defs>
-                <text 
-                  x="24" 
-                  y="32" 
-                  textAnchor="middle" 
-                  fill="#ef4444" 
-                  fontSize="16" 
-                  fontWeight="bold"
-                >
-                  !
-                </text>
+                <text x="24" y="32" textAnchor="middle" fill="#ef4444" fontSize="16" fontWeight="bold">!</text>
               </svg>
             </div>
           </div>
@@ -441,32 +399,12 @@ const LabOverview = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={testVolumeData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                  <XAxis 
-                    dataKey="hour" 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#6b7280', fontSize: 12 }}
-                  />
-                  <YAxis 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#6b7280', fontSize: 12 }}
-                  />
+                  <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }}/>
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }}/>
                   <ReTooltip content={<CustomTooltip />} />
                   <Legend />
-                  <Bar 
-                    dataKey="tests" 
-                    name="Tests Received"
-                    fill="#3b82f6"
-                    radius={[4, 4, 0, 0]}
-                    opacity={0.8}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="completed" 
-                    name="Tests Completed"
-                    stroke="#10b981"
-                    strokeWidth={3}
+                  <Bar dataKey="tests" name="Tests Received" fill="#3b82f6" radius={[4, 4, 0, 0]} opacity={0.8}/>
+                  <Line type="monotone" dataKey="completed" name="Tests Completed" stroke="#10b981" strokeWidth={3}
                     dot={{ r: 4, fill: "#10b981", strokeWidth: 2, stroke: "#fff" }}
                     activeDot={{ r: 6, fill: "#10b981", stroke: "#fff", strokeWidth: 2 }}
                   />
@@ -500,18 +438,10 @@ const LabOverview = () => {
               <div style={{ width: '100%', height: 200 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie
-                      data={testCategoryData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={40}
-                      outerRadius={70}
-                      paddingAngle={2}
-                      dataKey="value"
-                      nameKey="name"
+                    <Pie data={testCategoryData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={2}
+                      dataKey="value" nameKey="name"
                       label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      labelLine={false}
-                    >
+                      labelLine={false}>
                       {testCategoryData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
@@ -561,10 +491,7 @@ const LabOverview = () => {
                   <p className="text-sm text-gray-500">Current processing status</p>
                 </div>
               </div>
-              <button 
-                onClick={() => handleQuickAction('test-registration')}
-                className="text-sm text-green-600 hover:text-green-800 font-medium"
-              >
+              <button onClick={() => handleQuickAction('test-registration')} className="text-sm text-green-600 hover:text-green-800 font-medium">
                 View Details →
               </button>
             </div>
@@ -573,26 +500,10 @@ const LabOverview = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={testsByStatus}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                  <XAxis 
-                    dataKey="status" 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#6b7280', fontSize: 11 }}
-                    angle={-45}
-                    textAnchor="end"
-                    height={60}
-                  />
-                  <YAxis 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#6b7280', fontSize: 12 }}
-                  />
+                  <XAxis dataKey="status" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} angle={-45} textAnchor="end" height={60}/>
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }}/>
                   <ReTooltip content={<CustomTooltip />} />
-                  <Bar 
-                    dataKey="count" 
-                    name="Test Count"
-                    radius={[4, 4, 0, 0]}
-                  >
+                  <Bar dataKey="count" name="Test Count" radius={[4, 4, 0, 0]}>
                     {testsByStatus.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
@@ -633,38 +544,12 @@ const LabOverview = () => {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                  <XAxis 
-                    dataKey="time" 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#6b7280', fontSize: 12 }}
-                  />
-                  <YAxis 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#6b7280', fontSize: 12 }}
-                    domain={[90, 110]}
-                  />
+                  <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }}/>
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} domain={[90, 110]}/>
                   <ReTooltip content={<CustomTooltip />} />
-                  <Area 
-                    type="monotone" 
-                    dataKey="value" 
-                    name="QC Value"
-                    stroke="#06b6d4" 
-                    strokeWidth={3}
-                    fillOpacity={1} 
-                    fill="url(#colorValue)"
-                    activeDot={{ r: 6, fill: "#06b6d4", stroke: "#fff", strokeWidth: 2 }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey={100} 
-                    stroke="#ef4444" 
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    dot={false}
-                    name="Target"
-                  />
+                  <Area type="monotone" dataKey="value" name="QC Value" stroke="#06b6d4" strokeWidth={3} fillOpacity={1} 
+                    fill="url(#colorValue)" activeDot={{ r: 6, fill: "#06b6d4", stroke: "#fff", strokeWidth: 2 }}/>
+                  <Line type="monotone" dataKey={100} stroke="#ef4444" strokeWidth={2} strokeDasharray="5 5" dot={false} name="Target"/>
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -719,45 +604,14 @@ const LabOverview = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={equipmentPerformance}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                  <XAxis 
-                    dataKey="name" 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#6b7280', fontSize: 11 }}
-                  />
-                  <YAxis 
-                    yAxisId="left"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#6b7280', fontSize: 12 }}
-                    domain={[80, 100]}
-                  />
-                  <YAxis 
-                    yAxisId="right"
-                    orientation="right"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#6b7280', fontSize: 12 }}
-                  />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }}/>
+                  <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} domain={[80, 100]}/>
+                  <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }}/>
                   <ReTooltip content={<CustomTooltip />} />
                   <Legend />
-                  <Bar 
-                    yAxisId="right"
-                    dataKey="downtime" 
-                    name="Downtime (hrs)"
-                    fill="#fb7185"
-                    radius={[4, 4, 0, 0]}
-                    opacity={0.8}
-                  />
-                  <Line 
-                    yAxisId="left"
-                    type="monotone" 
-                    dataKey="efficiency" 
-                    name="Efficiency %"
-                    stroke="#4f46e5"
-                    strokeWidth={3}
-                    dot={{ r: 4, fill: "#4f46e5", strokeWidth: 2, stroke: "#fff" }}
-                  />
+                  <Bar yAxisId="right" dataKey="downtime" name="Downtime (hrs)" fill="#fb7185" radius={[4, 4, 0, 0]} opacity={0.8}/>
+                  <Line yAxisId="left" type="monotone" dataKey="efficiency" name="Efficiency %" stroke="#4f46e5" strokeWidth={3}
+                    dot={{ r: 4, fill: "#4f46e5", strokeWidth: 2, stroke: "#fff" }}/>
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -788,34 +642,12 @@ const LabOverview = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dailyTrends}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                  <XAxis 
-                    dataKey="day" 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#6b7280', fontSize: 12 }}
-                  />
-                  <YAxis 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#6b7280', fontSize: 12 }}
-                  />
+                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }}/>
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }}/>
                   <ReTooltip content={<CustomTooltip />} />
                   <Legend />
-                  <Bar 
-                    dataKey="tests" 
-                    name="Total Tests"
-                    fill="#8b5cf6"
-                    radius={[4, 4, 0, 0]}
-                    opacity={0.8}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="critical" 
-                    name="Critical Results"
-                    stroke="#ef4444"
-                    strokeWidth={2}
-                    dot={{ r: 4, fill: "#ef4444", strokeWidth: 2, stroke: "#fff" }}
-                  />
+                  <Bar dataKey="tests" name="Total Tests" fill="#8b5cf6" radius={[4, 4, 0, 0]} opacity={0.8}/>
+                  <Line type="monotone" dataKey="critical" name="Critical Results" stroke="#ef4444" strokeWidth={2} dot={{ r: 4, fill: "#ef4444", strokeWidth: 2, stroke: "#fff" }}/>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -839,12 +671,7 @@ const LabOverview = () => {
                   <p className="text-sm text-gray-500">Require immediate attention</p>
                 </div>
               </div>
-              <button 
-                onClick={() => handleQuickAction('test-registration')}
-                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-              >
-                View All →
-              </button>
+              <button onClick={() => handleQuickAction('test-registration')} className="text-sm text-blue-600 hover:text-blue-800 font-medium">View All →</button>
             </div>
             <DataTable
               columns={[
@@ -852,10 +679,7 @@ const LabOverview = () => {
                 { key: 'patient', title: 'Patient', sortable: true },
                 { key: 'test', title: 'Test', sortable: true },
                 { key: 'received', title: 'Received', sortable: true },
-                { 
-                  key: 'priority', 
-                  title: 'Priority', 
-                  sortable: true,
+                { key: 'priority', title: 'Priority', sortable: true,
                   render: (value) => (
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                       value === 'urgent' 
@@ -889,12 +713,7 @@ const LabOverview = () => {
                   <p className="text-sm text-gray-500">Require physician notification</p>
                 </div>
               </div>
-              <button 
-                onClick={() => handleQuickAction('critical-results')}
-                className="text-sm text-red-600 hover:text-red-800 font-medium"
-              >
-                View All →
-              </button>
+              <button onClick={() => handleQuickAction('critical-results')} className="text-sm text-red-600 hover:text-red-800 font-medium">View All →</button>
             </div>
             <DataTable
               columns={[
@@ -902,10 +721,7 @@ const LabOverview = () => {
                 { key: 'patient', title: 'Patient', sortable: true },
                 { key: 'test', title: 'Test', sortable: true },
                 { key: 'value', title: 'Value', sortable: true },
-                { 
-                  key: 'alert', 
-                  title: 'Alert', 
-                  sortable: true,
+                { key: 'alert', title: 'Alert', sortable: true,
                   render: (value) => (
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                       value.includes('Critical') 
@@ -917,10 +733,7 @@ const LabOverview = () => {
                     </span>
                   )
                 },
-                { 
-                  key: 'notified', 
-                  title: 'Notified', 
-                  sortable: true,
+                { key: 'notified', title: 'Notified', sortable: true,
                   render: (value) => (
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                       value === 'Yes' 
@@ -955,21 +768,13 @@ const LabOverview = () => {
                   <p className="text-sm text-gray-500">Operational status overview</p>
                 </div>
               </div>
-              <button 
-                onClick={() => handleQuickAction('equipment-tracking')}
-                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-              >
-                Manage →
-              </button>
+              <button onClick={() => handleQuickAction('equipment-tracking')} className="text-sm text-blue-600 hover:text-blue-800 font-medium">Manage →</button>
             </div>
             <DataTable
               columns={[
                 { key: 'id', title: 'Equipment ID', sortable: true },
                 { key: 'name', title: 'Equipment', sortable: true },
-                { 
-                  key: 'status', 
-                  title: 'Status', 
-                  sortable: true,
+                { key: 'status', title: 'Status', sortable: true,
                   render: (value) => (
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                       value === 'Operational' ? 'bg-gradient-to-r from-green-100 to-green-50 text-green-700 border border-green-200' :
@@ -1008,20 +813,12 @@ const LabOverview = () => {
                   <p className="text-sm text-gray-500">Quality control results</p>
                 </div>
               </div>
-              <button 
-                onClick={() => handleQuickAction('quality-control')}
-                className="text-sm text-green-600 hover:text-green-800 font-medium"
-              >
-                View All →
-              </button>
+              <button onClick={() => handleQuickAction('quality-control')} className="text-sm text-green-600 hover:text-green-800 font-medium">View All →</button>
             </div>
             <DataTable
               columns={[
                 { key: 'test', title: 'Test', sortable: true },
-                { 
-                  key: 'status', 
-                  title: 'Status', 
-                  sortable: true,
+                { key: 'status', title: 'Status', sortable: true,
                   render: (value) => (
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                       value === 'Passed' ? 'bg-gradient-to-r from-green-100 to-green-50 text-green-700 border border-green-200' :
@@ -1054,10 +851,8 @@ const LabOverview = () => {
         <div className="relative">
           <h3 className="text-lg font-semibold mb-6">Quick Actions</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <button 
-              className="p-4 border border-gray-200 rounded-xl hover:bg-blue-50 hover:border-blue-300 hover:shadow-sm transition-all text-center group hover:-translate-y-1 duration-300"
-              onClick={() => handleQuickAction('test-registration')}
-            >
+            <button className="p-4 border border-gray-200 rounded-xl hover:bg-blue-50 hover:border-blue-300 hover:shadow-sm transition-all text-center group hover:-translate-y-1 duration-300"
+              onClick={() => handleQuickAction('test-registration')}>
               <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform duration-300">
                 <i className="fas fa-vial text-blue-600 text-xl"></i>
               </div>
@@ -1065,10 +860,8 @@ const LabOverview = () => {
               <p className="text-xs text-gray-500 mt-1">New test registration</p>
             </button>
             
-            <button 
-              className="p-4 border border-gray-200 rounded-xl hover:bg-green-50 hover:border-green-300 hover:shadow-sm transition-all text-center group hover:-translate-y-1 duration-300"
-              onClick={() => handleQuickAction('sample-tracking')}
-            >
+            <button className="p-4 border border-gray-200 rounded-xl hover:bg-green-50 hover:border-green-300 hover:shadow-sm transition-all text-center group hover:-translate-y-1 duration-300"
+              onClick={() => handleQuickAction('sample-tracking')}>
               <div className="w-12 h-12 bg-gradient-to-br from-green-100 to-green-200 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform duration-300">
                 <i className="fas fa-qrcode text-green-600 text-xl"></i>
               </div>
@@ -1076,10 +869,8 @@ const LabOverview = () => {
               <p className="text-xs text-gray-500 mt-1">Scan & track samples</p>
             </button>
             
-            <button 
-              className="p-4 border border-gray-200 rounded-xl hover:bg-yellow-50 hover:border-yellow-300 hover:shadow-sm transition-all text-center group hover:-translate-y-1 duration-300"
-              onClick={() => handleQuickAction('report-generation')}
-            >
+            <button className="p-4 border border-gray-200 rounded-xl hover:bg-yellow-50 hover:border-yellow-300 hover:shadow-sm transition-all text-center group hover:-translate-y-1 duration-300"
+              onClick={() => handleQuickAction('report-generation')}>
               <div className="w-12 h-12 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform duration-300">
                 <i className="fas fa-file-medical text-yellow-600 text-xl"></i>
               </div>
@@ -1087,10 +878,8 @@ const LabOverview = () => {
               <p className="text-xs text-gray-500 mt-1">Create lab reports</p>
             </button>
             
-            <button 
-              className="p-4 border border-gray-200 rounded-xl hover:bg-purple-50 hover:border-purple-300 hover:shadow-sm transition-all text-center group hover:-translate-y-1 duration-300"
-              onClick={() => handleQuickAction('quality-control')}
-            >
+            <button className="p-4 border border-gray-200 rounded-xl hover:bg-purple-50 hover:border-purple-300 hover:shadow-sm transition-all text-center group hover:-translate-y-1 duration-300"
+              onClick={() => handleQuickAction('quality-control')}>
               <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-purple-200 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform duration-300">
                 <i className="fas fa-chart-line text-purple-600 text-xl"></i>
               </div>
@@ -1100,30 +889,24 @@ const LabOverview = () => {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6">
-            <button 
-              className="p-3 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:shadow-sm transition-all text-center group"
-              onClick={() => handleQuickAction('test-catalogue')}
-            >
+            <button className="p-3 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:shadow-sm transition-all text-center group"
+              onClick={() => handleQuickAction('test-catalogue')}>
               <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
                 <i className="fas fa-book-medical text-blue-600"></i>
               </div>
               <p className="font-medium text-sm text-gray-800">Test Catalogue</p>
             </button>
             
-            <button 
-              className="p-3 border border-gray-200 rounded-lg hover:bg-green-50 hover:border-green-300 hover:shadow-sm transition-all text-center group"
-              onClick={() => handleQuickAction('equipment-tracking')}
-            >
+            <button className="p-3 border border-gray-200 rounded-lg hover:bg-green-50 hover:border-green-300 hover:shadow-sm transition-all text-center group"
+              onClick={() => handleQuickAction('equipment-tracking')}>
               <div className="w-10 h-10 bg-gradient-to-br from-green-100 to-green-200 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
                 <i className="fas fa-microscope text-green-600"></i>
               </div>
               <p className="font-medium text-sm text-gray-800">Equipment</p>
             </button>
             
-            <button 
-              className="p-3 border border-gray-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 hover:shadow-sm transition-all text-center group"
-              onClick={() => handleQuickAction('result-access')}
-            >
+            <button className="p-3 border border-gray-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 hover:shadow-sm transition-all text-center group"
+              onClick={() => handleQuickAction('result-access')}>
               <div className="w-10 h-10 bg-gradient-to-br from-purple-100 to-purple-200 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
                 <i className="fas fa-shield-alt text-purple-600"></i>
               </div>

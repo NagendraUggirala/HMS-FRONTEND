@@ -19,12 +19,14 @@ const LabDashboard = () => {
   const [activePage, setActivePage] = useState('lab-dashboard')
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true)
+  const [navigationData, setNavigationData] = useState(null)
 
   // Add event listener for header navigation
   useEffect(() => {
     const handleDashboardNavigation = (event) => {
-      const { page } = event.detail;
+      const { page, ...data } = event.detail;
       setActivePage(page);
+      setNavigationData(data);
       // Close mobile sidebar if open
       if (isMobileSidebarOpen) {
         setIsMobileSidebarOpen(false);
@@ -57,7 +59,7 @@ const LabDashboard = () => {
       case 'report-generation':
         return <ReportGeneration />
       case 'result-access':
-        return <ResultAccess />
+        return <ResultAccess initialSearch={navigationData?.searchTerm} />
       case 'test-catalogue':
         return <TestCatalogue />
       case 'equipment-tracking':
@@ -91,7 +93,7 @@ const LabDashboard = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Fixed Header */}
       <div className="fixed top-0 left-0 right-0 z-50">
-        <Header 
+        <Header
           onMenuToggle={handleMobileMenuToggle}
           onSidebarToggle={handleDesktopSidebarToggle}
           isSidebarOpen={isDesktopSidebarOpen}
@@ -104,24 +106,16 @@ const LabDashboard = () => {
         <div className={`hidden md:block fixed top-16 left-0 bottom-0 z-40 transition-transform duration-300 ${
           isDesktopSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}>
-          <Sidebar
-            activePage={activePage}
-            onPageChange={handlePageChange}
-            isOpen={isDesktopSidebarOpen}
-            onClose={() => setIsDesktopSidebarOpen(false)}
-          />
+          <Sidebar activePage={activePage} onPageChange={handlePageChange}
+            isOpen={isDesktopSidebarOpen} onClose={() => setIsDesktopSidebarOpen(false)} />
         </div>
         
         {/* Mobile Sidebar - Fixed position */}
         <div className={`md:hidden fixed top-0 left-0 bottom-0 z-40 transition-transform duration-300 ${
           isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}>
-          <Sidebar
-            activePage={activePage}
-            onPageChange={handlePageChange}
-            isOpen={isMobileSidebarOpen}
-            onClose={handleMobileSidebarClose}
-          />
+          <Sidebar activePage={activePage} onPageChange={handlePageChange}
+            isOpen={isMobileSidebarOpen} onClose={handleMobileSidebarClose} />
         </div>
        
         {/* Main Content */}
@@ -136,10 +130,8 @@ const LabDashboard = () => {
      
       {/* Mobile Overlay */}
       {isMobileSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
-          onClick={handleMobileSidebarClose}
-        />
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
+          onClick={handleMobileSidebarClose} />
       )}
     </div>
   )

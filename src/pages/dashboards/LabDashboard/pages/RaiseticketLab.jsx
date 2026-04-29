@@ -86,29 +86,23 @@ const SupportManagement = () => {
   const fetchTickets = async () => {
     setLoading(true);
     setConnectionError(false);
-    
     try {
       if (!token) {
         toast.warning('Please login to view tickets');
         setLoading(false);
         return;
       }
-      
       const queryParams = new URLSearchParams({
         skip: filters.skip,
         limit: filters.limit,
         completed_only: false
       });
-      
       if (filters.status) {
         queryParams.append('status', filters.status);
       }
-      
       const endpoint = `/api/v1/support/staff/tickets?${queryParams.toString()}`;
       console.log('Fetching tickets from:', endpoint);
-      
       const response = await apiFetch(endpoint, { method: "GET" });
-
       if (!response.ok) {
         if (response.status === 401) {
           toast.error('Authentication failed. Please login again.');
@@ -124,12 +118,9 @@ const SupportManagement = () => {
         }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-
       const data = await response.json();
       console.log('Tickets API Response:', data);
-      
       let ticketsData = data?.tickets || [];
-      
       // Sort by priority
       const priorityOrder = { 'CRITICAL': 1, 'URGENT': 2, 'HIGH': 3, 'NORMAL': 4, 'LOW': 5 };
       ticketsData = [...ticketsData].sort((a, b) => {
@@ -138,88 +129,80 @@ const SupportManagement = () => {
         if (orderA !== orderB) return orderA - orderB;
         return new Date(b.created_at) - new Date(a.created_at);
       });
-      
       setTickets(ticketsData);
       updateStats(ticketsData);
-      
       setPagination({
         total: data?.total || ticketsData.length,
         skip: data?.skip || filters.skip,
         limit: data?.limit || filters.limit
       });
       setConnectionError(false);
-
-    } catch (error) {
+    }
+    catch (error) {
       console.error("Fetch error:", error);
       if (error.message.includes('Failed to fetch')) {
         setConnectionError(true);
         toast.error('Cannot connect to server');
-      } else {
+      }
+      else {
         toast.error(error.message || 'Failed to fetch tickets');
       }
       setTickets([]);
       updateStats([]);
-    } finally {
+    }
+    finally {
       setLoading(false);
     }
   };
 
   const validateForm = () => {
     const errors = {};
-    
     if (!formData.subject.trim()) {
       errors.subject = "Subject is required";
-    } else if (formData.subject.trim().length < 3) {
+    }
+    else if (formData.subject.trim().length < 3) {
       errors.subject = "Subject must be at least 3 characters";
-    } else if (formData.subject.trim().length > 200) {
+    }
+    else if (formData.subject.trim().length > 200) {
       errors.subject = "Subject must not exceed 200 characters";
     }
-    
     if (!formData.description.trim()) {
       errors.description = "Description is required";
-    } else if (formData.description.trim().length < 5) {
+    }
+    else if (formData.description.trim().length < 5) {
       errors.description = "Description must be at least 5 characters";
-    } else if (formData.description.trim().length > 1000) {
+    }
+    else if (formData.description.trim().length > 1000) {
       errors.description = "Description must not exceed 1000 characters";
     }
-    
     if (!formData.priority) {
       errors.priority = "Priority is required";
     }
-    
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const handleCreateTicket = async (e) => {
     e.preventDefault();
-    
     if (!validateForm()) return;
-    
     setSubmitting(true);
-    
     try {
       if (!token) {
         toast.error('Please login to create a ticket');
         setSubmitting(false);
         return;
       }
-      
       const payload = {
         subject: formData.subject.trim(),
         description: formData.description.trim(),
         priority: formData.priority
       };
-      
       console.log('Creating ticket with payload:', payload);
-      
       const response = await apiFetch('/api/v1/support/staff/tickets', {
         method: "POST",
         body: payload,
       });
-      
       const responseData = await response.json();
-      
       if (!response.ok) {
         if (response.status === 422 && responseData.detail) {
           const validationErrors = responseData.detail;
@@ -237,9 +220,7 @@ const SupportManagement = () => {
         }
         throw new Error(responseData.message || responseData.detail || `Failed to create ticket: ${response.statusText}`);
       }
-      
       toast.success(`✅ ${responseData.message || 'Ticket created successfully!'}`);
-      
       setFormData({
         subject: '',
         description: '',
@@ -247,13 +228,13 @@ const SupportManagement = () => {
       });
       setFormErrors({});
       setShowCreateModal(false);
-      
       await fetchTickets();
-      
-    } catch (error) {
+    }
+    catch (error) {
       console.error("Create ticket error:", error);
       toast.error(error.message || "Failed to create ticket. Please try again.");
-    } finally {
+    }
+    finally {
       setSubmitting(false);
     }
   };
@@ -340,13 +321,9 @@ const SupportManagement = () => {
         <ToastContainer position="top-right" autoClose={5000} />
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
           <h3 className="text-lg font-medium text-red-800">Cannot Connect to Server</h3>
-          <p className="mt-1 text-sm text-red-600">
-            Please ensure the backend server is running
-          </p>
-          <button
-            onClick={() => fetchTickets()}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-          >
+          <p className="mt-1 text-sm text-red-600">Please ensure the backend server is running</p>
+          <button onClick={() => fetchTickets()}
+            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700" >
             Retry Connection
           </button>
         </div>
@@ -456,22 +433,16 @@ const SupportManagement = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
-              <input
-                type="text"
-                placeholder="Search tickets by ID, subject, status, or priority..."
+              <input type="text" placeholder="Search tickets by ID, subject, status, or priority..."
                 className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <select
-              className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-              value={filters.status}
-              onChange={(e) => handleFilterChange('status', e.target.value)}
-            >
+            <select className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+              value={filters.status} onChange={(e) => handleFilterChange('status', e.target.value)} >
               <option value="">All Status</option>
               <option value="OPEN">Open</option>
               <option value="IN_PROGRESS">In Progress</option>
@@ -479,10 +450,8 @@ const SupportManagement = () => {
               <option value="CLOSED">Closed</option>
             </select>
 
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="px-5 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:shadow-lg transition-all duration-200 font-medium flex items-center gap-2"
-            >
+            <button onClick={() => setShowCreateModal(true)}
+              className="px-5 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:shadow-lg transition-all duration-200 font-medium flex items-center gap-2" >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
@@ -508,10 +477,8 @@ const SupportManagement = () => {
             </div>
             <h3 className="text-lg font-semibold text-gray-700 mb-2">No tickets found</h3>
             <p className="text-gray-500 mb-6">Create your first support ticket</p>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:shadow-lg transition-all"
-            >
+            <button onClick={() => setShowCreateModal(true)}
+              className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:shadow-lg transition-all" >
               Create First Ticket
             </button>
           </div>
@@ -521,53 +488,51 @@ const SupportManagement = () => {
               <table className="w-full">
                 <thead>
                   <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-                    <th className="py-4 px-6 text-left text-sm font-semibold text-gray-700">Ticket ID</th>
-                    <th className="py-4 px-6 text-left text-sm font-semibold text-gray-700">Subject</th>
-                    <th className="py-4 px-6 text-left text-sm font-semibold text-gray-700">Status</th>
-                    <th className="py-4 px-6 text-left text-sm font-semibold text-gray-700">Priority</th>
-                    <th className="py-4 px-6 text-left text-sm font-semibold text-gray-700">Created</th>
-                    <th className="py-4 px-6 text-left text-sm font-semibold text-gray-700">Last Updated</th>
-                    <th className="py-4 px-6 text-left text-sm font-semibold text-gray-700">Actions</th>
+                    <th className="py-4 px-6 text-center text-sm font-semibold text-gray-700">Ticket ID</th>
+                    <th className="py-4 px-6 text-center text-sm font-semibold text-gray-700">Subject</th>
+                    <th className="py-4 px-6 text-center text-sm font-semibold text-gray-700">Status</th>
+                    <th className="py-4 px-6 text-center text-sm font-semibold text-gray-700">Priority</th>
+                    <th className="py-4 px-6 text-center text-sm font-semibold text-gray-700">Created</th>
+                    <th className="py-4 px-6 text-center text-sm font-semibold text-gray-700">Last Updated</th>
+                    <th className="py-4 px-6 text-center text-sm font-semibold text-gray-700">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredTickets.map((ticket) => (
                     <tr key={ticket.id} className="border-b border-gray-100 hover:bg-blue-50/30 transition-all duration-300">
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-6 text-center">
                         <p className="font-mono font-semibold text-blue-600 text-sm">
                           {formatTicketId(ticket.id)}
                         </p>
                       </td>
-                      <td className="py-4 px-6">
-                        <p className="text-gray-700 max-w-md truncate" title={ticket.subject}>
+                      <td className="py-4 px-6 text-center">
+                        <p className="text-gray-700 max-w-md mx-auto truncate" title={ticket.subject}>
                           {ticket.subject}
                         </p>
                       </td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-6 text-center">
                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusBadgeClass(ticket.status)}`}>
                           {ticket.status}
                         </span>
                       </td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-6 text-center">
                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${getPriorityBadgeClass(ticket.priority)}`}>
                           {ticket.priority}
                         </span>
                       </td>
-                      <td className="py-4 px-6 text-sm text-gray-500">
+                      <td className="py-4 px-6 text-center text-sm text-gray-500">
                         {formatDate(ticket.created_at)}
                        </td>
-                      <td className="py-4 px-6 text-sm text-gray-500">
+                      <td className="py-4 px-6 text-center text-sm text-gray-500">
                         {formatDate(ticket.updated_at)}
                        </td>
-                      <td className="py-4 px-6">
-                        <button
-                          onClick={() => {
+                      <td className="py-4 px-6 text-center">
+                        <button onClick={() => {
                             setSelectedTicket(ticket);
                             setShowViewModal(true);
                           }}
                           className="w-8 h-8 bg-blue-100 text-blue-600 hover:bg-blue-200 rounded-lg flex items-center justify-center transition-colors"
-                          title="View Details"
-                        >
+                          title="View Details" >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -583,33 +548,27 @@ const SupportManagement = () => {
             {/* Pagination */}
             <div className="px-6 py-4 bg-white border-t border-gray-200 flex items-center justify-between">
               <div className="text-sm text-gray-700">
-                Showing <span className="font-medium">{pagination.skip + 1}</span> to{' '}
+                Showing <span className="font-medium">{pagination.skip + 1}</span> to
                 <span className="font-medium">
                   {Math.min(pagination.skip + pagination.limit, pagination.total)}
-                </span>{' '}
+                </span>
                 of <span className="font-medium">{pagination.total}</span> results
               </div>
               <div className="flex space-x-2">
-                <button
-                  onClick={handlePrevPage}
-                  disabled={pagination.skip === 0}
+                <button onClick={handlePrevPage} disabled={pagination.skip === 0}
                   className={`px-3 py-1 rounded border ${
                     pagination.skip === 0
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                       : 'bg-white text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
+                  }`} >
                   Previous
                 </button>
-                <button
-                  onClick={handleNextPage}
-                  disabled={pagination.skip + pagination.limit >= pagination.total}
+                <button disabled={pagination.skip + pagination.limit >= pagination.total} onClick={handleNextPage}
                   className={`px-3 py-1 rounded border ${
                     pagination.skip + pagination.limit >= pagination.total
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                       : 'bg-white text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
+                  }`} >
                   Next
                 </button>
               </div>
@@ -619,22 +578,17 @@ const SupportManagement = () => {
       </div>
 
       {/* Create Ticket Modal (unchanged) */}
-      <Modal
-        isOpen={showCreateModal}
+      <Modal isOpen={showCreateModal}
         onClose={() => {
           setShowCreateModal(false);
           setFormErrors({});
         }}
-        title="Create Support Ticket"
-        size="lg"
-      >
+        title="Create Support Ticket" size="lg" >
         <form onSubmit={handleCreateTicket} className="space-y-6">
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Subject *</label>
-              <input
-                type="text"
-                value={formData.subject}
+              <input type="text" value={formData.subject}
                 onChange={(e) => {
                   setFormData({...formData, subject: e.target.value});
                   setFormErrors({...formErrors, subject: ''});
@@ -647,26 +601,21 @@ const SupportManagement = () => {
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Description *</label>
-              <textarea
-                value={formData.description}
+              <textarea value={formData.description}
                 onChange={(e) => {
                   setFormData({...formData, description: e.target.value});
                   setFormErrors({...formErrors, description: ''});
                 }}
-                rows="5"
+                rows="5" placeholder="Enter detailed description"
                 className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none transition-all ${formErrors.description ? 'border-red-400' : 'border-gray-200'}`}
-                placeholder="Enter detailed description"
               />
               {formErrors.description && <p className="mt-1 text-sm text-red-600">{formErrors.description}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Priority *</label>
-              <select
-                value={formData.priority}
-                onChange={(e) => setFormData({...formData, priority: e.target.value})}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-              >
+              <select value={formData.priority} onChange={(e) => setFormData({...formData, priority: e.target.value})}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all" >
                 <option value="CRITICAL">🔴 CRITICAL</option>
                 <option value="URGENT">🟠 URGENT</option>
                 <option value="HIGH">🟡 HIGH</option>
@@ -677,21 +626,16 @@ const SupportManagement = () => {
           </div>
 
           <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
-            <button
-              type="button"
+            <button type="button"
               onClick={() => {
                 setShowCreateModal(false);
                 setFormErrors({});
               }}
-              className="px-5 py-3 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-all duration-200 font-medium"
-            >
+              className="px-5 py-3 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-all duration-200 font-medium" >
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-5 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:shadow-lg transition-all duration-200 font-medium flex items-center gap-2 disabled:opacity-60"
-            >
+            <button type="submit" disabled={submitting}
+              className="px-5 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:shadow-lg transition-all duration-200 font-medium flex items-center gap-2 disabled:opacity-60" >
               {submitting ? (
                 <>
                   <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
@@ -711,12 +655,7 @@ const SupportManagement = () => {
       </Modal>
 
       {/* View Ticket Modal (unchanged) */}
-      <Modal
-        isOpen={showViewModal}
-        onClose={() => setShowViewModal(false)}
-        title="Ticket Details"
-        size="lg"
-      >
+      <Modal isOpen={showViewModal} onClose={() => setShowViewModal(false)} title="Ticket Details" size="lg" >
         {selectedTicket && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
@@ -794,10 +733,8 @@ const SupportManagement = () => {
             </div>
             
             <div className="flex justify-end">
-              <button
-                onClick={() => setShowViewModal(false)}
-                className="px-5 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200 font-medium"
-              >
+              <button onClick={() => setShowViewModal(false)}
+                className="px-5 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200 font-medium" >
                 Close
               </button>
             </div>
