@@ -1,6 +1,32 @@
 import React, { useState, useEffect } from 'react';
+import mammoth from 'mammoth';
+import {
+  PictureAsPdf as PictureAsPdfIcon,
+  Image as ImageIcon,
+  Description as DescriptionIcon,
+  InsertDriveFile as InsertDriveFileIcon,
+  Badge as BadgeIcon,
+  Person as PersonIcon,
+  Phone as PhoneIcon,
+  CalendarToday as CalendarTodayIcon,
+  AddCircle as AddCircleIcon,
+  Visibility as VisibilityIcon,
+  FileDownload as FileDownloadIcon,
+  CloudUpload as CloudUploadIcon,
+  Search as SearchIcon,
+  People as PeopleIcon,
+  Sick as SickIcon,
+  Assignment as AssignmentIcon,
+  Science as ScienceIcon,
+  Close as CloseIcon,
+  Upload as UploadIcon,
+  ChevronRight as ChevronRightIcon,
+  Info as InfoIcon
+} from '@mui/icons-material';
 import LoadingSpinner from '../../../../components/common/LoadingSpinner/LoadingSpinner';
 import Modal from '../../../../components/common/Modal/Modal';
+import { apiFetch } from '../../../../services/apiClient';
+import { RECEPTIONIST_PATIENT_SEARCH } from '../../../../config/api';
 
 const DocumentManagement = () => {
   const [loading, setLoading] = useState(true);
@@ -11,129 +37,100 @@ const DocumentManagement = () => {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [documentCategory, setDocumentCategory] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [documentToView, setDocumentToView] = useState(null);
+  const [showViewAllModal, setShowViewAllModal] = useState(false);
+  const [wordContent, setWordContent] = useState('');
+  const [wordLoading, setWordLoading] = useState(false);
   // Remove shared activeTab state
 
   useEffect(() => {
     loadPatientsData();
   }, []);
 
+  // Debounced search for patients
+  useEffect(() => {
+    if (searchTerm.trim()) {
+      const handler = setTimeout(() => {
+        searchPatients(searchTerm);
+      }, 500);
+      return () => clearTimeout(handler);
+    } else if (searchTerm === '') {
+      loadPatientsData();
+    }
+  }, [searchTerm]);
+
+  const searchPatients = async (query) => {
+    try {
+      const response = await apiFetch(`${RECEPTIONIST_PATIENT_SEARCH}?query=${encodeURIComponent(query)}`);
+      const json = await response.json();
+      if (json.success) {
+        const rawPatients = json.data?.patients || json.data || [];
+        const mappedPatients = rawPatients.map(p => ({
+          ...p,
+          id: p.patient_id || p.id || p._id,
+          name: p.name || p.patient_name || 'Unknown',
+          age: p.age || 'N/A',
+          gender: p.gender || 'N/A',
+          phone: p.phone || 'N/A',
+          lastVisit: p.last_visit || p.lastVisit || 'N/A',
+          documents: p.documents || []
+        }));
+        setPatients(mappedPatients);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (documentToView && documentToView.file && 
+       (documentToView.file.type.includes('word') || 
+        documentToView.file.name.toLowerCase().endsWith('.docx'))) {
+      
+      setWordLoading(true);
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const arrayBuffer = e.target.result;
+          const result = await mammoth.convertToHtml({ arrayBuffer });
+          setWordContent(result.value);
+        } catch (error) {
+          console.error('Error converting word document:', error);
+          setWordContent('<div class="text-center py-10"><p class="text-red-500">Error: Could not preview this Word document. Please download it to view.</p></div>');
+        } finally {
+          setWordLoading(false);
+        }
+      };
+      reader.readAsArrayBuffer(documentToView.file);
+    } else {
+      setWordContent('');
+    }
+  }, [documentToView]);
+
   const loadPatientsData = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setPatients([
-        {
-          id: 'PAT-001',
-          name: 'Ravi Kumar',
-          age: 32,
-          gender: 'Male',
-          phone: '+91 98765 43210',
-          lastVisit: '2023-10-15',
-          documents: [
-            {
-              id: 'DOC-001',
-              name: 'Aadhar Card',
-              type: 'ID Proof',
-              category: 'Registration',
-              size: '2.1 MB',
-              uploadedDate: '2023-10-01',
-              uploadedBy: 'Reception',
-              fileType: 'pdf'
-            },
-            {
-              id: 'DOC-002',
-              name: 'Previous Blood Report',
-              type: 'Lab Report',
-              category: 'Medical History',
-              size: '1.8 MB',
-              uploadedDate: '2023-09-15',
-              uploadedBy: 'Patient',
-              fileType: 'pdf'
-            },
-            {
-              id: 'DOC-003',
-              name: 'ECG Report',
-              type: 'Test Report',
-              category: 'Consultation',
-              size: '3.2 MB',
-              uploadedDate: '2023-10-15',
-              uploadedBy: 'Lab',
-              fileType: 'jpg'
-            }
-          ]
-        },
-        {
-          id: 'PAT-002',
-          name: 'Anita Sharma',
-          age: 28,
-          gender: 'Female',
-          phone: '+91 98765 43211',
-          lastVisit: '2023-10-10',
-          documents: [
-            {
-              id: 'DOC-004',
-              name: 'Insurance Card',
-              type: 'Insurance',
-              category: 'Registration',
-              size: '1.5 MB',
-              uploadedDate: '2023-10-10',
-              uploadedBy: 'Reception',
-              fileType: 'jpg'
-            },
-            {
-              id: 'DOC-005',
-              name: 'X-Ray Right Arm',
-              type: 'X-Ray',
-              category: 'Consultation',
-              size: '4.5 MB',
-              uploadedDate: '2023-10-10',
-              uploadedBy: 'Lab',
-              fileType: 'jpg'
-            }
-          ]
-        },
-        {
-          id: 'PAT-003',
-          name: 'Suresh Patel',
-          age: 45,
-          gender: 'Male',
-          phone: '+91 98765 43212',
-          lastVisit: '2023-10-05',
-          documents: [
-            {
-              id: 'DOC-006',
-              name: 'MRI Scan Report',
-              type: 'Scan Report',
-              category: 'Medical History',
-              size: '8.2 MB',
-              uploadedDate: '2023-09-28',
-              uploadedBy: 'Patient',
-              fileType: 'pdf'
-            },
-            {
-              id: 'DOC-007',
-              name: 'Blood Test Results',
-              type: 'Lab Report',
-              category: 'Consultation',
-              size: '1.2 MB',
-              uploadedDate: '2023-10-05',
-              uploadedBy: 'Lab',
-              fileType: 'pdf'
-            },
-            {
-              id: 'DOC-008',
-              name: 'Prescription Oct',
-              type: 'Prescription',
-              category: 'Consultation',
-              size: '0.8 MB',
-              uploadedDate: '2023-10-05',
-              uploadedBy: 'Dr. Menon',
-              fileType: 'pdf'
-            }
-          ]
-        }
-      ]);
+    try {
+      const response = await apiFetch(RECEPTIONIST_PATIENT_SEARCH);
+      const json = await response.json();
+      if (json.success) {
+        const rawPatients = json.data?.patients || json.data || [];
+        const mappedPatients = rawPatients.map(p => ({
+          ...p,
+          id: p.patient_id || p.id || p._id,
+          name: p.name || p.patient_name || 'Unknown',
+          age: p.age || 'N/A',
+          gender: p.gender || 'N/A',
+          phone: p.phone || 'N/A',
+          lastVisit: p.last_visit || p.lastVisit || 'N/A',
+          documents: p.documents || []
+        }));
+        setPatients(mappedPatients);
+      }
+    } catch (error) {
+      console.error('Error loading patients:', error);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   const handleFileSelect = (e) => {
@@ -169,9 +166,14 @@ const DocumentManagement = () => {
       category: 'Uploaded',
       size: file.size,
       uploadedDate: new Date().toISOString().split('T')[0],
-      uploadedBy: 'Reception',
-      fileType: file.type.toLowerCase().includes('pdf') ? 'pdf' : 
-                file.type.toLowerCase().includes('image') ? 'image' : 'file'
+      fileType: file.type.toLowerCase().includes('pdf') 
+  ? 'pdf'
+  : file.type.toLowerCase().includes('image') 
+  ? 'image'
+  : file.type.toLowerCase().includes('word') || file.name.endsWith('.doc') || file.name.endsWith('.docx')
+  ? 'doc'
+  : 'file',
+      file: file.file
     }));
 
     const updatedPatients = [...patients];
@@ -181,10 +183,30 @@ const DocumentManagement = () => {
     ];
 
     setPatients(updatedPatients);
+
+    // Update selectedPatient if it's the one we just uploaded to
+    if (selectedPatient && selectedPatient.id === updatedPatients[patientIndex].id) {
+      setSelectedPatient(updatedPatients[patientIndex]);
+    }
+
     setShowUploadModal(false);
     setUploadedFiles([]);
     setDocumentCategory('');
     alert('Documents uploaded successfully!');
+  };
+
+  const handleDownload = (doc) => {
+    if (doc.file) {
+      const url = URL.createObjectURL(doc.file);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', doc.name);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      alert(`Downloading ${doc.name} (Simulation)`);
+    }
   };
 
   const documentCategories = [
@@ -200,15 +222,15 @@ const DocumentManagement = () => {
   ];
 
   const getFileIcon = (fileType) => {
-    switch(fileType) {
-      case 'pdf': return 'fa-file-pdf';
+    switch (fileType) {
+      case 'pdf': return <PictureAsPdfIcon style={{ fontSize: '1.25rem' }} />;
       case 'jpg':
       case 'jpeg':
       case 'png':
-      case 'image': return 'fa-file-image';
+      case 'image': return <ImageIcon style={{ fontSize: '1.25rem' }} />;
       case 'doc':
-      case 'docx': return 'fa-file-word';
-      default: return 'fa-file';
+      case 'docx': return <DescriptionIcon style={{ fontSize: '1.25rem' }} />;
+      default: return <InsertDriveFileIcon style={{ fontSize: '1.25rem' }} />;
     }
   };
 
@@ -233,13 +255,13 @@ const DocumentManagement = () => {
 
     const getDocumentsByType = (documents, type) => {
       if (type === 'all') return documents;
-      if (type === 'medical') return documents.filter(d => 
+      if (type === 'medical') return documents.filter(d =>
         ['Previous Medical Reports', 'Prescription', 'Discharge Summary'].includes(d.type)
       );
-      if (type === 'reports') return documents.filter(d => 
+      if (type === 'reports') return documents.filter(d =>
         ['Lab Report', 'X-Ray', 'Scan Report', 'Test Report'].includes(d.type)
       );
-      if (type === 'other') return documents.filter(d => 
+      if (type === 'other') return documents.filter(d =>
         ['ID Proof', 'Insurance'].includes(d.type)
       );
       return documents;
@@ -261,19 +283,19 @@ const DocumentManagement = () => {
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                 <div className="flex items-center">
-                  <i className="fas fa-id-card text-gray-500 text-xs mr-1"></i>
+                  <BadgeIcon className="text-gray-500 mr-1" style={{ fontSize: '1rem' }} />
                   <span className="text-gray-600 truncate">{patient.id}</span>
                 </div>
                 <div className="flex items-center">
-                  <i className="fas fa-user text-gray-500 text-xs mr-1"></i>
+                  <PersonIcon className="text-gray-500 mr-1" style={{ fontSize: '1rem' }} />
                   <span className="text-gray-600">{patient.age}y, {patient.gender}</span>
                 </div>
                 <div className="flex items-center">
-                  <i className="fas fa-phone text-gray-500 text-xs mr-1"></i>
+                  <PhoneIcon className="text-gray-500 mr-1" style={{ fontSize: '1rem' }} />
                   <span className="text-gray-600 truncate">{patient.phone}</span>
                 </div>
                 <div className="flex items-center">
-                  <i className="fas fa-calendar text-gray-500 text-xs mr-1"></i>
+                  <CalendarTodayIcon className="text-gray-500 mr-1" style={{ fontSize: '1rem' }} />
                   <span className="text-gray-600">Last: {patient.lastVisit}</span>
                 </div>
               </div>
@@ -286,7 +308,7 @@ const DocumentManagement = () => {
               className="ml-3 text-blue-600 hover:text-blue-800 flex-shrink-0"
               title="Upload documents"
             >
-              <i className="fas fa-plus-circle text-xl"></i>
+              <AddCircleIcon className="text-xl" />
             </button>
           </div>
         </div>
@@ -298,11 +320,10 @@ const DocumentManagement = () => {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`flex-1 px-3 py-2 text-xs font-medium whitespace-nowrap ${
-                  activeTab === tab
-                    ? 'border-b-2 border-blue-500 text-blue-600'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
+                className={`flex-1 px-3 py-2 text-xs font-medium whitespace-nowrap ${activeTab === tab
+                  ? 'border-b-2 border-blue-500 text-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+                  }`}
               >
                 {tab === 'all' && 'All Documents'}
                 {tab === 'medical' && 'Medical'}
@@ -317,19 +338,18 @@ const DocumentManagement = () => {
         <div className="p-4 flex-1 overflow-hidden">
           {filteredDocs.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center py-6">
-              <i className="fas fa-file text-gray-300 text-3xl mb-2"></i>
+              <InsertDriveFileIcon className="text-gray-300 mb-2" style={{ fontSize: '3rem' }} />
               <p className="text-gray-500 text-sm">No documents found</p>
             </div>
           ) : (
             <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
-              {filteredDocs.slice(0, 3).map(doc => ( // Show only 3 documents initially
+              {filteredDocs.map(doc => (
                 <div key={doc.id} className="flex items-center p-2 bg-gray-50 rounded hover:bg-gray-100">
-                  <div className={`p-2 rounded-lg mr-3 ${
-                    doc.fileType === 'pdf' ? 'bg-red-50 text-red-600' : 
-                    doc.fileType === 'image' ? 'bg-green-50 text-green-600' : 
-                    'bg-blue-50 text-blue-600'
-                  }`}>
-                    <i className={`fas ${getFileIcon(doc.fileType)} text-sm`}></i>
+                  <div className={`p-2 rounded-lg mr-3 ${doc.fileType === 'pdf' ? 'bg-red-50 text-red-600' :
+                    doc.fileType === 'image' ? 'bg-green-50 text-green-600' :
+                      'bg-blue-50 text-blue-600'
+                    }`}>
+                    {getFileIcon(doc.fileType)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{doc.name}</p>
@@ -344,16 +364,16 @@ const DocumentManagement = () => {
                     <button
                       className="text-blue-600 hover:text-blue-800 p-1"
                       title="View"
-                      onClick={() => alert(`Viewing ${doc.name}`)}
+                      onClick={() => setDocumentToView(doc)}
                     >
-                      <i className="fas fa-eye text-sm"></i>
+                      <VisibilityIcon style={{ fontSize: '1.25rem' }} />
                     </button>
                     <button
                       className="text-green-600 hover:text-green-800 p-1"
                       title="Download"
-                      onClick={() => alert(`Downloading ${doc.name}`)}
+                      onClick={() => handleDownload(doc)}
                     >
-                      <i className="fas fa-download text-sm"></i>
+                      <FileDownloadIcon style={{ fontSize: '1.25rem' }} />
                     </button>
                   </div>
                 </div>
@@ -362,13 +382,12 @@ const DocumentManagement = () => {
           )}
         </div>
 
-        {/* View All Button */}
         {patient.documents.length > 3 && (
           <div className="px-4 py-2 border-t bg-gray-50">
             <button
               onClick={() => {
                 setSelectedPatient(patient);
-                setShowPatientModal(true);
+                setShowViewAllModal(true);
               }}
               className="w-full text-center text-sm text-blue-600 hover:text-blue-800 font-medium py-1"
             >
@@ -376,6 +395,7 @@ const DocumentManagement = () => {
             </button>
           </div>
         )}
+
       </div>
     );
   };
@@ -390,11 +410,11 @@ const DocumentManagement = () => {
           <p className="text-gray-600 text-sm mt-1">Manage patient documents, lab reports, and medical records</p>
         </div>
         <div className="flex gap-2">
-          <button 
+          <button
             onClick={() => setShowPatientModal(true)}
             className="btn btn-primary flex items-center"
           >
-            <i className="fas fa-cloud-upload-alt mr-2"></i> Upload Documents
+            <CloudUploadIcon className="mr-2" /> Upload Documents
           </button>
         </div>
       </div>
@@ -409,14 +429,75 @@ const DocumentManagement = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
-          <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+          <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        </div>
+      </div>
+
+      {/* Statistics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 mb-8">
+        <div className="bg-white rounded-lg shadow-sm border p-5">
+          <div className="flex items-center">
+            <div className="p-3 bg-blue-50 rounded-lg mr-4">
+              <SickIcon className="text-blue-600 text-lg" />
+            </div>
+            <div>
+              <p className="text-gray-500 text-sm">Total Patients</p>
+              <p className="text-xl font-bold text-blue-600 mt-1">{patients.length}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border p-5">
+          <div className="flex items-center">
+            <div className="p-3 bg-green-50 rounded-lg mr-4">
+              <AssignmentIcon className="text-green-600 text-lg" />
+            </div>
+            <div>
+              <p className="text-gray-500 text-sm">Total Documents</p>
+              <p className="text-xl font-bold text-green-600 mt-1">
+                {patients.reduce((sum, patient) => sum + patient.documents.length, 0)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border p-5">
+          <div className="flex items-center">
+            <div className="p-3 bg-purple-50 rounded-lg mr-4">
+              <ScienceIcon className="text-purple-600 text-lg" />
+            </div>
+            <div>
+              <p className="text-gray-500 text-sm">Lab Reports</p>
+              <p className="text-xl font-bold text-purple-600 mt-1">
+                {patients.reduce((sum, patient) =>
+                  sum + patient.documents.filter(d => d.type.includes('Report')).length, 0
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border p-5">
+          <div className="flex items-center">
+            <div className="p-3 bg-yellow-50 rounded-lg mr-4">
+              <BadgeIcon className="text-yellow-600 text-lg" />
+            </div>
+            <div>
+              <p className="text-gray-500 text-sm">ID Proofs</p>
+              <p className="text-xl font-bold text-yellow-600 mt-1">
+                {patients.reduce((sum, patient) =>
+                  sum + patient.documents.filter(d => d.type === 'ID Proof').length, 0
+                )}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Patients Grid */}
       {filteredPatients.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
-          <i className="fas fa-users text-gray-300 text-4xl mb-3"></i>
+          <PeopleIcon className="text-gray-300 mb-3" style={{ fontSize: '4rem' }} />
           <h3 className="text-lg font-medium text-gray-700 mb-2">No patients found</h3>
           <p className="text-gray-500 mb-4">Try adjusting your search criteria</p>
         </div>
@@ -428,66 +509,7 @@ const DocumentManagement = () => {
         </div>
       )}
 
-      {/* Statistics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
-        <div className="bg-white rounded-lg shadow-sm border p-5">
-          <div className="flex items-center">
-            <div className="p-3 bg-blue-50 rounded-lg mr-4">
-              <i className="fas fa-user-injured text-blue-600 text-lg"></i>
-            </div>
-            <div>
-              <p className="text-gray-500 text-sm">Total Patients</p>
-              <p className="text-xl font-bold text-blue-600 mt-1">{patients.length}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow-sm border p-5">
-          <div className="flex items-center">
-            <div className="p-3 bg-green-50 rounded-lg mr-4">
-              <i className="fas fa-file-medical text-green-600 text-lg"></i>
-            </div>
-            <div>
-              <p className="text-gray-500 text-sm">Total Documents</p>
-              <p className="text-xl font-bold text-green-600 mt-1">
-                {patients.reduce((sum, patient) => sum + patient.documents.length, 0)}
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow-sm border p-5">
-          <div className="flex items-center">
-            <div className="p-3 bg-purple-50 rounded-lg mr-4">
-              <i className="fas fa-vial text-purple-600 text-lg"></i>
-            </div>
-            <div>
-              <p className="text-gray-500 text-sm">Lab Reports</p>
-              <p className="text-xl font-bold text-purple-600 mt-1">
-                {patients.reduce((sum, patient) => 
-                  sum + patient.documents.filter(d => d.type.includes('Report')).length, 0
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow-sm border p-5">
-          <div className="flex items-center">
-            <div className="p-3 bg-yellow-50 rounded-lg mr-4">
-              <i className="fas fa-id-card text-yellow-600 text-lg"></i>
-            </div>
-            <div>
-              <p className="text-gray-500 text-sm">ID Proofs</p>
-              <p className="text-xl font-bold text-yellow-600 mt-1">
-                {patients.reduce((sum, patient) => 
-                  sum + patient.documents.filter(d => d.type === 'ID Proof').length, 0
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+
 
       {/* Upload Modal */}
       {selectedPatient && (
@@ -500,13 +522,35 @@ const DocumentManagement = () => {
           }}
           title={`Upload Documents to ${selectedPatient.name}`}
           size="lg"
+          footer={
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowUploadModal(false);
+                  setUploadedFiles([]);
+                  setDocumentCategory('');
+                }}
+                className="px-5 py-2.5 border rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpload}
+                disabled={!documentCategory || uploadedFiles.length === 0}
+                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              >
+                <UploadIcon className="mr-2" />
+                Upload to Patient
+              </button>
+            </div>
+          }
         >
-          <div className="space-y-6">
+          <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
             {/* Patient Info */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-center">
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
-                  <i className="fas fa-user text-blue-600 text-xl"></i>
+                  <PersonIcon className="text-blue-600 text-xl" />
                 </div>
                 <div>
                   <h4 className="font-bold text-lg">{selectedPatient.name}</h4>
@@ -552,7 +596,7 @@ const DocumentManagement = () => {
                 accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
               />
               <label htmlFor="file-upload" className="cursor-pointer block">
-                <i className="fas fa-cloud-upload-alt text-5xl text-blue-500 mb-4"></i>
+                <CloudUploadIcon className="text-blue-500 mb-4" style={{ fontSize: '5rem' }} />
                 <p className="text-lg font-medium text-gray-700 mb-1">Click to upload files</p>
                 <p className="text-gray-500">or drag and drop here</p>
                 <p className="text-sm text-gray-400 mt-3">
@@ -577,7 +621,7 @@ const DocumentManagement = () => {
                   {uploadedFiles.map(file => (
                     <div key={file.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
                       <div className="flex items-center">
-                        <i className="fas fa-file text-blue-500 mr-3"></i>
+                        <InsertDriveFileIcon className="text-blue-500 mr-3" />
                         <div>
                           <p className="font-medium text-sm">{file.name}</p>
                           <p className="text-xs text-gray-500">{file.size} • {file.type}</p>
@@ -587,35 +631,13 @@ const DocumentManagement = () => {
                         onClick={() => handleRemoveFile(file.id)}
                         className="text-red-500 hover:text-red-700"
                       >
-                        <i className="fas fa-times"></i>
+                        <CloseIcon />
                       </button>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-
-            {/* Action Buttons */}
-            <div className="flex justify-end gap-3 pt-4">
-              <button
-                onClick={() => {
-                  setShowUploadModal(false);
-                  setUploadedFiles([]);
-                  setDocumentCategory('');
-                }}
-                className="px-5 py-2.5 border rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleUpload}
-                disabled={!documentCategory || uploadedFiles.length === 0}
-                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-              >
-                <i className="fas fa-upload mr-2"></i>
-                Upload to Patient
-              </button>
-            </div>
           </div>
         </Modal>
       )}
@@ -635,7 +657,7 @@ const DocumentManagement = () => {
               className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-            <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto pr-2">
@@ -651,7 +673,7 @@ const DocumentManagement = () => {
               >
                 <div className="flex items-center">
                   <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                    <i className="fas fa-user text-blue-600"></i>
+                    <PersonIcon className="text-blue-600" />
                   </div>
                   <div className="flex-1">
                     <h4 className="font-bold">{patient.name}</h4>
@@ -662,7 +684,7 @@ const DocumentManagement = () => {
                       </span>
                     </div>
                   </div>
-                  <i className="fas fa-chevron-right text-gray-400"></i>
+                  <ChevronRightIcon className="text-gray-400" />
                 </div>
               </div>
             ))}
@@ -673,7 +695,7 @@ const DocumentManagement = () => {
       {/* Workflow Info */}
       <div className="mt-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
         <h4 className="font-bold text-gray-800 mb-4 flex items-center">
-          <i className="fas fa-info-circle text-blue-600 mr-2"></i>
+          <InfoIcon className="text-blue-600 mr-2" />
           Document Management Workflow
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -690,7 +712,7 @@ const DocumentManagement = () => {
               <li>• Attach previous medical reports</li>
             </ul>
           </div>
-          
+
           <div className="bg-white p-5 rounded-lg shadow-sm">
             <div className="flex items-center mb-4">
               <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
@@ -704,7 +726,7 @@ const DocumentManagement = () => {
               <li>• Doctor's notes and recommendations</li>
             </ul>
           </div>
-          
+
           <div className="bg-white p-5 rounded-lg shadow-sm">
             <div className="flex items-center mb-4">
               <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mr-3">
@@ -720,6 +742,172 @@ const DocumentManagement = () => {
           </div>
         </div>
       </div>
+
+      {/* View Document Modal */}
+      {documentToView && (
+        <Modal
+          isOpen={!!documentToView}
+          onClose={() => setDocumentToView(null)}
+          title={`Viewing: ${documentToView.name}`}
+          size="lg"
+        >
+          <div className="h-[70vh] flex flex-col items-center justify-center bg-gray-50 rounded-lg overflow-hidden border p-4 relative">
+            {documentToView.file ? (
+              documentToView.file.type.includes('image') ? (
+                <img src={URL.createObjectURL(documentToView.file)} alt={documentToView.name} className="max-w-full max-h-full object-contain shadow-sm" />
+              ) : documentToView.file.type.includes('pdf') ? (
+                <iframe src={URL.createObjectURL(documentToView.file)} title={documentToView.name} className="w-full h-full border-0 rounded" />
+              ) : (documentToView.file.type.includes('word') || documentToView.file.name.toLowerCase().endsWith('.docx') || documentToView.file.name.toLowerCase().endsWith('.doc')) ? (
+                documentToView.file.name.toLowerCase().endsWith('.docx') ? (
+                  wordLoading ? (
+                    <div className="text-center">
+                      <LoadingSpinner />
+                      <p className="mt-4 text-gray-500 font-medium">Processing document...</p>
+                    </div>
+                  ) : (
+                    <div className="w-full h-full overflow-auto bg-white p-8 shadow-inner border rounded">
+                      <div className="docx-preview-content max-w-3xl mx-auto" dangerouslySetInnerHTML={{ __html: wordContent }} />
+                    </div>
+                  )
+                ) : (
+                  <div className="text-center p-8 bg-blue-50 rounded-xl border border-blue-100 max-w-md">
+                    <DescriptionIcon style={{ fontSize: '5rem', color: '#3B82F6' }} className="mb-4" />
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Legacy Word Document</h4>
+                    <p className="text-gray-600 mb-6">Preview is only available for modern <strong>.docx</strong> files. Please download this <strong>.doc</strong> file to view its contents.</p>
+                    <button
+                      onClick={() => handleDownload(documentToView)}
+                      className="inline-flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                    >
+                      <FileDownloadIcon className="mr-2" /> Download Now
+                    </button>
+                  </div>
+                )
+              ) : (
+                <div className="text-center">
+                  <InsertDriveFileIcon style={{ fontSize: '5rem', color: '#9CA3AF' }} />
+                  <p className="mt-4 text-gray-500">Preview not available for this file type</p>
+                </div>
+              )
+            ) : (
+              <div className="text-center">
+                {documentToView.fileType === 'image' || documentToView.fileType === 'jpg' || documentToView.fileType === 'png' || documentToView.fileType === 'jpeg' ? (
+                  <ImageIcon style={{ fontSize: '5rem', color: '#9CA3AF' }} />
+                ) : documentToView.fileType === 'pdf' ? (
+                  <PictureAsPdfIcon style={{ fontSize: '5rem', color: '#9CA3AF' }} />
+                ) : documentToView.fileType === 'doc' || documentToView.fileType === 'docx' ? (
+                  <DescriptionIcon style={{ fontSize: '5rem', color: '#9CA3AF' }} />
+                ) : (
+                  <InsertDriveFileIcon style={{ fontSize: '5rem', color: '#9CA3AF' }} />
+                )}
+                <p className="mt-4 text-gray-500 font-medium text-lg">Document Preview Placeholder</p>
+                <p className="text-sm text-gray-400 mt-1">Mock document: {documentToView.name}</p>
+                <p className="text-xs text-gray-400 mt-2">In a real app, the file URL would be used here.</p>
+              </div>
+            )}
+
+            <div className="absolute bottom-6 right-8 flex gap-3">
+              <button
+                onClick={() => handleDownload(documentToView)}
+                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg shadow-lg hover:bg-blue-700 font-medium flex items-center transition-all hover:scale-105 active:scale-95"
+              >
+                <FileDownloadIcon className="mr-2" style={{ fontSize: '1.25rem' }} /> Download Document
+              </button>
+            </div>
+          </div>
+          <style dangerouslySetInnerHTML={{ __html: `
+            .docx-preview-content h1 { font-size: 1.8rem; font-weight: 800; margin-bottom: 1.25rem; color: #111827; border-bottom: 2px solid #E5E7EB; padding-bottom: 0.5rem; }
+            .docx-preview-content h2 { font-size: 1.5rem; font-weight: 700; margin-top: 1.5rem; margin-bottom: 1rem; color: #1F2937; }
+            .docx-preview-content h3 { font-size: 1.25rem; font-weight: 600; margin-top: 1.25rem; margin-bottom: 0.75rem; color: #374151; }
+            .docx-preview-content p { margin-bottom: 1rem; line-height: 1.6; color: #4B5563; font-size: 1rem; }
+            .docx-preview-content table { border-collapse: collapse; width: 100%; margin: 1.5rem 0; font-size: 0.9rem; }
+            .docx-preview-content table td, .docx-preview-content table th { border: 1px solid #D1D5DB; padding: 0.75rem; text-align: left; }
+            .docx-preview-content table th { bg-color: #F9FAFB; font-weight: 600; }
+            .docx-preview-content ul, .docx-preview-content ol { margin-left: 2rem; margin-bottom: 1.25rem; }
+            .docx-preview-content li { margin-bottom: 0.5rem; color: #4B5563; }
+            .docx-preview-content strong { color: #111827; font-weight: 600; }
+          ` }} />
+        </Modal>
+      )}
+
+      {/* View All Documents Modal */}
+      {selectedPatient && (
+        <Modal
+          isOpen={showViewAllModal}
+          onClose={() => setShowViewAllModal(false)}
+          title={`All Documents: ${selectedPatient.name}`}
+          size="lg"
+          footer={
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowViewAllModal(false)}
+                className="px-5 py-2.5 border rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+              >
+                Close
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-500">Patient ID:</span>
+                <span className="text-sm font-bold text-gray-700">{selectedPatient.id}</span>
+              </div>
+              <button
+                onClick={() => {
+                  setShowViewAllModal(false);
+                  setShowUploadModal(true);
+                }}
+                className="btn btn-primary btn-sm flex items-center"
+              >
+                <AddCircleIcon className="mr-1" style={{ fontSize: '1rem' }} /> Add Document
+              </button>
+            </div>
+
+            <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-3">
+              {selectedPatient.documents.map(doc => (
+                <div key={doc.id} className="flex items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 border border-gray-200">
+                  <div className={`p-2 rounded-lg mr-4 ${doc.fileType === 'pdf' ? 'bg-red-50 text-red-600' :
+                    doc.fileType === 'image' ? 'bg-green-50 text-green-600' :
+                      'bg-blue-50 text-blue-600'
+                    }`}>
+                    {getFileIcon(doc.fileType)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-800 truncate">{doc.name}</p>
+                    <div className="flex items-center gap-3 mt-1">
+                      <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold ${getCategoryColor(doc.category)}`}>
+                        {doc.type}
+                      </span>
+                      <span className="text-xs text-gray-500 flex items-center gap-1">
+                        <CalendarTodayIcon style={{ fontSize: '0.8rem' }} /> {doc.uploadedDate}
+                      </span>
+                      <span className="text-xs text-gray-400">{doc.size}</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 ml-4">
+                    <button
+                      className="text-blue-600 hover:text-blue-800 p-2 bg-blue-50 rounded-lg transition-colors"
+                      title="View"
+                      onClick={() => setDocumentToView(doc)}
+                    >
+                      <VisibilityIcon style={{ fontSize: '1.25rem' }} />
+                    </button>
+                    <button
+                      className="text-green-600 hover:text-green-800 p-2 bg-green-50 rounded-lg transition-colors"
+                      title="Download"
+                      onClick={() => handleDownload(doc)}
+                    >
+                      <FileDownloadIcon style={{ fontSize: '1.25rem' }} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Modal>
+      )}
+
     </div>
   );
 };

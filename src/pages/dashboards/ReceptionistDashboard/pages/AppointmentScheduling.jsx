@@ -1,12 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react'
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import AddIcon from '@mui/icons-material/Add';
-import CheckIcon from '@mui/icons-material/Check';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import EditIcon from '@mui/icons-material/Edit';
-import CloseIcon from '@mui/icons-material/Close';
-import SearchIcon from '@mui/icons-material/Search';
-import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import {
+  KeyboardArrowDown as KeyboardArrowDownIcon,
+  Add as AddIcon,
+  Check as CheckIcon,
+  Visibility as VisibilityIcon,
+  Edit as EditIcon,
+  Close as CloseIcon,
+  Search as SearchIcon,
+  AddCircleOutline as AddCircleOutlineIcon,
+  Event as EventIcon,
+  HourglassEmpty as HourglassEmptyIcon,
+  CheckCircle as CheckCircleIcon,
+  Cancel as CancelIcon
+} from '@mui/icons-material';
 import LoadingSpinner from '../../../../components/common/LoadingSpinner/LoadingSpinner'
 import DataTable from '../../../../components/ui/Tables/DataTable'
 import Modal from '../../../../components/common/Modal/Modal'
@@ -31,7 +37,7 @@ const AppointmentScheduling = () => {
   const [showForm, setShowForm] = useState(false)
   const [selectedAppointment, setSelectedAppointment] = useState(null)
   const [selectedPatientProfile, setSelectedPatientProfile] = useState(null)
-  
+
   // Search and Filter States
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -85,7 +91,7 @@ const AppointmentScheduling = () => {
   // Apply search and filters
   useEffect(() => {
     let filtered = appointments
-    
+
     if (searchTerm) {
       filtered = filtered.filter(apt =>
         apt.patient?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -119,7 +125,7 @@ const AppointmentScheduling = () => {
         setPatients(formattedPatients)
         console.log('Loaded Patients:', formattedPatients)
       }
-    } catch (e) { 
+    } catch (e) {
       console.error('Error fetching patients', e)
       setPatients([])
     }
@@ -133,24 +139,24 @@ const AppointmentScheduling = () => {
         console.log('Statistics Data:', data.data)
         setStatistics(data.data || {})
       }
-    } catch (e) { 
+    } catch (e) {
       console.error('Error fetching statistics', e)
       // Fallback: Calculate statistics from appointments
       calculateStatistics()
     }
   }
 
-  const calculateStatistics = () => {
-    if (appointments.length === 0) return
+  const calculateStatistics = (data = appointments) => {
+    if (!data || data.length === 0) return
 
     const stats = {
-      total_appointments: appointments.length,
-      checked_in: appointments.filter(a => a.status === 'CHECKED_IN' || a.is_checked_in).length,
-      waiting: appointments.filter(a => a.status === 'WAITING' || a.status === 'CHECKED_IN').length,
-      in_consultation: appointments.filter(a => a.status === 'IN_CONSULTATION').length,
-      completed: appointments.filter(a => a.status === 'COMPLETED').length,
-      cancelled: appointments.filter(a => a.status === 'CANCELLED').length,
-      no_show: appointments.filter(a => a.status === 'NO_SHOW').length
+      total_appointments: data.length,
+      checked_in: data.filter(a => a.status === 'CHECKED_IN' || a.is_checked_in).length,
+      waiting: data.filter(a => a.status === 'WAITING' || a.status === 'CHECKED_IN' || a.status === 'SCHEDULED').length,
+      in_consultation: data.filter(a => a.status === 'IN_CONSULTATION').length,
+      completed: data.filter(a => a.status === 'COMPLETED').length,
+      cancelled: data.filter(a => a.status === 'CANCELLED').length,
+      no_show: data.filter(a => a.status === 'NO_SHOW').length
     }
     setStatistics(stats)
   }
@@ -165,8 +171,8 @@ const AppointmentScheduling = () => {
     } catch (e) { console.error('Error fetching quick actions', e) }
   }
 
-  const loadAppointments = async () => {
-    setLoading(true)
+  const loadAppointments = async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const queryParams = new URLSearchParams()
       queryParams.append('page', filters.page)
@@ -203,7 +209,7 @@ const AppointmentScheduling = () => {
 
         console.log("Mapped Appointments for UI:", formatted)
         setAppointments(formatted)
-        calculateStatistics()
+        calculateStatistics(formatted)
       } else {
         if (typeof toast !== 'undefined') toast.error('Failed to load appointments')
       }
@@ -385,8 +391,8 @@ const AppointmentScheduling = () => {
       if (res.ok) {
         if (typeof toast !== 'undefined') toast.success(data.message || `Appointment ${formData.id ? 'modified' : 'scheduled'} successfully!`);
         setShowForm(false)
-        loadAppointments()
-        loadStatistics()
+        await loadAppointments(true) // Silent reload
+        await loadStatistics()
 
         setFormData({
           id: null,
@@ -485,8 +491,8 @@ const AppointmentScheduling = () => {
         });
         if (res.ok) {
           if (typeof toast !== 'undefined') toast.success('Appointment cancelled successfully');
-          loadAppointments()
-          loadStatistics()
+          await loadAppointments(true)
+          await loadStatistics()
         } else {
           if (typeof toast !== 'undefined') toast.error('Failed to cancel appointment')
         }
@@ -505,8 +511,8 @@ const AppointmentScheduling = () => {
       });
       if (res.ok) {
         if (typeof toast !== 'undefined') toast.success('Status updated successfully');
-        loadAppointments()
-        loadStatistics()
+        await loadAppointments(true)
+        await loadStatistics()
       } else {
         if (typeof toast !== 'undefined') toast.error('Failed to update status')
       }
@@ -519,12 +525,12 @@ const AppointmentScheduling = () => {
     try {
       const res = await apiFetch(`/api/v1/receptionist/appointments/${appointmentId}/check-in`, {
         method: 'POST',
-        body: { }
+        body: {}
       });
       if (res.ok) {
         if (typeof toast !== 'undefined') toast.success('Patient checked-in successfully');
-        loadAppointments()
-        loadStatistics()
+        await loadAppointments(true)
+        await loadStatistics()
       } else {
         const errorData = await res.json().catch(() => ({}));
         if (typeof toast !== 'undefined') toast.error(errorData?.message || 'Failed to check-in patient');
@@ -543,6 +549,13 @@ const AppointmentScheduling = () => {
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <h2 className="text-xl md:text-2xl lg:text-2xl font-semibold text-gray-700">Appointment Scheduling</h2>
+          <button
+            onClick={handleNewAppointment}
+            className="flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md hover:shadow-lg active:scale-95 font-medium"
+          >
+            <AddCircleOutlineIcon />
+            Appointment Schedule 
+          </button>
         </div>
 
         {/* KPI Statistics Cards */}
@@ -555,8 +568,8 @@ const AppointmentScheduling = () => {
                 <p className="text-3xl font-bold text-blue-600 mt-2">{statistics?.total_appointments || 0}</p>
                 <p className="text-xs text-gray-500 mt-1">Today's schedule</p>
               </div>
-              <div className="w-12 h-12 bg-blue-200 rounded-lg flex items-center justify-center text-xl">
-                📅
+              <div className="w-12 h-12 bg-blue-200 rounded-lg flex items-center justify-center text-blue-700">
+                <EventIcon />
               </div>
             </div>
           </div>
@@ -569,8 +582,8 @@ const AppointmentScheduling = () => {
                 <p className="text-3xl font-bold text-yellow-600 mt-2">{statistics?.waiting || 0}</p>
                 <p className="text-xs text-gray-500 mt-1">Checked in</p>
               </div>
-              <div className="w-12 h-12 bg-yellow-200 rounded-lg flex items-center justify-center text-xl">
-                ⏳
+              <div className="w-12 h-12 bg-yellow-200 rounded-lg flex items-center justify-center text-yellow-700">
+                <HourglassEmptyIcon />
               </div>
             </div>
           </div>
@@ -583,8 +596,8 @@ const AppointmentScheduling = () => {
                 <p className="text-3xl font-bold text-green-600 mt-2">{statistics?.completed || 0}</p>
                 <p className="text-xs text-gray-500 mt-1">Successfully served</p>
               </div>
-              <div className="w-12 h-12 bg-green-200 rounded-lg flex items-center justify-center text-xl">
-                ✅
+              <div className="w-12 h-12 bg-green-200 rounded-lg flex items-center justify-center text-green-700">
+                <CheckCircleIcon />
               </div>
             </div>
           </div>
@@ -597,8 +610,8 @@ const AppointmentScheduling = () => {
                 <p className="text-3xl font-bold text-red-600 mt-2">{statistics?.cancelled || 0}</p>
                 <p className="text-xs text-gray-500 mt-1">Not attended</p>
               </div>
-              <div className="w-12 h-12 bg-red-200 rounded-lg flex items-center justify-center text-xl">
-                ❌
+              <div className="w-12 h-12 bg-red-200 rounded-lg flex items-center justify-center text-red-700">
+                <CancelIcon />
               </div>
             </div>
           </div>
@@ -756,10 +769,28 @@ const AppointmentScheduling = () => {
       <Modal
         isOpen={showForm}
         onClose={() => setShowForm(false)}
-        title="Schedule Appointment"
+        title={formData.id ? "Edit Appointment" : "Schedule Appointment"}
         size="lg"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="appointment-form"
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md hover:shadow-lg active:scale-95 font-medium"
+            >
+              {formData.id ? 'Save Changes' : 'Schedule Appointment'}
+            </button>
+          </div>
+        }
       >
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form id="appointment-form" onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="relative" ref={patientDropdownRef}>
               <label className="block text-sm font-medium text-gray-700 mb-1">Patient <span className="text-red-500">*</span></label>
@@ -986,21 +1017,6 @@ const AppointmentScheduling = () => {
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Schedule Appointment
-            </button>
-          </div>
         </form>
       </Modal>
 
@@ -1010,6 +1026,36 @@ const AppointmentScheduling = () => {
         onClose={() => setSelectedAppointment(null)}
         title="Appointment Details"
         size="md"
+        footer={selectedAppointment && (String(selectedAppointment.status).toUpperCase() !== 'CANCELLED' && String(selectedAppointment.status).toUpperCase() !== 'COMPLETED') ? (
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => {
+                handleReschedule(selectedAppointment)
+              }}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md hover:shadow-lg active:scale-95 font-medium"
+            >
+              Reschedule
+            </button>
+            <button
+              onClick={() => {
+                handleCancelAppointment(selectedAppointment.id)
+                setSelectedAppointment(null)
+              }}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all shadow-md hover:shadow-lg active:scale-95 font-medium"
+            >
+              Cancel Appointment
+            </button>
+          </div>
+        ) : (
+          <div className="flex justify-end">
+            <button
+              onClick={() => setSelectedAppointment(null)}
+              className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+            >
+              Close
+            </button>
+          </div>
+        )}
       >
         {selectedAppointment && (
           <div className="space-y-4">
@@ -1063,29 +1109,7 @@ const AppointmentScheduling = () => {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t">
-              {String(selectedAppointment.status).toUpperCase() !== 'CANCELLED' && String(selectedAppointment.status).toUpperCase() !== 'COMPLETED' && (
-                <>
-                  <button
-                    onClick={() => {
-                      handleReschedule(selectedAppointment)
-                    }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    Reschedule
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleCancelAppointment(selectedAppointment.id)
-                      setSelectedAppointment(null)
-                    }}
-                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                  >
-                    Cancel Appointment
-                  </button>
-                </>
-              )}
-            </div>
+
           </div>
         )}
       </Modal>

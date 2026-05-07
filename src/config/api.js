@@ -157,9 +157,14 @@ export const RECEPTIONIST_PROFILE = '/api/v1/receptionist/profile';
 
 /** Receptionist: profile update */
 export const RECEPTIONIST_PROFILE_UPDATE = '/api/v1/receptionist/profile';
-
 /** Receptionist: patient registration */
 export const RECEPTIONIST_PATIENT_REGISTER = '/api/v1/receptionist/patients/register';
 
 /** Receptionist: dashboard overview */
 export const RECEPTIONIST_DASHBOARD_OVERVIEW = '/api/v1/receptionist/dashboard';
+
+/** Receptionist: patient management */
+export const RECEPTIONIST_PATIENTS = '/api/v1/receptionist/patients';
+export const RECEPTIONIST_PATIENT_SEARCH = '/api/v1/receptionist/patients/search';
+export const RECEPTIONIST_PATIENT_PROFILE = (patientRef) => `/api/v1/receptionist/patients/${encodeURIComponent(patientRef)}/profile`;
+export const RECEPTIONIST_PATIENT_UPDATE = (patientId) => `/api/v1/receptionist/patients/${encodeURIComponent(patientId)}`;

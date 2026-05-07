@@ -181,9 +181,22 @@ const PatientRecords = ({ onPageChange }) => {
 
   return (
     <div className="animate-fade-in">
-      <h2 className="text-2xl font-semibold text-gray-700 mb-6">
-        <i className='fas fa-user-injured text-blue-500 mr-3'></i> Patient Records
-      </h2>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <h2 className="text-2xl font-semibold text-gray-700">
+          <i className='fas fa-user-injured text-blue-500 mr-3'></i> Patient Records
+        </h2>
+
+        {/* Total Patients Stat */}
+        <div className="bg-white px-6 py-3 rounded-xl border shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center shadow-inner">
+            <i className="fas fa-users text-xl"></i>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500 font-medium tracking-wide">Total Patients</p>
+            <p className="text-2xl font-bold text-gray-800">{loading ? '...' : patients.length}</p>
+          </div>
+        </div>
+      </div>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {patients.map(patient => (

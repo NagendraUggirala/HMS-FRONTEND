@@ -429,9 +429,7 @@ const PatientRegistration = () => {
                         </div>
                     </div>
 
-
                     {/*Blood Group */}
-
                     <div>
                         <h3 className="text-lg font-semibold mb-4">Blood Group</h3>
                         <div>

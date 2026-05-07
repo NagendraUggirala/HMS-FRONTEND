@@ -118,49 +118,7 @@ const Billing = () => {
         </div>
       )}
 
-      <DataTable
-        columns={[
-          { key: 'id', title: 'Invoice ID', sortable: true },
-          { key: 'patient', title: 'Patient', sortable: true },
-          { key: 'date', title: 'Date', sortable: true },
-          { key: 'services', title: 'Services', sortable: true },
-          { key: 'amount', title: 'Amount', sortable: true },
-          { key: 'discount', title: 'Discount', sortable: true },
-          { key: 'total', title: 'Total', sortable: true },
-          { 
-            key: 'status', 
-            title: 'Status', 
-            sortable: true,
-            render: (value) => (
-              <span className={`px-2 py-1 rounded-full text-xs ${
-                value === 'Paid' ? 'status-confirmed' : 'status-pending'
-              }`}>
-                {value}
-              </span>
-            )
-          },
-          {
-            key: 'actions',
-            title: 'Actions',
-            render: (_, row) => (
-              <div className="flex gap-2">
-                <button className="text-blue-600 hover:text-blue-800" title="View">
-                  <i className="fas fa-eye"></i>
-                </button>
-                <button className="text-green-600 hover:text-green-800" title="Print">
-                  <i className="fas fa-print"></i>
-                </button>
-                <button className="text-purple-600 hover:text-purple-800" title="Receipt">
-                  <i className="fas fa-receipt"></i>
-                </button>
-              </div>
-            )
-          }
-        ]}
-        data={bills}
-      />
-
-      {/* Billing Summary */}
+            {/* Billing Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
 
   {/* TOTAL REVENUE */}
@@ -230,6 +188,50 @@ const Billing = () => {
   </div>
 
 </div>
+
+      <DataTable
+        columns={[
+          { key: 'id', title: 'Invoice ID', sortable: true },
+          { key: 'patient', title: 'Patient', sortable: true },
+          { key: 'date', title: 'Date', sortable: true },
+          { key: 'services', title: 'Services', sortable: true },
+          { key: 'amount', title: 'Amount', sortable: true },
+          { key: 'discount', title: 'Discount', sortable: true },
+          { key: 'total', title: 'Total', sortable: true },
+          { 
+            key: 'status', 
+            title: 'Status', 
+            sortable: true,
+            render: (value) => (
+              <span className={`px-2 py-1 rounded-full text-xs ${
+                value === 'Paid' ? 'status-confirmed' : 'status-pending'
+              }`}>
+                {value}
+              </span>
+            )
+          },
+          {
+            key: 'actions',
+            title: 'Actions',
+            render: (_, row) => (
+              <div className="flex gap-2">
+                <button className="text-blue-600 hover:text-blue-800" title="View">
+                  <i className="fas fa-eye"></i>
+                </button>
+                <button className="text-green-600 hover:text-green-800" title="Print">
+                  <i className="fas fa-print"></i>
+                </button>
+                <button className="text-purple-600 hover:text-purple-800" title="Receipt">
+                  <i className="fas fa-receipt"></i>
+                </button>
+              </div>
+            )
+          }
+        ]}
+        data={bills}
+      />
+
+
 
     </div>
   )
