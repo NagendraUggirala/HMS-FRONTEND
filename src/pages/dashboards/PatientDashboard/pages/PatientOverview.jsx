@@ -85,7 +85,8 @@ const PatientOverview = ({ setActivePage }) => {
       const rx = rxRes.status === 'fulfilled' ? extractList(rxRes.value).slice(0, 3) : [] // top 3
 
       // Normalize profile data
-      const pData = profile?.data || profile || {}
+      const rawProfileData = profile?.data || profile || {}
+      const pData = Array.isArray(rawProfileData) ? rawProfileData[0] : (rawProfileData || {})
       
       // Normalize metrics/vitals
       const vData = vitals?.data || vitals || {}
@@ -93,9 +94,9 @@ const PatientOverview = ({ setActivePage }) => {
 
       setDashboardData({
         patientInfo: {
-          name: pData.full_name || pData.name || 'Patient',
+          name: pData.full_name || pData.name || pData.first_name || pData.fullName || 'Patient',
           age: pData.age || '—',
-          bloodGroup: pData.blood_group || pData.blood_type || '—',
+          bloodGroup: pData.blood_group || pData.blood_type || pData.bloodgroup || pData.bloodGroup || '—',
           doctor: pData.primary_doctor || mData.primary_doctor || '—',
           lastVisit: mData.last_visit || '—',
           nextAppointment: mData.next_appointment || '—'
@@ -155,9 +156,6 @@ const PatientOverview = ({ setActivePage }) => {
           <h2 className="text-2xl font-semibold text-gray-700">
             Welcome back, {patientInfo.name}
           </h2>
-          <p className="text-gray-500 text-sm mt-1">
-            Age: {patientInfo.age} • Blood Group: {patientInfo.bloodGroup} • Last visit: {patientInfo.lastVisit}
-          </p>
         </div>
         <div className="flex gap-2">
           <button

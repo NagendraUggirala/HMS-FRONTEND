@@ -138,8 +138,8 @@ const Billing = () => {
       {/* Page Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Financial Center</h1>
-          <p className="text-slate-500 font-medium">Manage your medical expenses, bills, and insurance claims</p>
+          <h1 className="text-2xl font-semibold text-slate-800 tracking-tight">Financial Center</h1>
+          <p className="text-slate-500 text-sm mt-1">Manage your medical expenses, bills, and insurance claims</p>
         </div>
         
         <div className="flex gap-4">
@@ -163,11 +163,11 @@ const Billing = () => {
             <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center text-xl">
               <i className="fas fa-exclamation-triangle"></i>
             </div>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pending</span>
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Pending</span>
           </div>
-          <div className="text-sm font-bold text-slate-400 uppercase tracking-widest">Outstanding</div>
-          <div className="text-3xl font-black text-slate-900 mt-1">₹{summary?.total_outstanding || 0}</div>
-          <p className="text-xs text-rose-500 font-bold mt-2">
+          <div className="text-xs font-medium text-slate-400 uppercase tracking-widest">Outstanding</div>
+          <div className="text-2xl font-bold text-slate-900 mt-1">₹{summary?.total_outstanding || 0}</div>
+          <p className="text-xs text-rose-500 font-medium mt-2">
             <i className="fas fa-clock mr-1"></i> {summary?.unpaid_bill_count || 0} active invoices
           </p>
         </div>
@@ -177,11 +177,11 @@ const Billing = () => {
             <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-xl">
               <i className="fas fa-check-double"></i>
             </div>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Settled</span>
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Settled</span>
           </div>
-          <div className="text-sm font-bold text-slate-400 uppercase tracking-widest">Total Paid</div>
-          <div className="text-3xl font-black text-slate-900 mt-1">₹{summary?.total_paid || 0}</div>
-          <p className="text-xs text-emerald-600 font-bold mt-2">
+          <div className="text-xs font-medium text-slate-400 uppercase tracking-widest">Total Paid</div>
+          <div className="text-2xl font-bold text-slate-900 mt-1">₹{summary?.total_paid || 0}</div>
+          <p className="text-xs text-emerald-600 font-medium mt-2">
             <i className="fas fa-calendar-check mr-1"></i> Lifetime total
           </p>
         </div>
@@ -189,13 +189,13 @@ const Billing = () => {
         <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow lg:col-span-2">
           <div className="flex h-full items-center justify-between">
             <div>
-              <div className="text-sm font-bold text-slate-400 uppercase tracking-widest">Insurance Coverage</div>
-              <div className="text-3xl font-black text-slate-900 mt-1">{summary?.insurance_provider || 'Not Linked'}</div>
+              <div className="text-xs font-medium text-slate-400 uppercase tracking-widest">Insurance Coverage</div>
+              <div className="text-2xl font-bold text-slate-900 mt-1">{summary?.insurance_provider || 'Not Linked'}</div>
               <div className="flex gap-2 mt-3">
-                <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black rounded-lg uppercase tracking-widest">
+                <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-semibold rounded-lg uppercase tracking-widest">
                   Network Hospital
                 </span>
-                <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-lg uppercase tracking-widest">
+                <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-semibold rounded-lg uppercase tracking-widest">
                   Direct Billing
                 </span>
               </div>
@@ -233,7 +233,7 @@ const Billing = () => {
       {activeTab === 'invoices' ? (
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
           <div className="p-8 border-b border-slate-50 flex flex-col sm:flex-row justify-between items-center gap-6">
-            <h3 className="text-xl font-black text-slate-800 tracking-tight">Invoice History</h3>
+            <h3 className="text-lg font-semibold text-slate-800 tracking-tight">Invoice History</h3>
             
             <div className="flex gap-3 w-full sm:w-auto">
               <select 
@@ -257,13 +257,13 @@ const Billing = () => {
             <table className="w-full">
               <thead className="bg-slate-50/50">
                 <tr>
-                  <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Reference</th>
-                  <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Issue Date</th>
-                  <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Description</th>
-                  <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Amount</th>
-                  <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Balance Due</th>
-                  <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                  <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
+                  <th className="px-8 py-5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Reference</th>
+                  <th className="px-8 py-5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Issue Date</th>
+                  <th className="px-8 py-5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Description</th>
+                  <th className="px-8 py-5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Total Amount</th>
+                  <th className="px-8 py-5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Balance Due</th>
+                  <th className="px-8 py-5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Status</th>
+                  <th className="px-8 py-5 text-right text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -281,25 +281,25 @@ const Billing = () => {
                 ) : bills.map(bill => (
                   <tr key={bill.invoice_id || bill.bill_id || bill.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="px-8 py-6">
-                      <div className="font-black text-slate-800">#{bill.invoice_number || bill.bill_number || (bill.invoice_id || bill.bill_id || bill.id).slice(0, 8)}</div>
+                      <div className="font-bold text-slate-800">#{bill.invoice_number || bill.bill_number || (bill.invoice_id || bill.bill_id || bill.id).slice(0, 8)}</div>
                     </td>
-                    <td className="px-8 py-6 text-sm font-bold text-slate-600">
+                    <td className="px-8 py-6 text-sm font-medium text-slate-600">
                       {new Date(bill.created_at || bill.date).toLocaleDateString()}
                     </td>
                     <td className="px-8 py-6">
-                      <div className="text-sm font-black text-slate-700 line-clamp-1">{bill.description || 'Medical Services'}</div>
-                      <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">{bill.bill_type || 'General'}</div>
+                      <div className="text-sm font-semibold text-slate-700 line-clamp-1">{bill.description || 'Medical Services'}</div>
+                      <div className="text-[10px] text-slate-400 font-medium uppercase mt-1">{bill.bill_type || 'General'}</div>
                     </td>
                     <td className="px-8 py-6">
-                      <div className="font-black text-slate-900">₹{bill.total_amount || bill.amount}</div>
+                      <div className="font-bold text-slate-900">₹{bill.total_amount || bill.amount}</div>
                     </td>
                     <td className="px-8 py-6">
-                      <div className={`font-black ${bill.balance_due > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      <div className={`font-bold ${bill.balance_due > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                         ₹{bill.balance_due ?? 0}
                       </div>
                     </td>
                     <td className="px-8 py-6">
-                      <span className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${getStatusColor(bill.status)}`}>
+                      <span className={`px-4 py-1 rounded-full text-[10px] font-semibold uppercase tracking-widest ${getStatusColor(bill.status)}`}>
                         {bill.status}
                       </span>
                     </td>
@@ -345,7 +345,7 @@ const Billing = () => {
               >
                 <i className="fas fa-chevron-left text-slate-400"></i>
               </button>
-              <span className="text-sm font-black text-slate-500 uppercase tracking-widest">Page {page} of {totalPages}</span>
+              <span className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Page {page} of {totalPages}</span>
               <button 
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
@@ -359,17 +359,17 @@ const Billing = () => {
       ) : (
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
           <div className="p-8 border-b border-slate-50">
-            <h3 className="text-xl font-black text-slate-800 tracking-tight">Recent Transactions</h3>
+            <h3 className="text-lg font-semibold text-slate-800 tracking-tight">Recent Transactions</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-50/50">
                 <tr>
-                  <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
-                  <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Method</th>
-                  <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Transaction ID</th>
-                  <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
-                  <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                  <th className="px-8 py-5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Date</th>
+                  <th className="px-8 py-5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Method</th>
+                  <th className="px-8 py-5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Transaction ID</th>
+                  <th className="px-8 py-5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Amount</th>
+                  <th className="px-8 py-5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -379,20 +379,20 @@ const Billing = () => {
                   </tr>
                 ) : history.map((pay, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-8 py-6 text-sm font-bold text-slate-600">
+                    <td className="px-8 py-6 text-sm font-medium text-slate-600">
                       {new Date(pay.paid_at || pay.date).toLocaleDateString()}
                     </td>
-                    <td className="px-8 py-6 text-sm font-black text-slate-700">
+                    <td className="px-8 py-6 text-sm font-semibold text-slate-700">
                       {pay.payment_method || 'N/A'}
                     </td>
                     <td className="px-8 py-6 text-sm font-mono text-slate-500">
                       {pay.transaction_id || '---'}
                     </td>
-                    <td className="px-8 py-6 font-black text-emerald-600">
+                    <td className="px-8 py-6 font-bold text-emerald-600">
                       ₹{pay.amount}
                     </td>
                     <td className="px-8 py-6">
-                      <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase">
+                      <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-semibold uppercase">
                         {pay.status || 'SUCCESS'}
                       </span>
                     </td>
@@ -418,8 +418,8 @@ const Billing = () => {
                       <i className="fas fa-file-invoice"></i>
                     </div>
                     <div>
-                      <h3 className="text-2xl font-black tracking-tight">Invoice Details</h3>
-                      <p className="text-slate-400 font-bold">#{selectedBill.bill_number || selectedBill.id}</p>
+                      <h3 className="text-2xl font-semibold tracking-tight">Invoice Details</h3>
+                      <p className="text-slate-400 font-medium">#{selectedBill.bill_number || selectedBill.id}</p>
                     </div>
                   </div>
                   <button onClick={() => setSelectedBill(null)} className="w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-2xl transition-all">
@@ -430,27 +430,27 @@ const Billing = () => {
                 <div className="flex-1 overflow-y-auto p-10 space-y-10">
                   <div className="grid grid-cols-2 gap-8">
                     <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Issue Date</p>
-                      <p className="text-sm font-black text-slate-800">{new Date(selectedBill.created_at || selectedBill.date).toLocaleDateString()}</p>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Issue Date</p>
+                      <p className="text-sm font-bold text-slate-800">{new Date(selectedBill.created_at || selectedBill.date).toLocaleDateString()}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Due Date</p>
-                      <p className="text-sm font-black text-slate-800">{new Date(selectedBill.due_date || selectedBill.dueDate).toLocaleDateString()}</p>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Due Date</p>
+                      <p className="text-sm font-bold text-slate-800">{new Date(selectedBill.due_date || selectedBill.dueDate).toLocaleDateString()}</p>
                     </div>
                   </div>
 
                   <div className="space-y-4">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Line Items</p>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Line Items</p>
                     <div className="space-y-3">
                       {Array.isArray(selectedBill.items) ? selectedBill.items.map((item, idx) => (
                         <div key={idx} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl">
-                          <span className="text-sm font-black text-slate-700">{item.name || item.service_name}</span>
-                          <span className="font-black text-slate-900">₹{item.amount || item.price}</span>
+                          <span className="text-sm font-medium text-slate-700">{item.name || item.service_name}</span>
+                          <span className="font-bold text-slate-900">₹{item.amount || item.price}</span>
                         </div>
                       )) : (
                         <div className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl">
-                          <span className="text-sm font-black text-slate-700">{selectedBill.description || 'General Services'}</span>
-                          <span className="font-black text-slate-900">₹{selectedBill.total_amount || selectedBill.amount}</span>
+                          <span className="text-sm font-medium text-slate-700">{selectedBill.description || 'General Services'}</span>
+                          <span className="font-bold text-slate-900">₹{selectedBill.total_amount || selectedBill.amount}</span>
                         </div>
                       )}
                     </div>
@@ -466,20 +466,20 @@ const Billing = () => {
                       <span>- ₹{selectedBill.insurance_coverage || 0}</span>
                     </div>
                     <div className="flex justify-between items-center pt-4 border-t border-white/10">
-                      <span className="text-lg font-black tracking-tight">Total Outstanding</span>
-                      <span className="text-2xl font-black text-indigo-400">₹{selectedBill.balance_due ?? 0}</span>
+                      <span className="text-lg font-semibold tracking-tight">Total Outstanding</span>
+                      <span className="text-2xl font-bold text-indigo-400">₹{selectedBill.balance_due ?? 0}</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="p-10 border-t border-slate-50 bg-slate-50 flex gap-4">
-                  <button className="flex-1 px-8 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-100 transition-all">
+                  <button className="flex-1 px-8 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-semibold text-sm hover:bg-slate-100 transition-all">
                     Download Receipt
                   </button>
                   {selectedBill.balance_due > 0 && (
                     <button 
                       onClick={() => setShowPaymentModal(true)}
-                      className="flex-1 px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100"
+                      className="flex-1 px-8 py-4 bg-indigo-600 text-white rounded-2xl font-semibold text-sm hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100"
                     >
                       Process Payment
                     </button>
@@ -501,13 +501,13 @@ const Billing = () => {
               </div>
               
               <div>
-                <h3 className="text-2xl font-black text-slate-900 tracking-tight">Authorize Payment</h3>
-                <p className="text-slate-500 font-bold mt-2">Choose your preferred settlement method</p>
+                <h3 className="text-2xl font-semibold text-slate-900 tracking-tight">Authorize Payment</h3>
+                <p className="text-slate-500 font-medium mt-2">Choose your preferred settlement method</p>
               </div>
 
               <div className="bg-slate-50 rounded-3xl p-6 border border-slate-100">
-                <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Amount to Charge</div>
-                <div className="text-4xl font-black text-slate-900">₹{selectedBill.balance_due || selectedBill.total_amount}</div>
+                <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest mb-1">Amount to Charge</div>
+                <div className="text-4xl font-bold text-slate-900">₹{selectedBill.balance_due || selectedBill.total_amount}</div>
               </div>
 
               <div className="grid grid-cols-1 gap-3">
@@ -520,7 +520,7 @@ const Billing = () => {
                   <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-indigo-600 shadow-sm">
                     <i className="fas fa-credit-card"></i>
                   </div>
-                  <span className="font-black text-slate-700">Credit / Debit Card</span>
+                  <span className="font-semibold text-slate-700">Credit / Debit Card</span>
                   {paymentMethod === 'CARD' && <i className="fas fa-check-circle text-indigo-600 ml-auto"></i>}
                 </button>
 
@@ -533,7 +533,7 @@ const Billing = () => {
                   <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm">
                     <i className="fas fa-qrcode"></i>
                   </div>
-                  <span className="font-black text-slate-700">UPI (GPay, PhonePe)</span>
+                  <span className="font-semibold text-slate-700">UPI (GPay, PhonePe)</span>
                   {paymentMethod === 'UPI' && <i className="fas fa-check-circle text-emerald-600 ml-auto"></i>}
                 </button>
               </div>
@@ -542,14 +542,14 @@ const Billing = () => {
             <div className="p-8 border-t border-slate-50 bg-slate-50 flex gap-4">
               <button 
                 onClick={() => setShowPaymentModal(false)}
-                className="flex-1 px-8 py-5 text-slate-500 font-black text-sm hover:text-slate-800 transition-all"
+                className="flex-1 px-8 py-5 text-slate-500 font-semibold text-sm hover:text-slate-800 transition-all"
               >
                 Cancel
               </button>
               <button 
                 onClick={handlePaymentSubmit}
                 disabled={isProcessingPayment || !paymentMethod}
-                className="flex-[2] px-8 py-5 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 disabled:opacity-50"
+                className="flex-[2] px-8 py-5 bg-indigo-600 text-white rounded-2xl font-semibold text-sm hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 disabled:opacity-50"
               >
                 {isProcessingPayment ? <i className="fas fa-circle-notch animate-spin"></i> : <span>Pay Now</span>}
               </button>
