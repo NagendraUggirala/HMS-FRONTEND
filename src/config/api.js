@@ -34,6 +34,15 @@ export const AUTH_PATIENT_VERIFY_OTP = '/api/v1/auth/patient/verify-otp';
 
 /** Patient portal: authenticated appointment booking (Bearer patient JWT) */
 export const PATIENT_APPOINTMENT_BOOKING_BASE = '/api/v1/patient-appointment-booking';
+export const PATIENT_DOCUMENT_STORAGE_BASE = '/api/v1/patient-document-storage';
+export const PATIENT_MEDICAL_HISTORY_BASE = '/api/v1/patient-medical-history';
+export const PATIENT_PORTAL_DASHBOARD_BASE = '/api/v1/patient-dashboard';
+export const PATIENT_PRESCRIPTIONS_BASE = '/api/v1/patient-prescriptions';
+export const PATIENT_BILLING_BASE = '/api/v1/patient-billing';
+export const PATIENT_PROFILE_BASE = '/api/v1/patient-profile';
+export const PATIENT_LAB_TESTS_BASE = '/api/v1/patient-lab-tests';
+export const PATIENT_MESSAGING_BASE = '/api/v1/patient-messaging';
+export const PATIENT_DISCHARGE_SUMMARY_BASE = '/api/v1/patient-discharge-summary';
 
 /** Auth: hospital-admin change password (e.g. after first login with temp password) */
 export const AUTH_HOSPITAL_ADMIN_CHANGE_PASSWORD = '/api/v1/auth/hospital-admin/change-password';

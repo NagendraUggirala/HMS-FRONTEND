@@ -92,11 +92,19 @@ const Appointments = () => {
       })
       const payload = await res.json().catch(() => ({}))
       if (!res.ok) {
+        console.error('[Appointments] My-appointments error:', res.status, payload)
         toast.error(patientAppointmentErrorMessage(payload))
         setAppointments([])
         return
       }
-      const list = payload.appointments ?? []
+      console.log('[Appointments] My-appointments payload:', payload)
+      // Handle: { appointments: [] }, array, { data: [] }, { items: [] }
+      const list =
+        Array.isArray(payload) ? payload
+        : Array.isArray(payload?.appointments) ? payload.appointments
+        : Array.isArray(payload?.data) ? payload.data
+        : Array.isArray(payload?.items) ? payload.items
+        : []
       setAppointments(list)
       if (payload.pagination) {
         setPagination((prev) => ({
@@ -107,7 +115,8 @@ const Appointments = () => {
           pages: payload.pagination.pages ?? 1,
         }))
       }
-    } catch {
+    } catch (err) {
+      console.error('[Appointments] loadAppointments exception:', err)
       toast.error('Could not load appointments. Check your connection.')
       setAppointments([])
     } finally {
@@ -125,13 +134,25 @@ const Appointments = () => {
       const res = await getPatientDepartments()
       const payload = await res.json().catch(() => ({}))
       if (!res.ok) {
+        console.error('[Appointments] Departments API error:', res.status, payload)
         toast.error(patientAppointmentErrorMessage(payload))
         setDepartments([])
         return
       }
-      setDepartments(Array.isArray(payload) ? payload : [])
-    } catch {
-      toast.error('Failed to load departments.')
+      console.log('[Appointments] Departments payload:', payload)
+      // Handle multiple response shapes: array, { departments: [] }, { data: [] }
+      const list =
+        Array.isArray(payload) ? payload
+        : Array.isArray(payload?.departments) ? payload.departments
+        : Array.isArray(payload?.data) ? payload.data
+        : []
+      setDepartments(list)
+      if (list.length === 0) {
+        toast.info('No departments found. Contact your hospital administrator.')
+      }
+    } catch (err) {
+      console.error('[Appointments] loadDepartments exception:', err)
+      toast.error('Failed to load departments. Please try again.')
       setDepartments([])
     } finally {
       setLoadingDepartments(false)
@@ -148,13 +169,26 @@ const Appointments = () => {
       const res = await getPatientDepartmentDoctors(departmentName)
       const payload = await res.json().catch(() => ({}))
       if (!res.ok) {
+        console.error('[Appointments] Doctors API error:', res.status, payload)
         toast.error(patientAppointmentErrorMessage(payload))
         setDoctors([])
         return
       }
-      setDoctors(payload.doctors ?? [])
-    } catch {
-      toast.error('Failed to load doctors.')
+      console.log('[Appointments] Doctors payload:', payload)
+      // Handle multiple response shapes: { doctors: [] }, array, { data: [] }, { staff: [] }
+      const list =
+        Array.isArray(payload) ? payload
+        : Array.isArray(payload?.doctors) ? payload.doctors
+        : Array.isArray(payload?.data) ? payload.data
+        : Array.isArray(payload?.staff) ? payload.staff
+        : []
+      setDoctors(list)
+      if (list.length === 0) {
+        toast.info(`No doctors found in ${departmentName}.`)
+      }
+    } catch (err) {
+      console.error('[Appointments] loadDoctors exception:', err)
+      toast.error('Failed to load doctors. Please try again.')
       setDoctors([])
     } finally {
       setLoadingDoctors(false)
@@ -171,13 +205,23 @@ const Appointments = () => {
       const res = await getDoctorAvailableSlots(doctorName, date)
       const payload = await res.json().catch(() => ({}))
       if (!res.ok) {
+        console.error('[Appointments] Slots API error:', res.status, payload)
         toast.error(patientAppointmentErrorMessage(payload))
         setSlots([])
         return
       }
-      setSlots(payload.available_slots ?? [])
-    } catch {
-      toast.error('Failed to load time slots.')
+      console.log('[Appointments] Slots payload:', payload)
+      // Handle multiple response shapes
+      const list =
+        Array.isArray(payload) ? payload
+        : Array.isArray(payload?.available_slots) ? payload.available_slots
+        : Array.isArray(payload?.slots) ? payload.slots
+        : Array.isArray(payload?.data) ? payload.data
+        : []
+      setSlots(list)
+    } catch (err) {
+      console.error('[Appointments] loadSlots exception:', err)
+      toast.error('Failed to load time slots. Please try again.')
       setSlots([])
     } finally {
       setLoadingSlots(false)
@@ -239,14 +283,17 @@ const Appointments = () => {
     }
     setSubmitting(true)
     try {
-      const res = await bookPatientAppointment({
+      const body = {
         department_name: formData.departmentName,
         doctor_name: formData.doctorName,
         appointment_date: formData.date,
         appointment_time: formData.time,
         chief_complaint: formData.chiefComplaint.trim(),
-      })
+      }
+      console.log('[Appointments] Booking with:', body)
+      const res = await bookPatientAppointment(body)
       const payload = await res.json().catch(() => ({}))
+      console.log('[Appointments] Booking response:', res.status, payload)
       if (!res.ok) {
         toast.error(patientAppointmentErrorMessage(payload))
         return
@@ -254,8 +301,9 @@ const Appointments = () => {
       toast.success(payload.message || 'Appointment booked successfully!')
       setShowForm(false)
       await loadAppointments()
-    } catch {
-      toast.error('Booking failed. Try again.')
+    } catch (err) {
+      console.error('[Appointments] bookPatientAppointment exception:', err)
+      toast.error('Booking failed. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -635,26 +683,34 @@ const Appointments = () => {
                   ) : !formData.doctorName || !formData.date ? (
                     <p className="text-sm text-gray-500">Choose a doctor and date to see slots.</p>
                   ) : slots.length === 0 ? (
-                    <p className="text-sm text-amber-700">No slots returned for this day.</p>
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                      <p className="text-sm text-amber-800 font-medium">No available slots for this day.</p>
+                      <p className="text-xs text-amber-600 mt-1">Try selecting a different date or check with the hospital.</p>
+                    </div>
                   ) : (
                     <div className="flex flex-wrap gap-2">
-                      {slots.map((slot) => (
-                        <button
-                          key={slot.time}
-                          type="button"
-                          disabled={!slot.is_available}
-                          onClick={() => setFormData((prev) => ({ ...prev, time: slot.time }))}
-                          className={`px-3 py-2 rounded-lg text-sm border transition ${
-                            formData.time === slot.time
-                              ? 'bg-blue-600 text-white border-blue-600'
-                              : slot.is_available
-                                ? 'bg-white text-gray-800 border-gray-300 hover:border-blue-400'
-                                : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                          }`}
-                        >
-                          {slot.time}
-                        </button>
-                      ))}
+                      {slots.map((slot, idx) => {
+                        // Slots may be objects { time, is_available } or plain strings
+                        const slotTime = typeof slot === 'string' ? slot : slot.time
+                        const isAvail = typeof slot === 'string' ? true : (slot.is_available !== false)
+                        return (
+                          <button
+                            key={slotTime || idx}
+                            type="button"
+                            disabled={!isAvail}
+                            onClick={() => setFormData((prev) => ({ ...prev, time: slotTime }))}
+                            className={`px-3 py-2 rounded-lg text-sm border transition ${
+                              formData.time === slotTime
+                                ? 'bg-blue-600 text-white border-blue-600'
+                                : isAvail
+                                  ? 'bg-white text-gray-800 border-gray-300 hover:border-blue-400'
+                                  : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                            }`}
+                          >
+                            {slotTime}
+                          </button>
+                        )
+                      })}
                     </div>
                   )}
                 </div>

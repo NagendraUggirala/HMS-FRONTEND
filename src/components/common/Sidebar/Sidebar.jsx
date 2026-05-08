@@ -48,6 +48,7 @@ const Sidebar = ({ activePage, onPageChange, isOpen = false, onClose }) => {
     { id: 'prescriptions', label: 'Prescriptions', icon: 'fa-prescription-bottle-medical' },
     { id: 'labs', label: 'Lab Results', icon: 'fa-flask' },
     { id: 'inpatient', label: 'Inpatient Visits', icon: 'fa-procedures' },
+    { id: 'discharge', label: 'Discharge Summary', icon: 'fa-file-contract' },
     { id: 'messages', label: 'Messaging', icon: 'fa-comments' },
     { id: 'profile', label: 'My Profile', icon: 'fa-user-md' },
     { id: 'raise-ticket', label: 'Raise Ticket', icon: 'fa-envelope-open-text' }
@@ -122,6 +123,8 @@ const Sidebar = ({ activePage, onPageChange, isOpen = false, onClose }) => {
     { id: 'tests', label: 'Test Results', icon: 'fa-flask' },
     { id: 'billing', label: 'Billing & Payments', icon: 'fa-credit-card' },
     { id: 'messages', label: 'Messages', icon: 'fa-comments' },
+    { id: 'documentstorage', label: 'Document Storage', icon: 'fa-folder-open' },
+    { id: 'discharge', label: 'Discharge Summary', icon: 'fa-file-contract' },
     { id: 'profile', label: 'My Profile', icon: 'fa-user' }
   ]
 

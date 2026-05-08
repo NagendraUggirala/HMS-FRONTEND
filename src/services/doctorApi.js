@@ -513,3 +513,46 @@ export function cleanupDoctorTreatmentPlanDates() {
     }
   )
 }
+// --- DISCHARGE SUMMARY ---
+const DISCHARGE_SUMMARY_BASE = '/api/v1/patient-discharge-summary'
+
+export async function getAdmissionsReadyForDischarge(params = {}) {
+  const path = withQuery(`${DISCHARGE_SUMMARY_BASE}/admissions/ready-for-discharge`, params)
+  return doctorApiFetchWithFallback([path])
+}
+
+export async function getDischargeSummaryTemplate(admissionNumber) {
+  const path = `${DISCHARGE_SUMMARY_BASE}/admissions/${encodeURIComponent(admissionNumber)}/discharge-template`
+  return doctorApiFetchWithFallback([path])
+}
+
+export async function createDischargeSummary(body) {
+  return doctorApiFetchWithFallback([`${DISCHARGE_SUMMARY_BASE}/discharge-summaries`], {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' }
+  })
+}
+
+export async function getDischargeSummaryById(summaryId) {
+  return doctorApiFetchWithFallback([`${DISCHARGE_SUMMARY_BASE}/discharge-summaries/${encodeURIComponent(summaryId)}`])
+}
+
+export async function updateDischargeSummary(summaryId, body) {
+  return doctorApiFetchWithFallback([`${DISCHARGE_SUMMARY_BASE}/discharge-summaries/${encodeURIComponent(summaryId)}`], {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' }
+  })
+}
+
+export async function finalizeDischargeSummary(summaryId) {
+  return doctorApiFetchWithFallback([`${DISCHARGE_SUMMARY_BASE}/discharge-summaries/${encodeURIComponent(summaryId)}/finalize`], {
+    method: 'POST'
+  })
+}
+
+export async function getDischargeStatistics(params = {}) {
+  const path = withQuery(`${DISCHARGE_SUMMARY_BASE}/discharge-summaries/statistics`, params)
+  return doctorApiFetchWithFallback([path])
+}
