@@ -111,7 +111,6 @@ const Sidebar = ({ activePage, onPageChange, isOpen = false, onClose }) => {
     { id: 'dashboard', label: 'Dashboard Overview', icon: 'fa-chart-line' },
     { id: 'appointments', label: 'My Appointments', icon: 'fa-calendar-check' },
     { id: 'records', label: 'Medical Records', icon: 'fa-file-medical' },
-    { id: 'discharge', label: 'Discharge Summary', icon: 'fa-file-medical' },
     { id: 'prescriptions', label: 'Prescriptions', icon: 'fa-prescription-bottle-alt' },
     { id: 'tests', label: 'Test Results', icon: 'fa-flask' },
     { id: 'billing', label: 'Billing & Payments', icon: 'fa-credit-card' },
