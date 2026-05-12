@@ -163,3 +163,19 @@ export const RECEPTIONIST_PATIENT_REGISTER = '/api/v1/receptionist/patients/regi
 
 /** Receptionist: dashboard overview */
 export const RECEPTIONIST_DASHBOARD_OVERVIEW = '/api/v1/receptionist/dashboard';
+
+/** Prescription Management - Doctor endpoints */
+export const PRESCRIPTION_MEDICINES_SEARCH = '/api/v1/simple-prescription/doctor/medicines/search';
+export const PRESCRIPTION_CREATE = '/api/v1/simple-prescription/doctor/prescriptions/create';
+export const PRESCRIPTION_DOCTOR_LIST = '/api/v1/simple-prescription/doctor/prescriptions';
+
+/** Prescription Management - Pharmacist endpoints */
+export const PRESCRIPTION_PHARMACIST_LIST = '/api/v1/simple-prescription/pharmacist/prescriptions';
+export const PRESCRIPTION_DISPENSE = (prescriptionId) => `/api/v1/simple-prescription/pharmacist/prescriptions/${encodeURIComponent(prescriptionId)}/dispense`;
+
+/** Prescription Management - Patient endpoints */
+export const PRESCRIPTION_PATIENT_LIST = '/api/v1/simple-prescription/patient/prescriptions';
+
+/** Prescription Management - Common endpoints */
+export const PRESCRIPTION_DETAILS = (prescriptionId) => `/api/v1/simple-prescription/prescriptions/${encodeURIComponent(prescriptionId)}`;
+export const PRESCRIPTION_PDF_DOWNLOAD = (prescriptionId) => `/api/v1/simple-prescription/prescriptions/${encodeURIComponent(prescriptionId)}/pdf`;
