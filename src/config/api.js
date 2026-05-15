@@ -1,11 +1,4 @@
-// src/config/api.js  apiConfig.js - Add support endpoints
-/*
- * Backend API base URL (`BASE_URL` + paths = e.g. http://localhost:8060/api/v1/...).
- * In dev: empty string so requests use the Vite dev server origin and `/api` is proxied to the backend (avoids CORS).
- * In production: set `VITE_API_BASE_URL` (e.g. http://localhost:8060).
-*/
-// In local dev, use Vite proxy (/api -> Render backend) to avoid browser CORS.
-// In production builds, call backend directly.
+
 export const API_BASE_URL = import.meta.env.DEV
   ? ''
   : (import.meta.env.VITE_API_BASE_URL || 'https://hms-backend-t9m3.onrender.com').replace(/\/$/, '');
@@ -175,7 +168,7 @@ export const RECEPTIONIST_PATIENT_UPDATE = (patientId) => `/api/v1/receptionist/
 /** Receptionist: dashboard overview */
 export const RECEPTIONIST_DASHBOARD_OVERVIEW = '/api/v1/receptionist/dashboard';
 
-<<<<<<< Updated upstream
+
 /** Prescription Management - Doctor endpoints */
 export const PRESCRIPTION_MEDICINES_SEARCH = '/api/v1/simple-prescription/doctor/medicines/search';
 export const PRESCRIPTION_CREATE = '/api/v1/simple-prescription/doctor/prescriptions/create';
@@ -191,7 +184,6 @@ export const PRESCRIPTION_PATIENT_LIST = '/api/v1/simple-prescription/patient/pr
 /** Prescription Management - Common endpoints */
 export const PRESCRIPTION_DETAILS = (prescriptionId) => `/api/v1/simple-prescription/prescriptions/${encodeURIComponent(prescriptionId)}`;
 export const PRESCRIPTION_PDF_DOWNLOAD = (prescriptionId) => `/api/v1/simple-prescription/prescriptions/${encodeURIComponent(prescriptionId)}/pdf`;
-=======
 /** Receptionist: patient management */
 export const RECEPTIONIST_PATIENTS = '/api/v1/receptionist/patients';
 export const RECEPTIONIST_PATIENT_SEARCH = '/api/v1/receptionist/patients/search';
@@ -222,4 +214,4 @@ export const PHARMACY_SETTINGS_BASE = '/api/v1/pharmacy/settings';
 export const NURSE_BASE = '/api/v1/nurse';
 export const NURSE_ASSIGNED_PATIENTS = `${NURSE_BASE}/assigned_patients`;
 
->>>>>>> Stashed changes
+
