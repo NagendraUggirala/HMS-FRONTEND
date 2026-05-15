@@ -2,13 +2,14 @@ import React, { useState } from "react";
 import { toast } from "react-toastify";
 
 import {
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
+  Cell,
 } from "recharts";
 
 import {
@@ -27,42 +28,188 @@ import {
   Download,
   Printer,
   X,
+  Loader2,
 } from "lucide-react";
 
-import Modal from "../../../../components/common/Modal/Modal"; // Import your existing Modal component
+import Modal from "../../../../components/common/Modal/Modal";
+import {
+  getDashboardOverview,
+  getSuppliers,
+  getMedicines,
+  getSales,
+  getSalesSummary,
+  getAlerts,
+  createPurchaseOrder,
+  getStockBatches
+} from "../../../../services/pharmacyApi";
 
-/* ================= DATA ================= */
 
-const salesData = [
-  { day: "Mon", sales: 32000 },
-  { day: "Tue", sales: 38000 },
-  { day: "Wed", sales: 42000 },
-  { day: "Thu", sales: 39000 },
-  { day: "Fri", sales: 43000 },
-  { day: "Sat", sales: 51000 },
-  { day: "Sun", sales: 48000 },
-];
 
-// Original low stock items data (expanded with more items)
-const lowStockItems = [
-  { name: "Amoxicillin 500mg", category: "Antibiotic", stock: "12 units", status: "Critical" },
-  { name: "Paracetamol 650mg", category: "Analgesic", stock: "8 units", status: "Critical" },
-  { name: "Ibuprofen 400mg", category: "Pain Relief", stock: "15 units", status: "Low Stock" },
-  { name: "Cetirizine 10mg", category: "Antihistamine", stock: "22 units", status: "Low Stock" },
-  { name: "Metformin 500mg", category: "Diabetes", stock: "18 units", status: "Low Stock" },
-  { name: "Atorvastatin 20mg", category: "Cholesterol", stock: "9 units", status: "Critical" },
-  { name: "Levothyroxine 50mcg", category: "Thyroid", stock: "14 units", status: "Low Stock" },
-  { name: "Losartan 50mg", category: "Hypertension", stock: "11 units", status: "Critical" },
-];
-
-export default function Dashboard() {
+export default function Dashboard({ onPageChange }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState("");
-  const [orderItems, setOrderItems] = useState([
-    { id: 1, name: "Amoxicillin 500mg", quantity: 0, price: 85 },
-    { id: 2, name: "Paracetamol 650mg", quantity: 0, price: 25 },
-    { id: 3, name: "Ibuprofen 400mg", quantity: 0, price: 45 },
-  ]);
+  const [orderItems, setOrderItems] = useState([]);
+
+
+  const [dashboardData, setDashboardData] = useState(null);
+  const [activeSuppliersCount, setActiveSuppliersCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [suppliersListState, setSuppliersListState] = useState([]);
+  const [medicinesListState, setMedicinesListState] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  React.useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const today = new Date();
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(today.getDate() - 7);
+
+        const fromDate = sevenDaysAgo.toISOString().split('T')[0];
+        const toDate = today.toISOString().split('T')[0];
+
+        const safeFetch = async (promise, name) => {
+          try {
+            const res = await promise;
+            return res;
+          } catch (e) {
+            console.error(`[Dashboard] ${name} API failed:`, e);
+            return null;
+          }
+        };
+
+        const [response, suppliersRes, medicinesRes, salesRes, salesSummaryRes, alertsRes, lowStockRes] = await Promise.all([
+          safeFetch(getDashboardOverview(), "Overview"),
+          safeFetch(getSuppliers(), "Suppliers"),
+          safeFetch(getMedicines(0, 1000), "Medicines"),
+          safeFetch(getSales("", "Completed", "", "", 0, 5), "Sales"),
+          safeFetch(getSalesSummary(fromDate, toDate, 'day'), "SalesSummary"),
+          safeFetch(getAlerts(0, 5, 'EXPIRY', 'PENDING'), "Alerts"),
+          safeFetch(getStockBatches(undefined, true, null, 0, 1000), "LowStock")
+        ]);
+
+        // 1. Process Overview Data
+        const data = response?.overview || response?.stats || response?.data || response || {};
+
+        // 1.1 Process Low Stock Data from dedicated endpoint
+        const rawLowStock = lowStockRes?.batches || lowStockRes?.items || (Array.isArray(lowStockRes) ? lowStockRes : []) || [];
+        const medicineList = medicinesRes?.medicines || medicinesRes?.items || (Array.isArray(medicinesRes) ? medicinesRes : []) || [];
+        
+        const formattedLowStock = rawLowStock
+          .filter(item => (item.qty_on_hand ?? item.quantity ?? 0) <= 10) // Strict filter for low stock
+          .slice(0, 5)
+          .map(item => {
+             const medId = item.medicine_id || item.id;
+             const masterMed = medicineList.find(m => (m.id || m._id) === medId);
+             return {
+                name: item.brand_name || item.medicine_name || item.medicine?.brand_name || item.medicine?.name || item.item_name || item.name || masterMed?.name || masterMed?.brand_name || masterMed?.brand_name || `Medicine (${(medId || '').toString().slice(-6)})`,
+                category: item.medicine?.category || item.category || masterMed?.category || 'General',
+                stock: item.qty_on_hand ?? item.quantity ?? 0,
+                status: (item.qty_on_hand ?? item.quantity) <= 5 ? 'Critical' : 'Low'
+             };
+          });
+
+        // ... previous logic for combined activity ...
+        const apiActivity = Array.isArray(data.recent_activity || data.recentActivity) ? (data.recent_activity || data.recentActivity) : [];
+        const medicineActivity = (Array.isArray(medicineList) ? medicineList : []).slice(0, 3).map(m => ({
+          title: "New Medicine Added",
+          desc: `${m?.brand_name || m?.name || 'Unknown medicine'} added`,
+          type: "medicine",
+          time: "Recently"
+        }));
+        const salesList = salesRes?.sales || salesRes?.items || (Array.isArray(salesRes) ? salesRes : []) || [];
+        const saleActivity = (Array.isArray(salesList) ? salesList : []).slice(0, 3).map(s => ({
+          title: "Medicine Sold",
+          desc: `Sale #${s?.id?.toString().slice(-6) || 'N/A'} for ₹${s?.total_amount || 0}`,
+          type: "sale",
+          time: "Recently"
+        }));
+        const combinedActivity = [...apiActivity, ...medicineActivity, ...saleActivity].slice(0, 8);
+
+        // ... previous logic for chart data ...
+        const salesSummary = salesSummaryRes?.summary || (Array.isArray(salesSummaryRes) ? salesSummaryRes : []) || [];
+        const chartSalesData = (Array.isArray(salesSummary) ? salesSummary : []).map(item => ({
+          day: item?.period || item?.day || item?.date || "N/A",
+          sales: Number(item?.total_sales || item?.sales || item?.amount || 0)
+        }));
+
+        // 3.5 Process Expiry Alerts
+        const rawAlerts = alertsRes?.items || alertsRes?.data || (Array.isArray(alertsRes) ? alertsRes : []) || [];
+        // Sort by creation date to show most recent alerts first
+        const sortedAlerts = [...rawAlerts].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        
+        const formattedAlerts = sortedAlerts.slice(0, 5).map(item => {
+          const meta = item.metadata || {};
+          const daysLeft = meta.days_left ?? item.days_left ?? item.days_until_expiry ?? 0;
+          return {
+            name: meta.medicine_name || item.name || item.item_name || 'Unknown',
+            batch: meta.batch_number || item.batch_number || item.batch || 'N/A',
+            days: `${daysLeft} days`,
+            danger: daysLeft <= 15
+          };
+        });
+
+        const filteredRawLowStock = rawLowStock.filter(item => (item.qty_on_hand ?? item.quantity ?? 0) <= 10);
+        const totalLowStock = filteredRawLowStock.length;
+
+        setDashboardData({
+          ...data,
+          recent_activity: combinedActivity,
+          sales_data: chartSalesData,
+          low_stock_count: totalLowStock,
+          expiry_alerts: formattedAlerts.length > 0 ? formattedAlerts : (data.expiry_alerts || data.expiryAlerts || []),
+          low_stock_list: formattedLowStock.length > 0 ? formattedLowStock : (data.low_stock_list || data.lowStockList || [])
+        });
+
+        // 4. Process Suppliers Count
+        const suppliersList = suppliersRes?.suppliers || suppliersRes?.items || suppliersRes?.data || (Array.isArray(suppliersRes) ? suppliersRes : []) || [];
+        setSuppliersListState(suppliersList);
+        setMedicinesListState(medicineList);
+        const activeCount = (Array.isArray(suppliersList) ? suppliersList : []).filter(s =>
+          s &&
+          !s.is_deleted &&
+          s.status !== 'Inactive' &&
+          s.status !== 'Deleted' &&
+          s.status !== 'Archived'
+        ).length;
+        setActiveSuppliersCount(activeCount);
+
+      } catch (err) {
+        console.error("[Dashboard] Processing Error:", err);
+        // Don't show toast for every minor issue, just log it
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, []);
+
+  const dData = dashboardData || {};
+  const tMedicines = dData.medicines_count ?? dData.total_medicines_count ?? dData.total_medicines ?? dData.totalMedicines ?? "0";
+  const tSales = dData.sales_today_count ?? dData.todays_sales ?? dData.todaysSales ?? "0";
+  const lStock = dData.low_stock_count ?? dData.low_stock_items ?? dData.lowStockItems ?? "0";
+  const aSuppliers = activeSuppliersCount || "0";
+
+  const rawChartData = dData.sales_data || dData.salesData || [];
+  const processedChartData = rawChartData.map(item => ({
+    ...item,
+    sales: Number(item.sales ?? item.amount ?? item.total ?? item.revenue ?? 0),
+    day: item.day ?? item.date ?? item.label ?? "N/A"
+  }));
+
+  // Show zero-filled week if no data is present
+  const displayData = processedChartData.length > 0 ? processedChartData : [
+    { day: 'Mon', sales: 0 },
+    { day: 'Tue', sales: 0 },
+    { day: 'Wed', sales: 0 },
+    { day: 'Thu', sales: 0 },
+    { day: 'Fri', sales: 0 },
+    { day: 'Sat', sales: 0 },
+    { day: 'Sun', sales: 0 },
+  ];
+  const lsItems = dData.low_stock_list || dData.lowStockList || [];
+  const eAlerts = dData.expiry_alerts || dData.expiryAlerts || [];
+  const rActivity = dData.recent_activity || dData.recentActivity || [];
 
   const AnalyticsCard = ({
     title,
@@ -143,11 +290,13 @@ export default function Dashboard() {
   const handleMedicines = () =>
     toast.info("Opening total medicines");
 
-  const handleViewAllStock = () =>
-    toast.info("Viewing all low stock medicines");
+  const handleViewAllStock = () => {
+    if (onPageChange) onPageChange("stock");
+  };
 
-  const handleViewAllExpiry = () =>
-    toast.warning("Viewing expiry alerts");
+  const handleViewAllExpiry = () => {
+    if (onPageChange) onPageChange("purchaseorders");
+  };
 
   const handleNewOrder = () => {
     setIsModalOpen(true);
@@ -157,11 +306,22 @@ export default function Dashboard() {
   const handleFilterChange = (e) =>
     toast(`Filter applied: ${e.target.value}`);
 
+  const handleAddItem = () => {
+    const newItem = {
+      id: Date.now(),
+      medicine_id: "",
+      name: "",
+      price: 0,
+      quantity: 1
+    };
+    setOrderItems([...orderItems, newItem]);
+  };
+
   const updateQuantity = (id, delta) => {
     setOrderItems(items =>
       items.map(item =>
         item.id === id
-          ? { ...item, quantity: Math.max(0, item.quantity + delta) }
+          ? { ...item, quantity: Math.max(1, item.quantity + delta) }
           : item
       )
     );
@@ -171,11 +331,32 @@ export default function Dashboard() {
     return orderItems.reduce((total, item) => total + (item.quantity * item.price), 0);
   };
 
-  const handleSubmitOrder = () => {
-    toast.success(`Order submitted successfully! Total: ₹${calculateTotal()}`);
-    setIsModalOpen(false);
-    setOrderItems(items => items.map(item => ({ ...item, quantity: 0 })));
-    setSelectedSupplier("");
+  const handleSubmitOrder = async () => {
+    if (!selectedSupplier || calculateTotal() === 0) return;
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        supplier_id: selectedSupplier,
+        expected_date: document.getElementById('po-delivery-date').value || new Date().toISOString().split('T')[0],
+        notes: document.getElementById('po-notes').value || "",
+        items: orderItems.map(item => ({
+          medicine_id: item.medicine_id,
+          ordered_qty: Number(item.quantity),
+          purchase_rate: Number(item.price)
+        }))
+      };
+
+      await createPurchaseOrder(payload);
+      toast.success(`Purchase Order submitted successfully!`);
+
+      setIsModalOpen(false);
+      setOrderItems([]);
+      setSelectedSupplier("");
+    } catch (err) {
+      toast.error(err.message || "Failed to create purchase order");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Original StockRow component remains the same
@@ -185,9 +366,8 @@ export default function Dashboard() {
       <td>{category}</td>
       <td>{stock}</td>
       <td>
-        <span className={`px-3 py-1 text-xs rounded-full ${
-          status === "Critical" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"
-        }`}>
+        <span className={`px-3 py-1 text-xs rounded-full ${status === "Critical" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"
+          }`}>
           {status}
         </span>
       </td>
@@ -215,10 +395,9 @@ export default function Dashboard() {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             >
               <option value="">Choose a supplier</option>
-              <option value="MedLife Corp">MedLife Corp</option>
-              <option value="PharmaDirect">PharmaDirect</option>
-              <option value="HealthPlus">HealthPlus</option>
-              <option value="MediCare">MediCare</option>
+              {suppliersListState.map(s => (
+                <option key={s.id} value={s.id}>{s.name || s.supplier_name}</option>
+              ))}
             </select>
           </div>
 
@@ -226,8 +405,16 @@ export default function Dashboard() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-medium text-gray-900">Order Items</h3>
-              <div className="text-lg font-semibold text-blue-600">
-                Total: ₹{calculateTotal()}
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={handleAddItem}
+                  className="flex items-center gap-1 text-sm bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition"
+                >
+                  <Plus size={16} /> Add Item
+                </button>
+                <div className="text-lg font-semibold text-blue-600">
+                  Total: ₹{calculateTotal()}
+                </div>
               </div>
             </div>
 
@@ -245,9 +432,33 @@ export default function Dashboard() {
                   {orderItems.map((item) => (
                     <tr key={item.id}>
                       <td className="p-3">
-                        <div className="font-medium">{item.name}</div>
+                        <select
+                          value={item.medicine_id}
+                          onChange={(e) => {
+                            const selectedMed = medicinesListState.find(m => String(m.id) === e.target.value);
+                            if (selectedMed) {
+                              setOrderItems(items => items.map(i => i.id === item.id ? { ...i, medicine_id: selectedMed.id, name: selectedMed.name || selectedMed.brand_name, price: selectedMed.unit_price || selectedMed.price || 0 } : i));
+                            }
+                          }}
+                          className="w-full border border-gray-300 rounded px-2 py-1 outline-none focus:border-blue-500"
+                        >
+                          <option value="">Select Medicine</option>
+                          {medicinesListState.map(m => (
+                            <option key={m.id} value={m.id}>{m.name || m.brand_name}</option>
+                          ))}
+                        </select>
                       </td>
-                      <td className="p-3">₹{item.price}</td>
+                      <td className="p-3">
+                        <div className="flex items-center">
+                          <span className="mr-1">₹</span>
+                          <input
+                            type="number"
+                            className="w-20 border border-gray-300 rounded px-2 py-1 outline-none focus:border-blue-500"
+                            value={item.price}
+                            onChange={(e) => setOrderItems(items => items.map(i => i.id === item.id ? { ...i, price: Number(e.target.value) } : i))}
+                          />
+                        </div>
+                      </td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
                           <button
@@ -279,6 +490,7 @@ export default function Dashboard() {
               Additional Notes
             </label>
             <textarea
+              id="po-notes"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               rows="3"
               placeholder="Add any special instructions or notes for this order..."
@@ -293,6 +505,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
               <Calendar size={18} className="text-gray-400" />
               <input
+                id="po-delivery-date"
                 type="date"
                 className="flex-1 outline-none"
                 min={new Date().toISOString().split('T')[0]}
@@ -310,13 +523,13 @@ export default function Dashboard() {
             </button>
             <button
               onClick={handleSubmitOrder}
-              disabled={!selectedSupplier || calculateTotal() === 0}
-              className={`px-4 py-2 rounded-lg ${
-                !selectedSupplier || calculateTotal() === 0
-                  ? 'bg-gray-300 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700'
-              } text-white`}
+              disabled={!selectedSupplier || calculateTotal() === 0 || isSubmitting}
+              className={`px-4 py-2 rounded-lg ${!selectedSupplier || calculateTotal() === 0 || isSubmitting
+                ? 'bg-gray-300 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700'
+                } text-white flex items-center gap-2`}
             >
+              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : null}
               Submit Order
             </button>
           </div>
@@ -325,6 +538,11 @@ export default function Dashboard() {
 
       {/* Dashboard Content */}
       <div className="bg-slate-100 min-h-screen w-full text-left space-y-6 px-3 sm:px-6 py-4 relative">
+        {isLoading && (
+          <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center">
+            <Loader2 className="animate-spin text-blue-600" size={48} />
+          </div>
+        )}
         {/* HEADER */}
         <div className="flex flex-col gap-1">
           <h1 className="text-xl sm:text-2xl font-bold">Dashboard</h1>
@@ -337,7 +555,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <AnalyticsCard
             title="Total Medicines"
-            value="1,247"
+            value={tMedicines}
             percent="+12%"
             icon={Pill}
             iconBg="bg-indigo-600"
@@ -348,7 +566,7 @@ export default function Dashboard() {
 
           <AnalyticsCard
             title="Today's Sales"
-            value="₹42,580"
+            value={tSales}
             percent="+8%"
             icon={IndianRupee}
             iconBg="bg-green-600"
@@ -360,7 +578,7 @@ export default function Dashboard() {
 
           <AnalyticsCard
             title="Low Stock Items"
-            value="18"
+            value={lStock}
             percent="-5%"
             danger
             icon={AlertTriangle}
@@ -372,7 +590,7 @@ export default function Dashboard() {
 
           <AnalyticsCard
             title="Active Suppliers"
-            value="24"
+            value={aSuppliers}
             percent="+25%"
             icon={Truck}
             iconBg="bg-purple-600"
@@ -394,16 +612,50 @@ export default function Dashboard() {
                 <option>Last 30 days</option>
               </select>
             </div>
-
             <div className="h-64 sm:h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={salesData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="day" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="sales" stroke="#2563eb" strokeWidth={3} />
-                </LineChart>
+                <AreaChart data={displayData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.15} />
+                      <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis
+                    dataKey="day"
+                    axisLine={{ stroke: '#000000', strokeWidth: 1.5 }}
+                    tickLine={false}
+                    tick={{ fill: '#64748b', fontSize: 12, fontWeight: 500 }}
+                    dy={10}
+                  />
+                  <YAxis
+                    axisLine={{ stroke: '#000000', strokeWidth: 1.5 }}
+                    tickLine={false}
+                    tick={{ fill: '#64748b', fontSize: 12, fontWeight: 500 }}
+                    tickFormatter={(value) => `₹${value > 999 ? (value / 1000).toFixed(0) + 'K' : value}`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '12px',
+                      border: 'none',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                      padding: '12px'
+                    }}
+                    formatter={(value) => [`₹${value.toLocaleString()}`, 'Sales']}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="sales"
+                    stroke="#4f46e5"
+                    strokeWidth={3}
+                    fillOpacity={1}
+                    fill="url(#colorSales)"
+                    dot={{ r: 4, fill: '#fff', stroke: '#4f46e5', strokeWidth: 2 }}
+                    activeDot={{ r: 6, strokeWidth: 0 }}
+                    animationDuration={1500}
+                  />
+                </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
@@ -412,10 +664,42 @@ export default function Dashboard() {
           <div className="bg-white rounded-xl shadow p-4 sm:p-6">
             <h2 className="font-semibold text-lg mb-4">Recent Activity</h2>
             <ul className="space-y-3">
-              <ActivityItem title="New purchase order created" desc="Order #PO-7842 for 50 units" icon={ShoppingCart} bg="bg-blue-100 text-blue-600" />
-              <ActivityItem title="Stock updated" desc="Paracetamol stock increased to 120" icon={CheckCircle} bg="bg-green-100 text-green-600" />
-              <ActivityItem title="Expiry alert" desc="Amoxicillin expires in 7 days" icon={AlertCircle} bg="bg-red-100 text-red-600" />
-              <ActivityItem title="Supplier updated" desc="MedLife Corp contact info updated" icon={RefreshCcw} bg="bg-purple-100 text-purple-600" />
+              {rActivity.length > 0 ? (
+                rActivity.map((act, i) => {
+                  let Icon = CheckCircle;
+                  let bg = "bg-blue-100 text-blue-600";
+
+                  const title = (act.title || "").toLowerCase();
+                  if (title.includes("medicine") || title.includes("pill") || title.includes("drug")) {
+                    Icon = Pill;
+                    bg = "bg-indigo-100 text-indigo-600";
+                  } else if (title.includes("sale") || title.includes("sold") || title.includes("order")) {
+                    Icon = ShoppingCart;
+                    bg = "bg-green-100 text-green-600";
+                  } else if (title.includes("stock") || title.includes("inventory") || title.includes("batch")) {
+                    Icon = Package;
+                    bg = "bg-orange-100 text-orange-600";
+                  } else if (title.includes("supplier") || title.includes("truck") || title.includes("delivery")) {
+                    Icon = Truck;
+                    bg = "bg-purple-100 text-purple-600";
+                  }
+
+                  return (
+                    <ActivityItem
+                      key={i}
+                      title={act.title}
+                      desc={act.desc}
+                      icon={Icon}
+                      bg={bg}
+                      time={act.time}
+                    />
+                  );
+                })
+              ) : (
+                <div className="py-8 text-center text-slate-400 italic text-sm">
+                  No recent activity found.
+                </div>
+              )}
             </ul>
           </div>
         </div>
@@ -442,8 +726,8 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {lowStockItems.map((item, index) => (
-                    <StockRow 
+                  {lsItems.map((item, index) => (
+                    <StockRow
                       key={index}
                       name={item.name}
                       category={item.category}
@@ -459,17 +743,16 @@ export default function Dashboard() {
           {/* EXPIRY ALERTS */}
           <div className="bg-white rounded-xl shadow p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-              <h2 className="font-semibold text-lg">Expiry Alerts</h2>
+              <h2 className="font-semibold text-lg">Purchase Order</h2>
               <button onClick={handleViewAllExpiry} className="text-blue-600 text-sm">
                 View all →
               </button>
             </div>
 
             <div className="space-y-3">
-              <AlertCard name="Amoxicillin 500mg" batch="AMX-7842" days="7 days" danger />
-              <AlertCard name="Cetirizine 10mg" batch="CET-4521" days="15 days" />
-              <AlertCard name="Ibuprofen 400mg" batch="IBU-8923" days="21 days" />
-              <AlertCard name="Paracetamol 650mg" batch="PAR-3456" days="30 days" />
+              {eAlerts.map((alert, index) => (
+                <AlertCard key={index} name={alert.name} batch={alert.batch} days={alert.days} danger={alert.danger} />
+              ))}
             </div>
 
             <button onClick={handleNewOrder} className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2">
@@ -485,14 +768,17 @@ export default function Dashboard() {
 
 /* ================= COMPONENTS ================= */
 
-const ActivityItem = ({ title, desc, icon: Icon, bg }) => (
+const ActivityItem = ({ title, desc, icon: Icon, bg, time }) => (
   <li onClick={() => toast.info(title)} className="flex gap-3 items-start hover:bg-slate-50 p-2 sm:p-3 rounded cursor-pointer">
-    <div className={`w-9 h-9 rounded-full flex items-center justify-center ${bg}`}>
+    <div className={`w-9 h-9 rounded-full flex items-center justify-center ${bg} shrink-0`}>
       <Icon size={16} />
     </div>
-    <div>
-      <p className="font-medium">{title}</p>
-      <p className="text-slate-500 text-sm">{desc}</p>
+    <div className="flex-1 min-w-0">
+      <div className="flex justify-between items-start gap-2">
+        <p className="font-medium text-sm truncate">{title}</p>
+        {time && <span className="text-[10px] text-slate-400 whitespace-nowrap">{time}</span>}
+      </div>
+      <p className="text-slate-500 text-xs line-clamp-1">{desc}</p>
     </div>
   </li>
 );
@@ -504,9 +790,8 @@ const AlertCard = ({ name, batch, days, danger }) => (
         ? toast.error(`${name} expires in ${days}`)
         : toast.warn(`${name} expires in ${days}`)
     }
-    className={`p-4 rounded-lg cursor-pointer ${
-      danger ? "bg-red-50" : "bg-yellow-50"
-    }`}
+    className={`p-4 rounded-lg cursor-pointer ${danger ? "bg-red-50" : "bg-yellow-50"
+      }`}
   >
     <div className="flex justify-between">
       <div>

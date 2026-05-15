@@ -121,13 +121,17 @@ const Sidebar = ({ activePage, onPageChange, isOpen = false, onClose }) => {
   ]
 
    const pharmacyMenu = [
-    { id: "dashboard", label: "Dashboard", icon: "fas fa-tachometer-alt" },
-    { id: "inventory", label: "Inventory", icon: "fas fa-boxes" },
+    { id: "dashboard", label: "Dashboard Overview", icon: "fas fa-tachometer-alt" },
+    { id: "inventory", label: "Inventory Management", icon: "fas fa-boxes" },
     { id: "purchaseorders", label: "Purchase Orders", icon: "fas fa-shopping-cart" },
     { id: "salestracking", label: "Sales Tracking", icon: "fa-chart-line" },
     { id: "expiryalerts", label: "Expiry Alerts", icon: "fas fa-exclamation-triangle" },
     { id: "suppliermanagement", label: "Supplier Management", icon: "fas fa-truck" },
     { id: "medicinedatabase", label: "Medicine Database", icon: "fas fa-database" },
+    { id: "stock", label: "Stock", icon: "fas fa-cubes" },
+    { id: "return", label: "Return", icon: "fas fa-undo" },
+    { id: "grn", label: "GRN", icon: "fas fa-file-invoice" },
+    { id: "report", label: "Report", icon: "fas fa-chart-bar" },
     { id: "settings", label: "Settings", icon: "fas fa-cog" },
     { id: 'raise-ticket', label: 'Raise Ticket', icon: 'fa-envelope-open-text' }
   ];
