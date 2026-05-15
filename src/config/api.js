@@ -186,9 +186,6 @@ export const PRESCRIPTION_DETAILS = (prescriptionId) => `/api/v1/simple-prescrip
 export const PRESCRIPTION_PDF_DOWNLOAD = (prescriptionId) => `/api/v1/simple-prescription/prescriptions/${encodeURIComponent(prescriptionId)}/pdf`;
 /** Receptionist: patient management */
 export const RECEPTIONIST_PATIENTS = '/api/v1/receptionist/patients';
-export const RECEPTIONIST_PATIENT_SEARCH = '/api/v1/receptionist/patients/search';
-export const RECEPTIONIST_PATIENT_PROFILE = (patientRef) => `/api/v1/receptionist/patients/${encodeURIComponent(patientRef)}/profile`;
-export const RECEPTIONIST_PATIENT_UPDATE = (patientId) => `/api/v1/receptionist/patients/${encodeURIComponent(patientId)}`;
 // --- PHARMACY REPORTS ---
 export const PHARMACY_REPORTS_BASE = '/api/v1/pharmacy/reports';
 export const PHARMACY_REPORTS_SALES_SUMMARY = `${PHARMACY_REPORTS_BASE}/sales-summary`;
