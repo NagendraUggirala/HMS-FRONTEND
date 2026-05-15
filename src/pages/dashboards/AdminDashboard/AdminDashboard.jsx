@@ -1,3 +1,4 @@
+// src/pages/dashboards/AdminDashboard/AdminDashboard.jsx
 import React, { useState, useEffect } from 'react'
 import Header from '../../../components/common/Header/Header'
 import Sidebar from '../../../components/common/Sidebar/Sidebar'
@@ -76,9 +77,9 @@ const AdminDashboard = () => {
       case 'reports':
         return <Reports />
       case 'settings':
+        return <Settings />
       case 'audit':
         return <AuditLogs />
-        return <Settings />
       case 'raise-ticket':
         return <Raiseticket />
 

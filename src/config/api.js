@@ -76,6 +76,21 @@ export const SUPER_ADMIN_ME_AVATAR = '/api/v1/super-admin/me/avatar';
 export const SUPER_ADMIN_ME_SECURITY = '/api/v1/super-admin/me/security';
 export const SUPER_ADMIN_ME_CHANGE_PASSWORD = '/api/v1/super-admin/me/change-password';
 
+/** Hospital Admin: personal profile */
+export const HOSPITAL_ADMIN_ME = '/api/v1/hospital-admin/me';
+export const HOSPITAL_ADMIN_ME_AVATAR = '/api/v1/hospital-admin/me/avatar';
+export const HOSPITAL_ADMIN_ME_SECURITY = '/api/v1/hospital-admin/me/security';
+export const HOSPITAL_ADMIN_ME_CHANGE_PASSWORD = '/api/v1/hospital-admin/me/change-password';
+
+/** Hospital Admin: Platform Settings */
+export const HOSPITAL_ADMIN_PLATFORM_FEATURES = '/api/v1/hospital-admin/platform-settings/features';
+export const HOSPITAL_ADMIN_PLATFORM_SUBSCRIPTION = '/api/v1/hospital-admin/platform-settings/subscription';
+export const HOSPITAL_ADMIN_PLATFORM_PLAN = '/api/v1/hospital-admin/platform-settings/plan';
+export const HOSPITAL_ADMIN_PLATFORM_HOSPITAL = '/api/v1/hospital-admin/platform-settings/hospital';
+export const HOSPITAL_ADMIN_PLATFORM_MODULES = '/api/v1/hospital-admin/platform-settings/modules';
+export const HOSPITAL_ADMIN_PLATFORM_USAGE = '/api/v1/hospital-admin/platform-settings/usage';
+export const HOSPITAL_ADMIN_PLATFORM_COMBINED = '/api/v1/hospital-admin/platform-settings';
+
 /** Analytics: GET overview (hospitals, subscriptions, revenue, patients, occupancy) */
 export const ANALYTICS_OVERVIEW = '/api/v1/analytics/overview';
 export const SUPER_ADMIN_ANALYTICS_OVERVIEW = '/api/v1/super-admin/analytics/overview';

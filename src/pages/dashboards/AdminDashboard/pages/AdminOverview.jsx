@@ -1,3 +1,4 @@
+// src/pages/dashboards/AdminDashboard/pages/AdminOverview.jsx
 import React, { useState, useEffect } from 'react';
 import LoadingSpinner from '../../../../components/common/LoadingSpinner/LoadingSpinner';
 import { apiFetch } from '../../../../services/apiClient';
@@ -65,12 +66,8 @@ const AdminOverview = ({ setActivePage }) => {
     active_staff: 0,
     staff_by_role: {},
     staff_by_department: {},
-    // Keep mock critical alerts
-    criticalAlerts: [
-      { id: 1, type: 'bed', severity: 'high', message: 'ICU beds at 95% capacity', time: '2 hours ago' },
-      { id: 2, type: 'staff', severity: 'medium', message: '3 nurses on leave tomorrow', time: '4 hours ago' },
-      { id: 3, type: 'equipment', severity: 'low', message: 'MRI maintenance due in 3 days', time: '1 day ago' }
-    ],
+    staff_by_department: {},
+    criticalAlerts: [],
   });
 
   useEffect(() => {
@@ -266,6 +263,47 @@ const AdminOverview = ({ setActivePage }) => {
         active_staff: staffParsed?.active_staff ?? overview?.staff_metrics?.total_staff ?? 0,
         staff_by_role: staffParsed?.staff_by_role ?? {},
         staff_by_department: staffParsed?.staff_by_department ?? {},
+        
+        // Critical alerts dynamically calculated
+        criticalAlerts: (() => {
+          const generatedAlerts = [];
+          let alertId = 1;
+
+          const bedOccupancyRate = overview?.bed_metrics?.bed_occupancy_rate || 0;
+          if (bedOccupancyRate >= 90) {
+            generatedAlerts.push({
+              id: alertId++, type: 'bed', severity: 'high',
+              message: `High bed occupancy: ${bedOccupancyRate.toFixed(1)}% capacity reached`, time: 'Just now'
+            });
+          } else if (bedOccupancyRate >= 80) {
+            generatedAlerts.push({
+              id: alertId++, type: 'bed', severity: 'medium',
+              message: `Bed occupancy at ${bedOccupancyRate.toFixed(1)}% capacity`, time: 'Just now'
+            });
+          }
+
+          const tStaff = staffParsed?.total_staff || overview?.staff_metrics?.total_staff || 0;
+          const aStaff = staffParsed?.active_staff || overview?.staff_metrics?.active_staff || 0;
+          const sLeave = tStaff - aStaff;
+          if (tStaff > 0 && sLeave > 0) {
+            generatedAlerts.push({
+              id: alertId++, type: 'staff', severity: sLeave > 5 ? 'high' : 'medium',
+              message: `${sLeave} staff member${sLeave > 1 ? 's' : ''} currently on leave or inactive`, time: 'Just now'
+            });
+          }
+
+          const pendingAppts = appointmentParsed?.appointments_by_status?.pending || 0;
+          if (pendingAppts > 10) {
+            generatedAlerts.push({
+              id: alertId++, type: 'appointments', severity: 'medium',
+              message: `${pendingAppts} appointments pending review`, time: 'Just now'
+            });
+          }
+
+          return Array.isArray(overview?.critical_alerts) && overview.critical_alerts.length > 0 
+            ? overview.critical_alerts 
+            : generatedAlerts;
+        })(),
       }));
 
       if (warnings.length) setWarning(warnings.join(' • '));

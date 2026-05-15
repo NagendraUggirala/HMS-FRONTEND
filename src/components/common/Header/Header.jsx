@@ -1,10 +1,14 @@
+// src/components/common/Header/Header.jsx
 import React, { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../../hooks/useAuth'
+import { useSelector } from 'react-redux'
 import { getInitials } from '../../../utils/helpers'
 import { useNavigate } from 'react-router-dom'
 
 const Header = ({ onMenuToggle = () => {}, onSidebarToggle = () => {}, isSidebarOpen = true }) => {
   const { user, logout } = useAuth()
+  const { logo: hospitalLogo, name: hospitalName } = useSelector(state => state.hospital)
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'super_admin'
   const navigate = useNavigate()
 
   const [showNotifications, setShowNotifications] = useState(false)
@@ -103,8 +107,7 @@ const Header = ({ onMenuToggle = () => {}, onSidebarToggle = () => {}, isSidebar
         {/* Left: hamburger + logo */}
         <div className="flex items-center gap-3 flex-1">
           {/* Mobile hamburger - Always show on mobile with smooth animation */}
-          <button
-            onClick={handleMobileMenuToggle}
+          <button onClick={handleMobileMenuToggle}
             className={`lg:hidden md:hidden p-2 rounded-lg hover:bg-gray-100 transition-all duration-300 ease-in-out touch-target ${
               isAnimating ? 'transform scale-95' : ''
             }`}
@@ -131,29 +134,33 @@ const Header = ({ onMenuToggle = () => {}, onSidebarToggle = () => {}, isSidebar
           {/* Logo with hospital name - Updated with better mobile view */}
           <div className="flex items-center gap-3 transition-all duration-300 ease-in-out">
             {/* Logo Icon */}
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center text-white font-bold transition-all duration-300 hover:scale-105 cursor-pointer shadow-md flex-shrink-0">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-            </div>
+            {!isSuperAdmin && hospitalLogo ? (
+              <img src={hospitalLogo} alt="Logo" className="w-10 h-10 rounded-xl object-contain shadow-md transition-all duration-300 hover:scale-105 cursor-pointer" />
+            ) : (
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center text-white font-bold transition-all duration-300 hover:scale-105 cursor-pointer shadow-md flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+            )}
             
             {/* Hospital Name for Desktop and Tablet */}
             <div className="hidden sm:block">
               <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent transition-all duration-300">
-               Levitica
+               {!isSuperAdmin ? hospitalName : 'Super Admin'}
               </h1>
               <p className="text-xs text-gray-500 font-medium transition-all duration-300">
-                Hospital Management System
+                {!isSuperAdmin ? 'Hospital Management System' : 'Platform Administration'}
               </p>
             </div>
 
             {/* Hospital Name for Mobile - Compact version */}
             <div className="sm:hidden max-w-[120px]">
               <h1 className="text-sm font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent transition-all duration-300 truncate">
-                SmartMedi Hub
+                {!isSuperAdmin ? hospitalName : 'Admin'}
               </h1>
               <p className="text-[10px] text-gray-500 font-medium transition-all duration-300 truncate">
-                HMS
+                {!isSuperAdmin ? 'HMS' : 'Portal'}
               </p>
             </div>
           </div>
