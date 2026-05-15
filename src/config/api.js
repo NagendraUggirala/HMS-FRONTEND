@@ -168,6 +168,9 @@ export const RECEPTIONIST_PROFILE = '/api/v1/receptionist/profile';
 export const RECEPTIONIST_PROFILE_UPDATE = '/api/v1/receptionist/profile';
 /** Receptionist: patient registration */
 export const RECEPTIONIST_PATIENT_REGISTER = '/api/v1/receptionist/patients/register';
+export const RECEPTIONIST_PATIENT_SEARCH = '/api/v1/receptionist/patients/search';
+export const RECEPTIONIST_PATIENT_PROFILE = (patientId) => `/api/v1/receptionist/patients/${encodeURIComponent(patientId)}`;
+export const RECEPTIONIST_PATIENT_UPDATE = (patientId) => `/api/v1/receptionist/patients/${encodeURIComponent(patientId)}`;
 
 /** Receptionist: dashboard overview */
 export const RECEPTIONIST_DASHBOARD_OVERVIEW = '/api/v1/receptionist/dashboard';
