@@ -3,6 +3,7 @@ import LoadingSpinner from '../../../../components/common/LoadingSpinner/Loading
 import DataTable from '../../../../components/ui/Tables/DataTable'
 import Modal from '../../../../components/common/Modal/Modal'
 import * as XLSX from 'xlsx'
+import { getDoctorLabResults, reviewDoctorLabResult, doctorAppointmentErrorMessage } from '../../../../services/doctorApi'
 
 const LabResults = () => {
   const [loading, setLoading] = useState(true)
@@ -25,142 +26,16 @@ const LabResults = () => {
   }, [])
 
   const loadLabResults = async () => {
-    setLoading(true)
-    setTimeout(() => {
-      setLabResults([
-        { 
-          id: 1, 
-          patient: "Ravi Kumar", 
-          patientId: "PT-2023-001",
-          age: 45,
-          gender: "Male",
-          test: "Complete Blood Count ", 
-          testCode: "LAB-CBC-001",
-          result: {
-            hemoglobin: "14.2 g/dL",
-            wbc: "7.8 x10³/μL",
-            platelets: "250 x10³/μL",
-            rbc: "5.2 x10⁶/μL"
-          },
-          referenceRange: {
-            hemoglobin: "13.5-17.5 g/dL",
-            wbc: "4.5-11.0 x10³/μL",
-            platelets: "150-450 x10³/μL",
-            rbc: "4.7-6.1 x10⁶/μL"
-          },
-          date: "2023-10-10", 
-          time: "10:30 AM",
-          lab: "Pathology Lab",
-          technician: "Dr. Sharma",
-          status: "Reviewed",
-          reviewedBy: "Dr. Patel",
-          reviewDate: "2023-10-10",
-          notes: "All parameters within normal limits. No abnormalities detected."
-        },
-        { 
-          id: 2, 
-          patient: "Ravi Kumar", 
-          patientId: "PT-2023-001",
-          age: 45,
-          gender: "Male",
-          test: "Chest X-Ray (PA View)", 
-          testCode: "RAD-XRAY-002",
-          result: {
-            impression: "Mild opacity in right lower lobe suggestive of mild infection",
-            lungs: "Clear except RLL opacity",
-            heart: "Normal size and contour",
-            bones: "No fracture detected"
-          },
-          referenceRange: "N/A",
-          date: "2023-10-05", 
-          time: "2:15 PM",
-          lab: "Radiology Department",
-          technician: "Dr. Verma",
-          status: "Pending ",
-          reviewedBy: "",
-          reviewDate: "",
-          notes: ""
-        },
-        { 
-          id: 3, 
-          patient: "Anita Sharma", 
-          patientId: "PT-2023-002",
-          age: 32,
-          gender: "Female",
-          test: "CT Scan - Abdomen ", 
-          testCode: "RAD-CT-003",
-          result: {
-            liver: "Normal size, texture, and enhancement",
-            kidneys: "Normal bilateral, no stones",
-            pancreas: "Normal",
-            spleen: "Normal",
-            impression: "No significant abnormalities detected"
-          },
-          referenceRange: "N/A",
-          date: "2023-10-08", 
-          time: "11:00 AM",
-          lab: "Radiology Department",
-          technician: "Dr. Singh",
-          status: "Reviewed",
-          reviewedBy: "Dr. Gupta",
-          reviewDate: "2023-10-09",
-          notes: "CT scan appears normal. Follow up in 6 months recommended."
-        },
-        { 
-          id: 4, 
-          patient: "Suresh Patel", 
-          patientId: "PT-2023-003",
-          age: 58,
-          gender: "Male",
-          test: "Blood Glucose (Fasting)", 
-          testCode: "LAB-GLU-004",
-          result: {
-            glucose: "145 mg/dL",
-            hba1c: "6.8%"
-          },
-          referenceRange: {
-            glucose: "70-100 mg/dL",
-            hba1c: "<5.7%"
-          },
-          date: "2023-10-12", 
-          time: "8:00 AM",
-          lab: "Pathology Lab",
-          technician: "Dr. Joshi",
-          status: "Critical",
-          reviewedBy: "",
-          reviewDate: "",
-          notes: "Elevated glucose levels detected. Urgent review required."
-        },
-        { 
-          id: 5, 
-          patient: "Meera Desai", 
-          patientId: "PT-2023-004",
-          age: 28,
-          gender: "Female",
-          test: "Thyroid Profile", 
-          testCode: "LAB-THY-005",
-          result: {
-            tsh: "2.5 mIU/L",
-            t3: "1.2 ng/dL",
-            t4: "8.5 μg/dL"
-          },
-          referenceRange: {
-            tsh: "0.4-4.0 mIU/L",
-            t3: "0.8-2.0 ng/dL",
-            t4: "5.0-12.0 μg/dL"
-          },
-          date: "2023-10-15", 
-          time: "9:45 AM",
-          lab: "Endocrinology Lab",
-          technician: "Dr. Reddy",
-          status: "Pending Review",
-          reviewedBy: "",
-          reviewDate: "",
-          notes: ""
-        }
-      ])
+    try {
+      setLoading(true)
+      const data = await getDoctorLabResults()
+      setLabResults(data)
+    } catch (error) {
+      console.error('Error loading lab results:', error)
+      alert('Failed to load lab results')
+    } finally {
       setLoading(false)
-    }, 1000)
+    }
   }
 
   const handleAction = (lab, action) => {
@@ -185,24 +60,30 @@ const LabResults = () => {
     closeModal()
   }
 
-  const handleReviewSubmit = () => {
+  const handleReviewSubmit = async () => {
     if (!reviewNotes.trim()) {
       alert('Please add review notes before submitting')
       return
     }
 
-    setLabResults(prev => prev.map(lab => 
-      lab.id === selectedLab.id ? { 
-        ...lab, 
-        status: reviewStatus === 'reviewed' ? 'Reviewed' : reviewStatus,
-        reviewedBy: 'Dr. Current User',
-        reviewDate: new Date().toISOString().split('T')[0],
-        notes: reviewNotes
-      } : lab
-    ))
-    
-    alert(`✅ Lab report reviewed successfully!`)
-    closeModal()
+    try {
+      const response = await reviewDoctorLabResult(selectedLab.id, {
+        review_status: reviewStatus === 'reviewed' ? 'REVIEWED' : reviewStatus.toUpperCase(),
+        review_notes: reviewNotes,
+        severity_assessment: severity.toUpperCase()
+      })
+
+      if (response.error) {
+        throw new Error(doctorAppointmentErrorMessage(response))
+      }
+
+      alert(`✅ Lab report reviewed successfully!`)
+      loadLabResults()
+      closeModal()
+    } catch (error) {
+      console.error('Error submitting review:', error)
+      alert(`Failed to submit review: ${error.message}`)
+    }
   }
 
   const handlePrintReport = () => {
@@ -595,17 +476,20 @@ const LabResults = () => {
                 Cancel
               </button>
               <button 
-                onClick={() => {
-                  setLabResults(prev => prev.map(lab => 
-                    lab.id === selectedLab.id ? { 
-                      ...lab, 
-                      status: 'Reviewed',
-                      reviewedBy: 'Dr. Current User',
-                      reviewDate: new Date().toISOString().split('T')[0]
-                    } : lab
-                  ))
-                  alert(`✅ Marked ${selectedLab.test} as reviewed`)
-                  closeModal()
+                onClick={async () => {
+                  try {
+                    await reviewDoctorLabResult(selectedLab.id, {
+                      review_status: 'REVIEWED',
+                      review_notes: 'Marked as reviewed via quick action',
+                      severity_assessment: (selectedLab.severity || 'normal').toUpperCase()
+                    })
+                    alert(`✅ Marked ${selectedLab.test} as reviewed`)
+                    loadLabResults()
+                    closeModal()
+                  } catch (error) {
+                    console.error('Error marking as reviewed:', error)
+                    alert(`Failed to mark as reviewed: ${error.message}`)
+                  }
                 }}
                 className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
               >

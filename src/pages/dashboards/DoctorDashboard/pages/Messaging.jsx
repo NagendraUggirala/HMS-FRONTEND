@@ -1,280 +1,332 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import LoadingSpinner from '../../../../components/common/LoadingSpinner/LoadingSpinner'
+import { getDoctorMessages, sendDoctorMessage, markDoctorMessageRead } from '../../../../services/doctorApi'
 
 const Messaging = () => {
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [messages, setMessages] = useState([])
-  const [newMessage, setNewMessage] = useState('')
-  const [selectedRecipient, setSelectedRecipient] = useState('')
+  const [unreadOnly, setUnreadOnly] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [markingRead, setMarkingRead] = useState(null)
+
+  // Compose form state
+  const [recipientUserId, setRecipientUserId] = useState('')
+  const [msgTitle, setMsgTitle] = useState('')
+  const [msgBody, setMsgBody] = useState('')
+  const [msgEventType, setMsgEventType] = useState('NEW_MESSAGE')
+
   const [notificationSettings, setNotificationSettings] = useState({
     appointmentReminders: true,
     labResults: true,
     messages: true,
     emergencyAlerts: true
   })
-  const [sentMessages, setSentMessages] = useState([])
 
-  const contacts = [
-    { id: "nurse-kavya", name: "Nurse Kavya", role: "Ward Nurse", icon: "user-nurse", color: "blue" },
-    { id: "dr-sharma", name: "Dr. Sharma", role: "Cardiology", icon: "user-md", color: "green" },
-    { id: "reception", name: "Reception", role: "Front Desk", icon: "user-tie", color: "purple" },
-    { id: "dr-patel", name: "Dr. Patel", role: "Orthopedics", icon: "user-md", color: "yellow" }
-  ]
+  const bodyRef = useRef(null)
 
   useEffect(() => {
     loadMessages()
-  }, [])
+  }, [unreadOnly])
 
   const loadMessages = async () => {
-    setLoading(true)
-    setTimeout(() => {
-      setMessages([
-        { 
-          id: 1, 
-          from: "Nurse Kavya", 
-          fromId: "nurse-kavya",
-          message: "Patient in bed 101 needs pain medication", 
-          time: "10:15 AM", 
-          timestamp: new Date().setHours(10, 15, 0),
-          read: false,
-          type: "incoming"
-        },
-        { 
-          id: 2, 
-          from: "Reception", 
-          fromId: "reception",
-          message: "New appointment request from Priya Singh", 
-          time: "09:30 AM", 
-          timestamp: new Date().setHours(9, 30, 0),
-          read: true,
-          type: "incoming"
-        },
-        { 
-          id: 3, 
-          from: "Dr. Sharma", 
-          fromId: "dr-sharma",
-          message: "Can you consult on the CT scan for patient in 205?", 
-          time: "Yesterday", 
-          timestamp: new Date().setDate(new Date().getDate() - 1),
-          read: true,
-          type: "incoming"
-        }
-      ])
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await getDoctorMessages({ limit: 100, unreadOnly })
+      setMessages(data)
+    } catch (err) {
+      console.error('Failed to load messages:', err)
+      setError(err.message || 'Failed to load messages')
+    } finally {
       setLoading(false)
-    }, 1000)
-  }
-
-  const handleSendMessage = (e) => {
-    e.preventDefault()
-    if (!newMessage.trim() || !selectedRecipient) return
-    
-    const recipient = contacts.find(contact => contact.id === selectedRecipient)
-    
-    // Add to sent messages
-    const sentMessage = {
-      id: Date.now(),
-      to: recipient.name,
-      toId: recipient.id,
-      message: newMessage,
-      time: "Just now",
-      timestamp: new Date(),
-      type: "outgoing"
     }
-    
-    setSentMessages(prev => [sentMessage, ...prev])
-    
-    // Simulate reply after delay
-    setTimeout(() => {
-      const replies = {
-        'nurse-kavya': 'Noted. Will administer medication shortly.',
-        'dr-sharma': 'Thanks, I will review the CT scan.',
-        'reception': 'Received. Will process the request.',
-        'dr-patel': 'Understood. Will follow up.'
-      }
-      
-      const replyMessage = {
-        id: Date.now() + 1,
-        from: recipient.name,
-        fromId: recipient.id,
-        message: replies[selectedRecipient] || 'Thank you for your message.',
-        time: "Just now",
-        timestamp: new Date(),
-        read: false,
-        type: "incoming"
-      }
-      
-      setMessages(prev => [replyMessage, ...prev])
-    }, 2000)
-    
-    setNewMessage('')
-    setSelectedRecipient('')
   }
 
-  const handleMarkAsRead = (messageId) => {
-    setMessages(prev => 
-      prev.map(msg => 
-        msg.id === messageId ? { ...msg, read: true } : msg
+  const handleSendMessage = async (e) => {
+    e.preventDefault()
+    if (!recipientUserId.trim() || !msgTitle.trim() || !msgBody.trim()) return
+    try {
+      setSending(true)
+      await sendDoctorMessage({
+        recipientUserId: recipientUserId.trim(),
+        title: msgTitle.trim(),
+        body: msgBody.trim(),
+        eventType: msgEventType,
+      })
+      setRecipientUserId('')
+      setMsgTitle('')
+      setMsgBody('')
+      setMsgEventType('NEW_MESSAGE')
+      alert('Message sent successfully!')
+      // Refresh list after sending
+      loadMessages()
+    } catch (err) {
+      console.error('Failed to send message:', err)
+      alert('Failed to send message: ' + err.message)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const handleMarkAsRead = async (msg) => {
+    if (msg.isRead || !msg.source || !msg.id) return
+    try {
+      setMarkingRead(msg.id)
+      await markDoctorMessageRead({ source: msg.source, messageId: msg.id })
+      setMessages(prev =>
+        prev.map(m => m.id === msg.id ? { ...m, isRead: true, readAt: new Date().toISOString() } : m)
       )
-    )
-  }
-
-  const handleContactClick = (contactId) => {
-    setSelectedRecipient(contactId)
-    // Focus on message input
-    setTimeout(() => {
-      document.querySelector('textarea')?.focus()
-    }, 100)
+    } catch (err) {
+      console.error('Failed to mark as read:', err)
+    } finally {
+      setMarkingRead(null)
+    }
   }
 
   const handleNotificationSettingChange = (setting, value) => {
-    setNotificationSettings(prev => ({
-      ...prev,
-      [setting]: value
-    }))
+    setNotificationSettings(prev => ({ ...prev, [setting]: value }))
   }
 
-  const formatTime = (timestamp) => {
+  const formatTime = (isoString) => {
+    if (!isoString) return ''
+    const d = new Date(isoString)
     const now = new Date()
-    const messageTime = new Date(timestamp)
-    const diffInHours = (now - messageTime) / (1000 * 60 * 60)
-    
-    if (diffInHours < 1) {
-      return 'Just now'
-    } else if (diffInHours < 24) {
-      return messageTime.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        hour12: true 
-      })
-    } else if (diffInHours < 48) {
-      return 'Yesterday'
-    } else {
-      return messageTime.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric'
-      })
-    }
+    const diffMs = now - d
+    const diffHours = diffMs / (1000 * 60 * 60)
+    if (diffHours < 1) return 'Just now'
+    if (diffHours < 24) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+    if (diffHours < 48) return 'Yesterday'
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
-  const allMessages = [...messages, ...sentMessages].sort((a, b) => 
-    new Date(b.timestamp) - new Date(a.timestamp)
-  )
+  const sourceLabel = (source) => {
+    if (source === 'telemed') return { label: 'Telemedicine', color: 'blue', icon: 'video' }
+    if (source === 'prescription') return { label: 'Prescription', color: 'green', icon: 'prescription-bottle-alt' }
+    return { label: source, color: 'gray', icon: 'bell' }
+  }
+
+  const unreadCount = messages.filter(m => !m.isRead).length
 
   if (loading) return <LoadingSpinner />
 
   return (
     <div className="animate-fade-in">
-      <h2 className="text-2xl font-semibold text-gray-700 mb-6">
-        <i className='fas fa-comments text-blue-500 mr-3'></i> Messaging & Notifications</h2>
-      
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+        <div>
+          <h2 className="text-2xl font-semibold text-gray-700">
+            <i className="fas fa-comments text-blue-500 mr-3"></i>
+            Messaging &amp; Notifications
+          </h2>
+          {unreadCount > 0 && (
+            <p className="text-sm text-blue-600 mt-1">
+              <i className="fas fa-circle text-xs mr-1"></i>
+              {unreadCount} unread message{unreadCount !== 1 ? 's' : ''}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={unreadOnly}
+              onChange={(e) => setUnreadOnly(e.target.checked)}
+              className="rounded"
+            />
+            Unread only
+          </label>
+          <button
+            onClick={loadMessages}
+            className="px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg text-sm flex items-center gap-2 transition-colors"
+          >
+            <i className="fas fa-sync-alt"></i> Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
+          <i className="fas fa-exclamation-circle text-red-500"></i>
+          <div>
+            <p className="text-red-700 font-medium">Failed to load messages</p>
+            <p className="text-red-600 text-sm">{error}</p>
+          </div>
+          <button onClick={loadMessages} className="ml-auto text-red-600 hover:text-red-800 text-sm underline">
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Messages Section */}
+        {/* Messages Inbox */}
         <div className="bg-white p-4 border rounded card-shadow lg:col-span-2">
-          <h3 className="text-lg font-semibold mb-3">Recent Messages</h3>
-          
-          {/* Messages List */}
-          <div className="space-y-3 max-h-96 overflow-y-auto mb-4">
-            {allMessages.map(msg => (
-              <div 
-                key={msg.id} 
-                className={`flex items-start p-3 border rounded hover:bg-gray-50 cursor-pointer transition-colors ${
-                  !msg.read && msg.type === 'incoming' ? 'bg-blue-50 border-blue-200' : ''
-                } ${msg.type === 'outgoing' ? 'bg-green-50 border-green-200' : ''}`}
-                onClick={() => msg.type === 'incoming' && !msg.read && handleMarkAsRead(msg.id)}
-              >
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 flex-shrink-0 ${
-                  msg.type === 'outgoing' ? 'bg-green-100' : 'bg-blue-100'
-                }`}>
-                  <i className={`fas ${msg.type === 'outgoing' ? 'fa-arrow-right text-green-600' : 'fa-user text-blue-600'}`}></i>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-start">
-                    <p className="font-medium text-sm">
-                      {msg.type === 'outgoing' ? `To: ${msg.to}` : msg.from}
-                    </p>
-                    <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
-                      {formatTime(msg.timestamp)}
-                    </span>
+          <h3 className="text-lg font-semibold mb-3">
+            Inbox
+            {unreadCount > 0 && (
+              <span className="ml-2 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">{unreadCount}</span>
+            )}
+          </h3>
+
+          <div className="space-y-3 max-h-96 overflow-y-auto mb-4 pr-1">
+            {messages.map(msg => {
+              const src = sourceLabel(msg.source)
+              const isMarking = markingRead === msg.id
+              return (
+                <div
+                  key={msg.id}
+                  onClick={() => handleMarkAsRead(msg)}
+                  className={`flex items-start p-3 border rounded-lg transition-colors ${
+                    !msg.isRead
+                      ? 'bg-blue-50 border-blue-200 cursor-pointer hover:bg-blue-100'
+                      : 'bg-white border-gray-100 cursor-default'
+                  }`}
+                >
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 flex-shrink-0 bg-${src.color}-100`}>
+                    {isMarking
+                      ? <i className="fas fa-spinner fa-spin text-gray-400"></i>
+                      : <i className={`fas fa-${src.icon} text-${src.color}-600`}></i>
+                    }
                   </div>
-                  <p className="text-sm text-gray-600 mt-1 break-words">{msg.message}</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate">{msg.title || '(No title)'}</p>
+                        <span className={`text-xs text-${src.color}-600 bg-${src.color}-50 px-1.5 py-0.5 rounded`}>
+                          {src.label}
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-400 flex-shrink-0">{formatTime(msg.createdAt)}</span>
+                    </div>
+                    {msg.body && (
+                      <p className="text-sm text-gray-600 mt-1 break-words">{msg.body}</p>
+                    )}
+                    {msg.eventType && (
+                      <p className="text-xs text-gray-400 mt-1">Event: {msg.eventType}</p>
+                    )}
+                  </div>
+                  {!msg.isRead && (
+                    <span className="w-2 h-2 bg-blue-500 rounded-full ml-2 flex-shrink-0 mt-2"></span>
+                  )}
                 </div>
-                {msg.type === 'incoming' && !msg.read && (
-                  <span className="w-2 h-2 bg-blue-500 rounded-full ml-2 flex-shrink-0 mt-2"></span>
-                )}
-              </div>
-            ))}
-            
-            {allMessages.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
-                <i className="fas fa-comments text-3xl mb-2"></i>
-                <p>No messages yet</p>
+              )
+            })}
+
+            {messages.length === 0 && !error && (
+              <div className="text-center py-10 text-gray-400">
+                <i className="fas fa-comments text-4xl mb-3 block"></i>
+                <p className="font-medium">No messages found</p>
+                <p className="text-sm mt-1">
+                  {unreadOnly ? 'No unread messages.' : 'Your inbox is empty.'}
+                </p>
               </div>
             )}
           </div>
 
-          {/* New Message Form */}
-          <div className="mt-6 p-4 border rounded bg-gray-50">
-            <h4 className="font-medium mb-3">Send New Message</h4>
+          {/* Send Message Form */}
+          <div className="mt-4 p-4 border rounded-lg bg-gray-50">
+            <h4 className="font-medium mb-3 text-gray-700">
+              <i className="fas fa-paper-plane mr-2 text-blue-500"></i>
+              Send Notification
+            </h4>
             <form onSubmit={handleSendMessage} className="space-y-3">
-              <select 
-                value={selectedRecipient}
-                onChange={(e) => setSelectedRecipient(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                required
-              >
-                <option value="">Select Recipient</option>
-                {contacts.map(contact => (
-                  <option key={contact.id} value={contact.id}>
-                    {contact.name} - {contact.role}
-                  </option>
-                ))}
-              </select>
-              <textarea 
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
-                rows="3" 
-                placeholder="Type your message here..."
-                required
-              ></textarea>
-              <button 
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Recipient User ID</label>
+                <input
+                  type="text"
+                  value={recipientUserId}
+                  onChange={(e) => setRecipientUserId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  placeholder="Enter recipient user ID..."
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Title</label>
+                <input
+                  type="text"
+                  value={msgTitle}
+                  onChange={(e) => setMsgTitle(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  placeholder="Message title..."
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Event Type</label>
+                <select
+                  value={msgEventType}
+                  onChange={(e) => setMsgEventType(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                >
+                  <option value="NEW_MESSAGE">NEW_MESSAGE</option>
+                  <option value="APPOINTMENT_REMINDER">APPOINTMENT_REMINDER</option>
+                  <option value="LAB_RESULT">LAB_RESULT</option>
+                  <option value="PRESCRIPTION_READY">PRESCRIPTION_READY</option>
+                  <option value="EMERGENCY_ALERT">EMERGENCY_ALERT</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Message (Body)</label>
+                <textarea
+                  ref={bodyRef}
+                  value={msgBody}
+                  onChange={(e) => setMsgBody(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  rows="3"
+                  placeholder="Type your message here..."
+                  required
+                ></textarea>
+              </div>
+              <button
                 type="submit"
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 w-full flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!newMessage.trim() || !selectedRecipient}
+                disabled={sending || !recipientUserId.trim() || !msgTitle.trim() || !msgBody.trim() || !msgEventType}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 w-full flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <i className="fas fa-paper-plane mr-2"></i> 
-                Send Message
+                {sending
+                  ? <><i className="fas fa-spinner fa-spin"></i> Sending...</>
+                  : <><i className="fas fa-paper-plane"></i> Send Message</>
+                }
               </button>
             </form>
           </div>
         </div>
-        
-        {/* Contacts & Settings Sidebar */}
+
+        {/* Sidebar */}
         <div className="space-y-6">
-          {/* Quick Contacts */}
+          {/* Message Summary */}
           <div className="bg-white p-4 border rounded card-shadow">
-            <h3 className="text-lg font-semibold mb-3">Quick Contacts</h3>
-            <div className="space-y-2">
-              {contacts.map((contact) => (
-                <div 
-                  key={contact.id}
-                  onClick={() => handleContactClick(contact.id)}
-                  className={`flex items-center p-3 hover:bg-gray-50 rounded cursor-pointer transition-colors ${
-                    selectedRecipient === contact.id ? 'bg-blue-50 border border-blue-200' : ''
-                  }`}
-                >
-                  <div className={`w-10 h-10 bg-${contact.color}-100 rounded-full flex items-center justify-center mr-3`}>
-                    <i className={`fas fa-${contact.icon} text-${contact.color}-600`}></i>
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">{contact.name}</p>
-                    <p className="text-xs text-gray-500">{contact.role}</p>
-                  </div>
-                  {selectedRecipient === contact.id && (
-                    <i className="fas fa-check text-green-500 ml-2"></i>
-                  )}
-                </div>
-              ))}
+            <h3 className="text-lg font-semibold mb-3">Summary</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center p-2 bg-blue-50 rounded-lg">
+                <span className="text-sm text-gray-600 flex items-center gap-2">
+                  <i className="fas fa-envelope text-blue-500"></i> Total
+                </span>
+                <span className="font-semibold text-blue-700">{messages.length}</span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-orange-50 rounded-lg">
+                <span className="text-sm text-gray-600 flex items-center gap-2">
+                  <i className="fas fa-envelope-open text-orange-500"></i> Unread
+                </span>
+                <span className="font-semibold text-orange-700">{unreadCount}</span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-blue-50 rounded-lg">
+                <span className="text-sm text-gray-600 flex items-center gap-2">
+                  <i className="fas fa-video text-blue-500"></i> Telemedicine
+                </span>
+                <span className="font-semibold text-blue-700">
+                  {messages.filter(m => m.source === 'telemed').length}
+                </span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-green-50 rounded-lg">
+                <span className="text-sm text-gray-600 flex items-center gap-2">
+                  <i className="fas fa-prescription-bottle-alt text-green-500"></i> Prescription
+                </span>
+                <span className="font-semibold text-green-700">
+                  {messages.filter(m => m.source === 'prescription').length}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -283,10 +335,10 @@ const Messaging = () => {
             <h3 className="text-lg font-semibold mb-3">Notification Settings</h3>
             <div className="space-y-3">
               {[
-                { key: 'appointmentReminders', label: "Appointment Reminders", icon: "calendar-check" },
-                { key: 'labResults', label: "Lab Results", icon: "flask" },
-                { key: 'messages', label: "Messages", icon: "comments" },
-                { key: 'emergencyAlerts', label: "Emergency Alerts", icon: "exclamation-triangle" }
+                { key: 'appointmentReminders', label: 'Appointment Reminders', icon: 'calendar-check' },
+                { key: 'labResults', label: 'Lab Results', icon: 'flask' },
+                { key: 'messages', label: 'Messages', icon: 'comments' },
+                { key: 'emergencyAlerts', label: 'Emergency Alerts', icon: 'exclamation-triangle' }
               ].map((setting) => (
                 <div key={setting.key} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
                   <div className="flex items-center">
@@ -294,8 +346,8 @@ const Messaging = () => {
                     <span className="text-sm">{setting.label}</span>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       checked={notificationSettings[setting.key]}
                       onChange={(e) => handleNotificationSettingChange(setting.key, e.target.checked)}
                       className="sr-only peer"
@@ -305,20 +357,13 @@ const Messaging = () => {
                 </div>
               ))}
             </div>
-            
-            {/* Notification Status */}
             <div className="mt-4 p-3 bg-gray-50 rounded">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">Notifications are</span>
                 <span className={`font-medium ${
-                  Object.values(notificationSettings).some(setting => setting) 
-                    ? 'text-green-600' 
-                    : 'text-red-600'
+                  Object.values(notificationSettings).some(v => v) ? 'text-green-600' : 'text-red-600'
                 }`}>
-                  {Object.values(notificationSettings).some(setting => setting) 
-                    ? 'Enabled' 
-                    : 'Disabled'
-                  }
+                  {Object.values(notificationSettings).some(v => v) ? 'Enabled' : 'Disabled'}
                 </span>
               </div>
             </div>

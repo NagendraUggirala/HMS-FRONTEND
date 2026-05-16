@@ -21,7 +21,7 @@ export default function Inventory() {
 
   const fetchMasterData = async () => {
     try {
-      const data = await getMedicines(0, 2000);
+      const data = await getMedicines(0, 1000);
       const items = Array.isArray(data) ? data : (data?.medicines || data?.items || data?.data || []);
       setMasterMedicines(items.map(m => ({ 
         ...m, 

@@ -72,7 +72,7 @@ export default function Settings() {
         const [metricsRes, suppliersRes, medicinesRes, poRes] = await Promise.allSettled([
           pharmacyApi.getDashboardOverview(),
           pharmacyApi.getSuppliers(),
-          pharmacyApi.getMedicines(0, 5000),
+          pharmacyApi.getMedicines(0, 1000),
           pharmacyApi.getPurchaseOrders()
         ]);
         
