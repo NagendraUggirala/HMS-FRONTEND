@@ -224,7 +224,6 @@ export const PHARMACY_SETTINGS_BASE = '/api/v1/pharmacy/settings';
  
 // --- NURSE ---
 export const NURSE_BASE = '/api/v1/nurse';
-export const NURSE_ASSIGNED_PATIENTS = `${NURSE_BASE}/assigned_patients`;
 // NURSE DASHBOARD APIs
 export const NURSE_DASHBOARD_OVERVIEW =
   '/api/v1/nurse/dashboard';
