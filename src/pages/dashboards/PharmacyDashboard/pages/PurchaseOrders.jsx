@@ -678,12 +678,13 @@ export default function PurchaseOrders() {
                 </button>
               )}
               {['DRAFT', 'PENDING', 'APPROVED'].includes(selectedOrder.status) && (
-                <button
-                  onClick={() => handlePOAction('cancel', selectedOrder.id || selectedOrder._id)}
-                  className="px-6 py-2.5 bg-rose-50 text-rose-600 rounded-xl font-bold hover:bg-rose-100 transition-all"
-                >
-                  <Ban size={18} /> Cancel Order
-                </button>
+              <button
+  onClick={() => handlePOAction('cancel', selectedOrder.id || selectedOrder._id)}
+  className="px-6 py-2.5 bg-rose-50 text-rose-600 rounded-xl font-bold hover:bg-rose-100 transition-all flex items-center gap-2"
+>
+  <Ban size={18} />
+  <span>Cancel Order</span>
+</button>
               )}
               <button
                 onClick={() => setIsViewModalOpen(false)}
