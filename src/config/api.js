@@ -199,6 +199,32 @@ export const PRESCRIPTION_PATIENT_LIST = '/api/v1/simple-prescription/patient/pr
 /** Prescription Management - Common endpoints */
 export const PRESCRIPTION_DETAILS = (prescriptionId) => `/api/v1/simple-prescription/prescriptions/${encodeURIComponent(prescriptionId)}`;
 export const PRESCRIPTION_PDF_DOWNLOAD = (prescriptionId) => `/api/v1/simple-prescription/prescriptions/${encodeURIComponent(prescriptionId)}/pdf`;
+/** Receptionist: patient management */
+export const RECEPTIONIST_PATIENTS = '/api/v1/receptionist/patients';
+// --- PHARMACY REPORTS ---
+export const PHARMACY_REPORTS_BASE = '/api/v1/pharmacy/reports';
+export const PHARMACY_REPORTS_SALES_SUMMARY = `${PHARMACY_REPORTS_BASE}/sales-summary`;
+export const PHARMACY_REPORTS_STOCK_VALUATION = `${PHARMACY_REPORTS_BASE}/stock-valuation`;
+export const PHARMACY_REPORTS_EXPIRY = `${PHARMACY_REPORTS_BASE}/expiry`;
+export const PHARMACY_REPORTS_FAST_SLOW_MOVING = `${PHARMACY_REPORTS_BASE}/fast-slow-moving`;
+export const PHARMACY_REPORTS_PROFIT_MARGINS = `${PHARMACY_REPORTS_BASE}/profit-margins`;
+ 
+// --- PHARMACY ---
+export const PHARMACY_INVENTORY_BASE = '/api/v1/pharmacy/inventory';
+export const PHARMACY_MEDICINES_BASE = '/api/v1/pharmacy/medicines';
+export const PHARMACY_SUPPLIERS_BASE = '/api/v1/pharmacy/suppliers';
+export const PHARMACY_PURCHASE_ORDERS_BASE = '/api/v1/pharmacy/purchase-orders';
+export const PHARMACY_GRN_BASE = '/api/v1/pharmacy/grn';
+export const PHARMACY_STOCK_BASE = '/api/v1/pharmacy/stock';
+export const PHARMACY_SALES_BASE = '/api/v1/pharmacy/sales';
+export const PHARMACY_RETURNS_BASE = '/api/v1/pharmacy/returns';
+export const PHARMACY_ALERTS_BASE = '/api/v1/pharmacy/alerts';
+export const PHARMACY_DASHBOARD_OVERVIEW = '/api/v1/pharmacy/dashboard/overview';
+export const PHARMACY_SETTINGS_BASE = '/api/v1/pharmacy/settings';
+ 
+// --- NURSE ---
+export const NURSE_BASE = '/api/v1/nurse';
+export const NURSE_ASSIGNED_PATIENTS = `${NURSE_BASE}/assigned_patients`;
 // NURSE DASHBOARD APIs
 export const NURSE_DASHBOARD_OVERVIEW =
   '/api/v1/nurse/dashboard';
@@ -223,3 +249,4 @@ export const NURSE_LAB_TESTS =
 
 export const NURSE_NURSING_NOTES =
   '/api/v1/nurse/nursing-notes';
+  
