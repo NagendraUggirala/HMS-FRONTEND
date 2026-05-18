@@ -251,7 +251,14 @@ export const PHARMACY_SETTINGS_BASE = '/api/v1/pharmacy/settings';
 
 // --- NURSE ---
 export const NURSE_BASE = '/api/v1/nurse';
-export const NURSE_ASSIGNED_PATIENTS = `${NURSE_BASE}/assigned_patients`;
+export const NURSE_DASHBOARD_OVERVIEW = `${NURSE_BASE}/dashboard`;
+export const NURSE_ADD_VITALS = `${NURSE_BASE}/vitals`;
+export const NURSE_GET_VITALS = `${NURSE_BASE}/vitals`;
+export const NURSE_ASSIGNED_PATIENTS = `${NURSE_BASE}/assigned-patients`;
+export const NURSE_MEDICATIONS = `${NURSE_BASE}/medications`;
+export const NURSE_BEDS = `${NURSE_BASE}/beds`;
+export const NURSE_LAB_TESTS = `${NURSE_BASE}/lab-tests`;
+export const NURSE_NURSING_NOTES = `${NURSE_BASE}/nursing-notes`;
 
 // --- LAB MANAGEMENT ---
 export const LAB_BASE = '/api/v1/lab';
@@ -265,32 +272,4 @@ export const LAB_EQUIPMENT_QC_BASE = `${LAB_BASE}/equipment-qc/equipment`;
 export const LAB_EQUIPMENT_DETAILS = (id) => `${LAB_EQUIPMENT_QC_BASE}/${encodeURIComponent(id)}`;
 export const LAB_EQUIPMENT_LOGS = (id) => `${LAB_EQUIPMENT_QC_BASE}/${encodeURIComponent(id)}/logs`;
 export const LAB_EQUIPMENT_STATUS = (id) => `${LAB_EQUIPMENT_QC_BASE}/${encodeURIComponent(id)}/status`;
-
- 
-// --- NURSE ---
-export const NURSE_BASE = '/api/v1/nurse';
-// NURSE DASHBOARD APIs
-export const NURSE_DASHBOARD_OVERVIEW =
-  '/api/v1/nurse/dashboard';
-
-export const NURSE_ADD_VITALS =
-  '/api/v1/nurse/vitals';
-
-export const NURSE_GET_VITALS =
-  '/api/v1/nurse/vitals';
-
-export const NURSE_ASSIGNED_PATIENTS =
-  '/api/v1/nurse/assigned-patients';
-
-export const NURSE_MEDICATIONS =
-  '/api/v1/nurse/medications';
-
-export const NURSE_BEDS =
-  '/api/v1/nurse/beds';
-
-export const NURSE_LAB_TESTS =
-  '/api/v1/nurse/lab-tests';
-
-export const NURSE_NURSING_NOTES =
-  '/api/v1/nurse/nursing-notes';
   
