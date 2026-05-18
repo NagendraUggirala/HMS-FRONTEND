@@ -713,3 +713,105 @@ export async function getDischargeStatistics(params = {}) {
   const path = withQuery(`${DISCHARGE_SUMMARY_BASE}/discharge-summaries/statistics`, params)
   return doctorApiFetchWithFallback([path])
 }
+
+// --- REPORTS AND ANALYTICS ---
+const REPORTS_BASE = '/api/v1/doctor-management/reports'
+
+export async function getPracticeOverview(params = {}) {
+  const query = {
+    report_period: params.report_period || 'this_month',
+    custom_date_from: params.custom_date_from,
+    custom_date_to: params.custom_date_to,
+  }
+  const path = withQuery(`${REPORTS_BASE}/practice-overview`, query)
+  const res = await doctorApiFetchWithFallback([path])
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to fetch practice overview'))
+  return res.json()
+}
+
+export async function getPatientAnalytics(params = {}) {
+  const query = {
+    report_period: params.report_period || 'this_month',
+    custom_date_from: params.custom_date_from,
+    custom_date_to: params.custom_date_to,
+  }
+  const path = withQuery(`${REPORTS_BASE}/patient-analytics`, query)
+  const res = await doctorApiFetchWithFallback([path])
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to fetch patient analytics'))
+  return res.json()
+}
+
+export async function getAppointmentAnalytics(params = {}) {
+  const query = {
+    report_period: params.report_period || 'this_month',
+    custom_date_from: params.custom_date_from,
+    custom_date_to: params.custom_date_to,
+  }
+  const path = withQuery(`${REPORTS_BASE}/appointment-analytics`, query)
+  const res = await doctorApiFetchWithFallback([path])
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to fetch appointment analytics'))
+  return res.json()
+}
+
+export async function getClinicalOutcomes(params = {}) {
+  const query = {
+    report_period: params.report_period || 'this_month',
+    custom_date_from: params.custom_date_from,
+    custom_date_to: params.custom_date_to,
+  }
+  const path = withQuery(`${REPORTS_BASE}/clinical-outcomes`, query)
+  const res = await doctorApiFetchWithFallback([path])
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to fetch clinical outcomes'))
+  return res.json()
+}
+
+export async function getFinancialSummary(params = {}) {
+  const query = {
+    report_period: params.report_period || 'this_month',
+    custom_date_from: params.custom_date_from,
+    custom_date_to: params.custom_date_to,
+  }
+  const path = withQuery(`${REPORTS_BASE}/financial-summary`, query)
+  const res = await doctorApiFetchWithFallback([path])
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to fetch financial summary'))
+  return res.json()
+}
+
+export async function getPerformanceMetrics(params = {}) {
+  const query = {
+    report_period: params.report_period || 'this_month',
+    custom_date_from: params.custom_date_from,
+    custom_date_to: params.custom_date_to,
+  }
+  const path = withQuery(`${REPORTS_BASE}/performance-metrics`, query)
+  const res = await doctorApiFetchWithFallback([path])
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to fetch performance metrics'))
+  return res.json()
+}
+
+export async function getComparativeAnalysis(params = {}) {
+  const query = {
+    report_period: params.report_period || 'this_month',
+    custom_date_from: params.custom_date_from,
+    custom_date_to: params.custom_date_to,
+  }
+  const path = withQuery(`${REPORTS_BASE}/comparative-analysis`, query)
+  const res = await doctorApiFetchWithFallback([path])
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to fetch comparative analysis'))
+  return res.json()
+}
+
+export async function generateCustomReport(body) {
+  const res = await doctorApiFetchWithFallback([`${REPORTS_BASE}/generate-custom-report`], {
+    method: 'POST',
+    body,
+  })
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to generate custom report'))
+  return res.json()
+}
+
+export async function getExportOptions() {
+  const res = await doctorApiFetchWithFallback([`${REPORTS_BASE}/export-options`])
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to fetch export options'))
+  return res.json()
+}
