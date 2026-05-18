@@ -272,7 +272,7 @@ const PatientRecords = () => {
 
         {/* Total Patients Stat */}
         <div className="bg-white px-6 py-3 rounded-xl border shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center shadow-inner">
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center shadow-inner">
             <PeopleIcon />
           </div>
           <div>
@@ -825,7 +825,6 @@ const PatientRecords = () => {
         </div>
       </Modal>
 
-
       {/* ================= VIEW PATIENT MODAL ================= */}
       <Modal
         isOpen={isViewModalOpen}
@@ -836,9 +835,9 @@ const PatientRecords = () => {
           <div className="flex justify-end w-full">
             <button
               onClick={handleCloseModal}
-              className="px-8 py-2.5 bg-gray-800 text-white font-semibold rounded-lg hover:bg-gray-900 transition-all active:scale-95 shadow-md"
+              className="px-8 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-gray-900 transition-all active:scale-95 shadow-md"
             >
-              Close Profile
+              Close
             </button>
           </div>
         }
@@ -846,8 +845,8 @@ const PatientRecords = () => {
         {selectedPatient && (
           <div className="space-y-8">
             {/* Header Profile Info */}
-            <div className="flex items-center gap-5 p-5 bg-indigo-50 rounded-2xl border border-indigo-100">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center text-3xl font-bold shadow-lg border-4 border-white">
+            <div className="flex items-center gap-5 p-5 bg-blue-50 rounded-2xl border border-blue-100">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center text-3xl font-bold shadow-lg border-4 border-white">
                 {(selectedPatient.first_name || selectedPatient.name || "P").charAt(0).toUpperCase()}
               </div>
               <div>

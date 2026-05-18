@@ -1,11 +1,11 @@
 // src/pages/dashboards/LabDashboard/pages/SampleTracking.jsx
 import React, { useState, useEffect, useRef } from "react";
 import DataTable from "../../../../components/ui/Tables/DataTable";
-import SearchBar from "../../../../components/common/SearchBar/SearchBar";
 import Button from "../../../../components/common/Button/Button";
 import Modal from "../../../../components/common/Modal/Modal";
 import LoadingSpinner from "../../../../components/common/LoadingSpinner/LoadingSpinner";
 import Toast from "../../../../components/common/Toast/Toast";
+import { apiFetch } from "../../../../services/apiClient";
 import { QRCodeSVG } from "qrcode.react";
 
 const SampleTracking = () => {
@@ -18,900 +18,446 @@ const SampleTracking = () => {
   const [scannedCode, setScannedCode] = useState("");
   const [currentSample, setCurrentSample] = useState(null);
   const [toast, setToast] = useState(null);
-  const printRef = useRef(null);
 
-  // Status to stage mapping for timeline
   const statusStageMap = {
-    Collected: 0,
-    "In Transit": 1,
-    "In Lab": 2,
-    Processing: 3,
-    Processed: 4,
-    Storage: 4,
-    Disposed: 4,
+    Pending: 0,
+    Collected: 1,
+    "In Transit": 2,
+    "In Lab": 3,
+    Processing: 4,
+    Processed: 5,
+    Storage: 5,
+    Disposed: 5,
   };
 
   const stages = [
-    "Collection",
-    "Transit",
-    "Lab Receipt",
+    "Awaiting Collection",
+    "Sample Collected",
+    "In Transit",
+    "Received in Lab",
     "Processing",
-    "Storage",
+    "Completed",
   ];
+
+  const statusOptions = {
+    Pending: { color: "bg-gray-100 text-gray-800", icon: "fa-clock" },
+    Collected: { color: "bg-blue-100 text-blue-800", icon: "fa-syringe" },
+    "In Transit": { color: "bg-yellow-100 text-yellow-800", icon: "fa-truck" },
+    "In Lab": { color: "bg-purple-100 text-purple-800", icon: "fa-microscope" },
+    Processing: { color: "bg-indigo-100 text-indigo-800", icon: "fa-flask" },
+    Processed: { color: "bg-green-100 text-green-800", icon: "fa-check-double" },
+    Storage: { color: "bg-teal-100 text-teal-800", icon: "fa-archive" },
+    Disposed: { color: "bg-red-100 text-red-800", icon: "fa-trash-alt" },
+  };
 
   useEffect(() => {
     loadSampleData();
-  }, []);
+  }, [searchTerm]);
+
+  const normalizeSampleData = (row) => ({
+    id: row.sample_id ?? row.id,
+    barcode: row.barcode || "N/A",
+    patientName: row.patient_name ?? row.patientName ?? "Unknown Patient",
+    patientId: row.patient_id ?? row.patientId ?? "N/A",
+    testType: row.test_type ?? row.testType ?? "N/A",
+    sampleType: row.sample_type ?? row.sampleType ?? "N/A",
+    status: row.status ?? "Pending",
+    collectionTime: row.collection_time ?? row.collectionTime ?? row.collected_at ?? "N/A",
+    collectedBy: row.collected_by ?? row.collectedBy ?? "N/A",
+    location: row.location ?? "N/A",
+    temperature: row.temperature ?? "N/A",
+    testId: row.test_id ?? row.testId ?? "N/A",
+    priority: row.priority ?? "Normal",
+    qrCodeData: row.qrCodeData || `${row.sample_id || row.id}\nPATIENT: ${row.patient_name || row.patientName}\nTEST: ${row.test_type || row.testType}`,
+    nextAction: row.next_action ?? row.nextAction ?? getNextAction(row.status ?? "Pending"),
+  });
 
   const loadSampleData = async () => {
     setLoading(true);
-    setTimeout(() => {
-      const sampleData = [
-        {
-          id: "SAMP-001",
-          testId: "TEST-2024-001",
-          barcode: "BC001",
-          patientName: "Rajesh Kumar",
-          testType: "CBC",
-          sampleType: "Blood",
-          collectionTime: "2024-01-15 09:30",
-          collectedBy: "Nurse Rani",
-          status: "Collected",
-          location: "Collection Room",
-          nextAction: "Transfer to Lab",
-          temperature: "24°C",
-          qrCodeData: `SAMPLE-001\nPATIENT: Rajesh Kumar\nTEST: CBC\nDATE: 2024-01-15`,
-        },
-        {
-          id: "SAMP-002",
-          testId: "TEST-2024-002",
-          barcode: "BC002",
-          patientName: "Priya Sharma",
-          testType: "Lipid Profile",
-          sampleType: "Blood",
-          collectionTime: "2024-01-15 10:15",
-          collectedBy: "Dr. Verma",
-          status: "In Transit",
-          location: "Corridor A",
-          nextAction: "Receive at Lab",
-          temperature: "22°C",
-          qrCodeData: `SAMPLE-002\nPATIENT: Priya Sharma\nTEST: Lipid Profile\nDATE: 2024-01-15`,
-        },
-        {
-          id: "SAMP-003",
-          testId: "TEST-2024-003",
-          barcode: "BC003",
-          patientName: "Suresh Patel",
-          testType: "Urine Culture",
-          sampleType: "Urine",
-          collectionTime: "2024-01-14 14:45",
-          collectedBy: "Lab Tech Ravi",
-          status: "In Lab",
-          location: "Microbiology Lab",
-          nextAction: "Processing",
-          temperature: "25°C",
-          qrCodeData: `SAMPLE-003\nPATIENT: Suresh Patel\nTEST: Urine Culture\nDATE: 2024-01-14`,
-        },
-        {
-          id: "SAMP-004",
-          testId: "TEST-2024-004",
-          barcode: "BC004",
-          patientName: "Anita Mehta",
-          testType: "Liver Function",
-          sampleType: "Blood",
-          collectionTime: "2024-01-14 11:20",
-          collectedBy: "Nurse Sonia",
-          status: "Processed",
-          location: "Chemistry Lab",
-          nextAction: "Storage",
-          temperature: "4°C",
-          qrCodeData: `SAMPLE-004\nPATIENT: Anita Mehta\nTEST: Liver Function\nDATE: 2024-01-14`,
-        },
-      ];
-      setSamples(sampleData);
+    try {
+      const url = searchTerm
+        ? `/api/v1/lab/sample-tracking?search=${encodeURIComponent(searchTerm)}`
+        : "/api/v1/lab/sample-tracking";
+
+      const res = await apiFetch(url);
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.detail?.message || data?.message || `Failed to fetch samples (${res.status})`);
+      }
+
+      const rawRows = data?.samples ?? data?.rows ?? data?.data ?? [];
+      const normalizedSamples = Array.isArray(rawRows) ? rawRows.map(normalizeSampleData) : [];
+      setSamples(normalizedSamples);
+    } catch (error) {
+      console.error("Failed to load sample tracking:", error);
+      setSamples([]);
+      setToast({ message: error.message, type: "error" });
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
-  const handleSearch = (term) => {
-    setSearchTerm(term);
-  };
+  const handleSearch = (term) => setSearchTerm(term);
 
   const handleScanBarcode = () => {
     setScannedCode("");
     setShowScannerModal(true);
   };
 
-  const performBarcodeLookup = (code) => {
+  const performBarcodeLookup = async (code, simulate = false) => {
     if (!code.trim()) {
       setToast({ message: "Please enter or scan a barcode", type: "warning" });
       return false;
     }
-    const foundSample = samples.find((s) => s.barcode === code.trim());
-    if (foundSample) {
-      setCurrentSample(foundSample);
-      setToast({
-        message: `Sample found: ${foundSample.id} (${foundSample.patientName})`,
-        type: "success",
-      });
-      setShowScannerModal(false);
-      return true;
-    } else {
-      setToast({
-        message: `Sample with barcode ${code} not found`,
-        type: "error",
-      });
-      return false;
+
+    try {
+      setLoading(true);
+      const endpoint = simulate 
+        ? `/api/v1/lab/sample-tracking/simulate-scan?barcode=${encodeURIComponent(code.trim())}`
+        : `/api/v1/lab/sample-tracking/lookup?barcode=${encodeURIComponent(code.trim())}`;
+      
+      const options = simulate ? { method: "POST" } : {};
+      const res = await apiFetch(endpoint, options);
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) throw new Error(data?.detail?.message || data?.message || "Barcode not found");
+
+      const foundSample = data?.data ?? data?.sample ?? data;
+      if (foundSample) {
+        const normalized = normalizeSampleData(foundSample);
+        setCurrentSample(normalized);
+        setShowScannerModal(false);
+        setToast({ message: `Sample found: ${normalized.barcode}`, type: "success" });
+        return true;
+      }
+    } catch (error) {
+      console.error("Barcode lookup failed:", error);
+      const localSample = samples.find((s) => s.barcode === code.trim());
+      if (localSample) {
+        setCurrentSample(localSample);
+        setShowScannerModal(false);
+        setToast({ message: "Found in local list", type: "success" });
+        return true;
+      }
+      setToast({ message: error.message, type: "error" });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const simulateBarcodeScan = () => {
-    const randomBarcode = `BC${Math.floor(Math.random() * 1000)
-      .toString()
-      .padStart(3, "0")}`;
-    setScannedCode(randomBarcode);
-    performBarcodeLookup(randomBarcode);
-  };
+  const updateSampleStatus = async (sampleId, action, location) => {
+    try {
+      const payload = { 
+        sample_id: sampleId, 
+        action: action, 
+        location: location 
+      };
+      
+      const res = await apiFetch("/api/v1/lab/sample-tracking/action", {
+        method: "POST",
+        body: payload,
+      });
 
-  const updateSampleStatus = (sampleId, newStatus, newLocation) => {
-    const updatedSamples = samples.map((sample) =>
-      sample.id === sampleId
-        ? {
-            ...sample,
-            status: newStatus,
-            location: newLocation || sample.location,
-            nextAction: getNextAction(newStatus),
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const updatedSample = data?.data ?? data?.sample;
+        
+        loadSampleData();
+        setToast({ message: `Action '${action}' applied successfully`, type: "success" });
+        
+        if (currentSample && currentSample.id === sampleId) {
+          if (updatedSample) {
+            setCurrentSample(normalizeSampleData(updatedSample));
+          } else {
+            const updated = { ...currentSample, status: action, location: location };
+            setCurrentSample(normalizeSampleData(updated));
           }
-        : sample,
-    );
-    setSamples(updatedSamples);
-
-    if (currentSample && currentSample.id === sampleId) {
-      const updatedCurrent = updatedSamples.find((s) => s.id === sampleId);
-      setCurrentSample(updatedCurrent);
+        }
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to apply action");
+      }
+    } catch (error) {
+      setToast({ message: error.message, type: "error" });
     }
-
-    setToast({
-      message: `Sample ${sampleId} status updated to: ${newStatus}`,
-      type: "success",
-    });
   };
 
   const getNextAction = (status) => {
     const actions = {
+      Pending: "Collect Sample",
       Collected: "Transfer to Lab",
       "In Transit": "Receive at Lab",
       "In Lab": "Start Processing",
       Processing: "Complete Analysis",
       Processed: "Move to Storage",
       Storage: "Dispose after retention",
-      Disposed: "No further action",
     };
     return actions[status] || "Awaiting update";
   };
 
-  const handleRowClick = (sample) => {
-    setCurrentSample(sample);
-  };
+  const handleRowClick = (sample) => setCurrentSample(sample);
 
-  // Fixed Print Label Functionality
   const handlePrintLabel = (sample) => {
     const printWindow = window.open("", "_blank", "width=800,height=600");
     if (!printWindow) {
-      setToast({
-        message: "Please allow pop-ups to print labels",
-        type: "error",
-      });
+      setToast({ message: "Please allow pop-ups to print labels", type: "error" });
       return;
     }
-
-    const htmlContent = generateLabelHTML(sample);
+    const htmlContent = `
+      <html><body style="font-family:monospace;text-align:center;padding:20px;border:2px solid #000;margin:20px;">
+      <h2>LEVITICA HEALTHCARE</h2><hr/>
+      <h3>SAMPLE SPECIMEN LABEL</h3>
+      <p style="font-size:1.2em;"><b>ID: ${sample.id}</b></p>
+      <p><b>Barcode: ${sample.barcode}</b></p>
+      <p><b>Patient:</b> ${sample.patientName} (${sample.patientId})</p>
+      <p><b>Test:</b> ${sample.testType}</p>
+      <p><b>Sample:</b> ${sample.sampleType}</p>
+      <p><b>Collected:</b> ${sample.collectionTime}</p>
+      <p style="margin-top:20px;">HANDLED BY: ${sample.collectedBy}</p>
+      </body></html>`;
     printWindow.document.write(htmlContent);
     printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-    printWindow.onafterprint = () => printWindow.close();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
   };
 
-  const generateLabelHTML = (sample) => {
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Sample Label - ${sample.id}</title>
-          <meta charset="utf-8" />
-          <style>
-            * {
-              margin: 0;
-              padding: 0;
-              box-sizing: border-box;
-            }
-            body {
-              font-family: 'Courier New', monospace;
-              background: white;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              min-height: 100vh;
-              padding: 20px;
-            }
-            .label {
-              width: 300px;
-              padding: 15px;
-              border: 2px solid #000;
-              border-radius: 8px;
-              background: white;
-              page-break-after: avoid;
-              break-inside: avoid;
-            }
-            .header {
-              text-align: center;
-              border-bottom: 1px dashed #000;
-              padding-bottom: 8px;
-              margin-bottom: 10px;
-            }
-            .header h3 {
-              font-size: 14px;
-              margin-bottom: 4px;
-            }
-            .barcode {
-              text-align: center;
-              margin: 15px 0;
-              padding: 10px;
-              background: #f9f9f9;
-            }
-            .barcode-text {
-              font-family: 'Courier New', monospace;
-              font-size: 24px;
-              font-weight: bold;
-              letter-spacing: 2px;
-            }
-            .info-row {
-              margin: 8px 0;
-              font-size: 12px;
-            }
-            .info-label {
-              font-weight: bold;
-              display: inline-block;
-              width: 80px;
-            }
-            .footer {
-              margin-top: 12px;
-              padding-top: 8px;
-              border-top: 1px dashed #000;
-              text-align: center;
-              font-size: 10px;
-            }
-            .qr-placeholder {
-              text-align: center;
-              margin: 10px 0;
-              font-family: monospace;
-              font-size: 10px;
-            }
-            @media print {
-              body {
-                padding: 0;
-                margin: 0;
-              }
-              .label {
-                border: 1px solid #000;
-                box-shadow: none;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="label">
-            <div class="header">
-              <h3>LEVITICA HEALTHCARE</h3>
-              <p style="font-size: 10px;">Diagnostic Laboratory</p>
-            </div>
-            
-            <div class="barcode">
-              <div class="barcode-text">${sample.barcode}</div>
-              <div style="font-size: 10px; margin-top: 5px;">${sample.id}</div>
-            </div>
-            
-            <div class="info-row">
-              <span class="info-label">Patient:</span>
-              <span>${sample.patientName}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Test Type:</span>
-              <span>${sample.testType}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Sample Type:</span>
-              <span>${sample.sampleType}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Collection:</span>
-              <span>${sample.collectionTime}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Collected By:</span>
-              <span>${sample.collectedBy}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Status:</span>
-              <span>${sample.status}</span>
-            </div>
-            
-            <div class="qr-placeholder">
-              <div style="font-size: 10px;">QR: ${sample.qrCodeData.substring(0, 30)}...</div>
-            </div>
-            
-            <div class="footer">
-              Handle with care | Store at ${sample.temperature}
-            </div>
-          </div>
-        </body>
-      </html>
-    `;
-  };
-
-  const handleViewQR = (sample) => {
-    setQRSample(sample);
-    setShowQRModal(true);
-  };
-
+  const handleViewQR = (sample) => { setQRSample(sample); setShowQRModal(true); };
+  
   const handlePrintQR = () => {
     if (!qrSample) return;
-
     const printWindow = window.open("", "_blank", "width=600,height=600");
-    if (!printWindow) {
-      setToast({
-        message: "Please allow pop-ups to print QR code",
-        type: "error",
-      });
-      return;
-    }
-
-    const htmlContent = generateQRPrintHTML(qrSample);
-    printWindow.document.write(htmlContent);
+    printWindow.document.write(`<html><body style="text-align:center;padding:40px;"><h2>QR Code</h2><p>${qrSample.id}</p><div id="qr"></div><p>${qrSample.patientName}</p></body></html>`);
     printWindow.document.close();
-    printWindow.focus();
     printWindow.print();
-    printWindow.onafterprint = () => printWindow.close();
   };
 
-  const generateQRPrintHTML = (sample) => {
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>QR Code - ${sample.id}</title>
-          <meta charset="utf-8" />
-          <style>
-            * {
-              margin: 0;
-              padding: 0;
-              box-sizing: border-box;
-            }
-            body {
-              font-family: Arial, sans-serif;
-              background: white;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              min-height: 100vh;
-              padding: 20px;
-            }
-            .qr-container {
-              text-align: center;
-              padding: 30px;
-              border: 2px solid #000;
-              border-radius: 12px;
-              background: white;
-            }
-            .qr-code {
-              margin: 20px auto;
-              padding: 20px;
-              background: white;
-            }
-            .sample-info {
-              margin-top: 20px;
-              padding-top: 20px;
-              border-top: 1px solid #ccc;
-            }
-            .sample-info p {
-              margin: 5px 0;
-              font-size: 12px;
-            }
-            @media print {
-              body {
-                padding: 0;
-                margin: 0;
-              }
-              .qr-container {
-                border: 1px solid #000;
-                box-shadow: none;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="qr-container">
-            <h3>LEVITICA HEALTHCARE</h3>
-            <p>Sample Tracking QR Code</p>
-            <div class="qr-code" id="qr-code">
-              <!-- QR will be rendered here -->
-              <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
-                <rect width="200" height="200" fill="white"/>
-                <text x="100" y="100" text-anchor="middle" font-size="10" fill="black">QR Code Placeholder</text>
-              </svg>
-            </div>
-            <div class="sample-info">
-              <p><strong>Sample ID:</strong> ${sample.id}</p>
-              <p><strong>Patient:</strong> ${sample.patientName}</p>
-              <p><strong>Test Type:</strong> ${sample.testType}</p>
-              <p><strong>Barcode:</strong> ${sample.barcode}</p>
-              <p><strong>Collection Date:</strong> ${sample.collectionTime}</p>
-            </div>
-            <p style="margin-top: 20px; font-size: 10px;">Scan this QR code to track sample status</p>
-          </div>
-        </body>
-      </html>
-    `;
-  };
+  const handleMarkReceived = () => currentSample && updateSampleStatus(currentSample.id, "In Lab", "Main Laboratory Reception");
+  const handleMarkInTransit = () => currentSample && updateSampleStatus(currentSample.id, "In Transit", "In Transit");
+  const handleStartProcessing = () => currentSample && updateSampleStatus(currentSample.id, "Processing", "Laboratory");
+  const handleCompleteTest = () => currentSample && updateSampleStatus(currentSample.id, "Processed", "Storage");
 
-  // Quick action handlers
-  const handleMarkCollected = () => {
-    if (!currentSample) {
-      setToast({ message: "Please select a sample first", type: "warning" });
-      return;
-    }
-    updateSampleStatus(currentSample.id, "Collected", "Collection Room");
-  };
-
-  const handleMarkInTransit = () => {
-    if (!currentSample) {
-      setToast({ message: "Please select a sample first", type: "warning" });
-      return;
-    }
-    if (currentSample.status !== "Collected") {
-      setToast({
-        message: "Sample must be Collected before marking In Transit",
-        type: "error",
-      });
-      return;
-    }
-    updateSampleStatus(currentSample.id, "In Transit", "In Transit");
-  };
-
-  const handleStartProcessing = () => {
-    if (!currentSample) {
-      setToast({ message: "Please select a sample first", type: "warning" });
-      return;
-    }
-    if (!["In Lab", "In Transit"].includes(currentSample.status)) {
-      setToast({
-        message: "Sample must be In Lab or In Transit to start processing",
-        type: "error",
-      });
-      return;
-    }
-    updateSampleStatus(currentSample.id, "Processing", "Chemistry Lab");
-  };
-
-  const handleCompleteTest = () => {
-    if (!currentSample) {
-      setToast({ message: "Please select a sample first", type: "warning" });
-      return;
-    }
-    if (currentSample.status !== "Processing") {
-      setToast({
-        message: "Sample must be Processing to complete",
-        type: "error",
-      });
-      return;
-    }
-    updateSampleStatus(currentSample.id, "Processed", "Storage");
-  };
-
-  const filteredSamples = samples.filter(
-    (sample) =>
-      sample.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      sample.barcode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      sample.testId.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
-
-  const statusOptions = {
-    Pending: { color: "bg-gray-100 text-gray-800" },
-    Collected: { color: "bg-blue-100 text-blue-800" },
-    "In Transit": { color: "bg-yellow-100 text-yellow-800" },
-    "In Lab": { color: "bg-purple-100 text-purple-800" },
-    Processing: { color: "bg-indigo-100 text-indigo-800" },
-    Processed: { color: "bg-green-100 text-green-800" },
-    Storage: { color: "bg-teal-100 text-teal-800" },
-    Disposed: { color: "bg-red-100 text-red-800" },
-  };
-
-  if (loading) return <LoadingSpinner />;
+  if (loading && samples.length === 0) return <LoadingSpinner />;
 
   return (
     <>
-      <div className="space-y-6 animate-fade-in">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="space-y-6 animate-fade-in p-2 sm:p-4 bg-gray-50/30 min-h-screen">
+        {/* Header Section */}
+        <div className="bg-white/80 backdrop-blur-md sticky top-0 z-20 p-5 border rounded-2xl shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h2 className="text-2xl font-semibold text-gray-700">
-              Sample Tracking
-            </h2>
-            <p className="text-gray-500">
-              Track samples with barcode/QR code support throughout the testing
-              process
-            </p>
+            <h2 className="text-2xl font-bold text-gray-800">Sample Logistics & Tracking</h2>
+            <p className="text-sm text-gray-500">Monitor sample chain of custody and processing status</p>
           </div>
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              icon="fas fa-qrcode"
-              onClick={handleScanBarcode}
-            >
-              Scan Barcode/QR
-            </Button>
-            <Button
-              variant="primary"
-              icon="fas fa-sync-alt"
-              onClick={loadSampleData}
-            >
-              Refresh Tracking
-            </Button>
+          <div className="flex gap-2 w-full md:w-auto">
+            <Button variant="outline" icon="fas fa-qrcode" onClick={handleScanBarcode} className="flex-1 md:flex-none py-2.5 rounded-xl border-gray-200">Scan Barcode</Button>
+            <Button variant="primary" icon="fas fa-sync-alt" onClick={loadSampleData} className="flex-1 md:flex-none py-2.5 rounded-xl shadow-lg shadow-blue-100">Refresh List</Button>
           </div>
         </div>
 
-        {/* Search and Scanner */}
-        <div className="bg-white p-4 rounded border card-shadow">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <SearchBar
-                placeholder="Search by barcode, patient name, or test ID..."
-                onSearch={handleSearch}
-                className="w-full"
-              />
-            </div>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <i className="fas fa-info-circle"></i>
-              <span>Scan or enter barcode to track sample</span>
-            </div>
+        {/* Global Search */}
+        <div className="bg-white p-2 rounded-2xl border card-shadow">
+          <div className="relative w-full">
+            <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+            <input
+              type="text"
+              placeholder="Search by Barcode, Patient Name, or Test ID..."
+              className="w-full pl-12 pr-4 py-3 bg-gray-50/50 rounded-xl outline-none text-sm border border-transparent focus:border-blue-200"
+              onChange={(e) => handleSearch(e.target.value)}
+              value={searchTerm}
+            />
           </div>
         </div>
 
-        {/* Current Sample Info */}
-        {currentSample && (
-          <div className="bg-white p-4 rounded border card-shadow border-blue-300">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-semibold text-lg text-gray-800">
-                  Currently Tracked Sample
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
-                  <div>
-                    <p className="text-sm text-gray-500">Sample ID</p>
-                    <p className="font-medium">{currentSample.id}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Patient</p>
-                    <p className="font-medium">{currentSample.patientName}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Current Status</p>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs ${statusOptions[currentSample.status]?.color || "bg-gray-100"}`}
-                    >
-                      {currentSample.status}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Location</p>
-                    <p className="font-medium">{currentSample.location}</p>
-                  </div>
-                </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-8 space-y-6">
+            <div className="bg-white rounded-2xl border card-shadow overflow-hidden">
+              <div className="p-4 border-b bg-gray-50/30 flex justify-between items-center">
+                <h3 className="font-bold text-gray-700 text-sm uppercase tracking-wider flex items-center gap-2"><i className="fas fa-vials text-blue-500"></i>Recent Samples</h3>
+                <span className="text-xs font-medium text-gray-400 bg-white px-2 py-1 rounded-lg border">Showing {samples.length} samples</span>
               </div>
-              <button
-                onClick={() => setCurrentSample(null)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <i className="fas fa-times"></i>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Samples Table */}
-        <div className="bg-white rounded border card-shadow overflow-hidden">
-          <DataTable
-            columns={[
-              { key: "barcode", title: "Barcode", sortable: true },
-              { key: "testId", title: "Test ID", sortable: true },
-              { key: "patientName", title: "Patient", sortable: true },
-              { key: "testType", title: "Test Type", sortable: true },
-              { key: "sampleType", title: "Sample Type", sortable: true },
-              {
-                key: "collectionTime",
-                title: "Collection Time",
-                sortable: true,
-              },
-              {
-                key: "status",
-                title: "Status",
-                sortable: true,
-                render: (value) => (
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs ${statusOptions[value]?.color || "bg-gray-100"}`}
-                  >
-                    {value}
-                  </span>
-                ),
-              },
-              { key: "location", title: "Current Location", sortable: true },
-              {
-                key: "actions",
-                title: "Actions",
-                render: (_, row) => (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleViewQR(row);
-                      }}
-                      className="px-3 py-1 text-xs bg-purple-100 text-purple-800 rounded hover:bg-purple-200"
-                      title="View QR Code"
-                    >
-                      <i className="fas fa-qrcode"></i>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePrintLabel(row);
-                      }}
-                      className="px-3 py-1 text-xs bg-gray-100 text-gray-800 rounded hover:bg-gray-200"
-                      title="Print Label"
-                    >
-                      <i className="fas fa-print"></i>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        updateSampleStatus(row.id, "Processed", "Storage");
-                      }}
-                      className="px-3 py-1 text-xs bg-green-100 text-green-800 rounded hover:bg-green-200"
-                      title="Mark as Processed"
-                    >
-                      <i className="fas fa-check"></i>
-                    </button>
-                  </div>
-                ),
-              },
-            ]}
-            data={filteredSamples}
-            onRowClick={handleRowClick}
-            emptyMessage="No samples found. Start by registering tests."
-          />
-        </div>
-
-        {/* Sample Tracking Timeline */}
-        {currentSample && (
-          <div className="bg-white p-6 rounded border card-shadow">
-            <h3 className="text-lg font-semibold mb-4">
-              Sample Journey - {currentSample.patientName}
-            </h3>
-            <div className="relative">
-              <div className="flex justify-between items-center mb-8">
-                {stages.map((stage, index) => {
-                  const currentStageIndex =
-                    statusStageMap[currentSample.status] ?? 0;
-                  const isCompleted = index <= currentStageIndex;
-                  const isCurrent = index === currentStageIndex;
-                  return (
-                    <div
-                      key={stage}
-                      className="flex flex-col items-center flex-1"
-                    >
-                      <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-colors
-                        ${isCompleted ? "bg-green-500 text-white" : "bg-gray-200 text-gray-500"}
-                        ${isCurrent ? "ring-4 ring-green-200" : ""}
-                      `}
-                      >
-                        {index + 1}
-                      </div>
-                      <span className="text-sm font-medium">{stage}</span>
-                      {isCurrent && (
-                        <span className="text-xs text-green-600 mt-1">
-                          Current
+              <div className="overflow-x-auto">
+                <DataTable
+                  columns={[
+                    { key: "barcode", title: "Barcode", render: (val) => <span className="font-mono font-bold text-blue-600">{val}</span> },
+                    { key: "patientName", title: "Patient" },
+                    { 
+                      key: "status", 
+                      title: "Status",
+                      render: (value) => (
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase ${statusOptions[value]?.color || "bg-gray-100"}`}>
+                          <i className={`fas ${statusOptions[value]?.icon || 'fa-circle'} text-[9px]`}></i>{value}
                         </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-blue-50 rounded-lg">
-                <div>
-                  <p className="text-sm text-gray-500">Temperature</p>
-                  <p className="text-xl font-bold">
-                    {currentSample.temperature}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Collected By</p>
-                  <p className="font-medium">{currentSample.collectedBy}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Next Action</p>
-                  <p className="font-medium">{currentSample.nextAction}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <button
-            className="p-4 bg-white border rounded-lg hover:bg-blue-50 transition-colors text-center group"
-            onClick={handleMarkCollected}
-          >
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-blue-200">
-              <i className="fas fa-syringe text-blue-600 text-xl"></i>
-            </div>
-            <p className="font-medium">Mark Collected</p>
-          </button>
-
-          <button
-            className="p-4 bg-white border rounded-lg hover:bg-green-50 transition-colors text-center group"
-            onClick={handleMarkInTransit}
-          >
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-green-200">
-              <i className="fas fa-truck text-green-600 text-xl"></i>
-            </div>
-            <p className="font-medium">Mark In Transit</p>
-          </button>
-
-          <button
-            className="p-4 bg-white border rounded-lg hover:bg-purple-50 transition-colors text-center group"
-            onClick={handleStartProcessing}
-          >
-            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-purple-200">
-              <i className="fas fa-flask text-purple-600 text-xl"></i>
-            </div>
-            <p className="font-medium">Start Processing</p>
-          </button>
-
-          <button
-            className="p-4 bg-white border rounded-lg hover:bg-teal-50 transition-colors text-center group"
-            onClick={handleCompleteTest}
-          >
-            <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-teal-200">
-              <i className="fas fa-check-circle text-teal-600 text-xl"></i>
-            </div>
-            <p className="font-medium">Complete Test</p>
-          </button>
-        </div>
-      </div>
-
-      {/* Barcode Scanner Modal */}
-      <Modal
-        isOpen={showScannerModal}
-        onClose={() => setShowScannerModal(false)}
-        title="Scan Barcode/QR Code"
-      >
-        <div className="space-y-4">
-          <div className="bg-gray-100 p-8 rounded-lg text-center">
-            <div className="w-48 h-48 mx-auto border-4 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
-              <i className="fas fa-qrcode text-4xl text-gray-400"></i>
-            </div>
-            <p className="text-gray-600 mb-4">
-              Position barcode/QR code within the frame
-            </p>
-          </div>
-
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Or Enter Barcode Manually
-              </label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 border rounded-lg"
-                placeholder="Enter barcode (e.g., BC001)"
-                value={scannedCode}
-                onChange={(e) => setScannedCode(e.target.value)}
-              />
-            </div>
-            <button
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 self-end"
-              onClick={() => performBarcodeLookup(scannedCode)}
-            >
-              Lookup
-            </button>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button
-              variant="outline"
-              onClick={() => setShowScannerModal(false)}
-            >
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={simulateBarcodeScan}>
-              Simulate Scan
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* QR Code Modal - Now with actual visible QR code */}
-      <Modal
-        isOpen={showQRModal}
-        onClose={() => setShowQRModal(false)}
-        title="Sample QR Code"
-        size="sm"
-      >
-        {qrSample && (
-          <div className="text-center space-y-4">
-            <div className="bg-gray-50 p-6 rounded-lg inline-block mx-auto">
-              <div className="bg-white p-4 rounded-lg shadow-md">
-                {/* Actual QR Code rendered using qrcode.react */}
-                <QRCodeSVG
-                  value={qrSample.qrCodeData}
-                  size={200}
-                  level="H"
-                  includeMargin={true}
+                      ),
+                    },
+                    { key: "collectionTime", title: "Collected", render: (val) => <span className="text-xs text-gray-500">{val}</span> },
+                    {
+                      key: "actions",
+                      title: "",
+                      render: (_, row) => (
+                        <div className="flex gap-1">
+                          <button onClick={(e) => { e.stopPropagation(); handleViewQR(row); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><i className="fas fa-qrcode"></i></button>
+                          <button onClick={(e) => { e.stopPropagation(); handlePrintLabel(row); }} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg"><i className="fas fa-print"></i></button>
+                        </div>
+                      ),
+                    },
+                  ]}
+                  data={samples}
+                  onRowClick={handleRowClick}
+                  emptyMessage="No samples found. Use search or scan a barcode."
                 />
               </div>
             </div>
-            <div className="border-t pt-4">
-              <p className="font-medium text-lg">{qrSample.patientName}</p>
-              <p className="text-sm text-gray-500">Sample ID: {qrSample.id}</p>
-              <p className="text-sm text-gray-500">
-                Barcode: {qrSample.barcode}
-              </p>
-              <p className="text-sm text-gray-500">
-                Test Type: {qrSample.testType}
-              </p>
-              <p className="text-xs text-gray-400 mt-2 break-all">
-                {qrSample.qrCodeData}
-              </p>
+          </div>
+
+          <div className="lg:col-span-4 space-y-6">
+            {!currentSample ? (
+              <div className="bg-blue-50/50 border-2 border-dashed border-blue-100 rounded-3xl p-10 text-center">
+                <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center mx-auto text-blue-300 mb-4"><i className="fas fa-fingerprint text-2xl"></i></div>
+                <h4 className="font-bold text-blue-800">Select a Sample</h4>
+                <p className="text-xs text-blue-600/60 leading-relaxed">Click on any sample or scan a barcode to view its detailed journey.</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-3xl border border-blue-100 card-shadow p-6 relative overflow-hidden">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-800">{currentSample.patientName}</h3>
+                    <p className="text-xs text-gray-400 font-mono mt-1">{currentSample.barcode}</p>
+                  </div>
+                  <button onClick={() => setCurrentSample(null)} className="p-2 text-gray-300 hover:text-gray-500 bg-gray-50 rounded-full"><i className="fas fa-times text-sm"></i></button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mb-8">
+                  <div className="bg-gray-50 p-2.5 rounded-2xl"><p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Temp</p><p className="text-sm font-bold text-gray-700">{currentSample.temperature}</p></div>
+                  <div className="bg-gray-50 p-2.5 rounded-2xl"><p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Type</p><p className="text-sm font-bold text-gray-700 truncate">{currentSample.sampleType}</p></div>
+                  <div className="bg-gray-50 p-2.5 rounded-2xl"><p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Test ID</p><p className="text-sm font-bold text-gray-700">{currentSample.testId}</p></div>
+                  <div className="bg-gray-50 p-2.5 rounded-2xl"><p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Priority</p><p className="text-sm font-bold text-gray-700">{currentSample.priority}</p></div>
+                </div>
+
+                <div className="space-y-6 pl-4 border-l-2 border-blue-50 ml-2 mb-8">
+                  {stages.map((stage, index) => {
+                    const currentStageIndex = statusStageMap[currentSample.status] ?? 0;
+                    const isCompleted = index < currentStageIndex;
+                    const isCurrent = index === currentStageIndex;
+                    return (
+                      <div key={stage} className="relative flex items-center gap-4">
+                        <div className={`absolute -left-[27px] w-5 h-5 rounded-full border-4 border-white shadow-sm z-10 ${isCompleted ? 'bg-green-500' : isCurrent ? 'bg-blue-600 scale-125 ring-4 ring-blue-50' : 'bg-gray-200'}`}></div>
+                        <div className={`flex-1 p-3 rounded-2xl ${isCurrent ? 'bg-blue-50 border border-blue-100' : ''}`}>
+                          <p className={`text-xs font-bold ${isCurrent ? 'text-blue-700' : isCompleted ? 'text-green-600' : 'text-gray-400'}`}>{stage}</p>
+                          {isCurrent && <p className="text-[10px] text-blue-500 mt-1 font-medium">{currentSample.nextAction}</p>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-50">
+                  <button 
+                    className={`p-3 rounded-2xl flex flex-col items-center gap-2 transition-all ${currentSample.status === "Collected" ? "bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-100" : "bg-gray-50 text-gray-300 cursor-not-allowed"}`} 
+                    onClick={handleMarkInTransit}
+                    disabled={currentSample.status !== "Collected"}
+                  >
+                    <i className="fas fa-truck"></i>
+                    <span className="text-[10px] font-bold uppercase">Transit</span>
+                  </button>
+                  <button 
+                    className={`p-3 rounded-2xl flex flex-col items-center gap-2 transition-all ${currentSample.status === "In Transit" ? "bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-100" : "bg-gray-50 text-gray-300 cursor-not-allowed"}`} 
+                    onClick={handleMarkReceived}
+                    disabled={currentSample.status !== "In Transit"}
+                  >
+                    <i className="fas fa-hospital-user"></i>
+                    <span className="text-[10px] font-bold uppercase">Receive</span>
+                  </button>
+                  <button 
+                    className={`p-3 rounded-2xl flex flex-col items-center gap-2 transition-all ${currentSample.status === "In Lab" ? "bg-purple-600 text-white hover:bg-purple-700 shadow-lg shadow-purple-100" : "bg-gray-50 text-gray-300 cursor-not-allowed"}`} 
+                    onClick={handleStartProcessing}
+                    disabled={currentSample.status !== "In Lab"}
+                  >
+                    <i className="fas fa-flask"></i>
+                    <span className="text-[10px] font-bold uppercase">Process</span>
+                  </button>
+                  <button 
+                    className={`p-3 rounded-2xl flex flex-col items-center gap-2 transition-all ${currentSample.status === "Processing" ? "bg-green-600 text-white hover:bg-green-700 shadow-lg shadow-green-100" : "bg-gray-50 text-gray-300 cursor-not-allowed"}`} 
+                    onClick={handleCompleteTest}
+                    disabled={currentSample.status !== "Processing"}
+                  >
+                    <i className="fas fa-check-double"></i>
+                    <span className="text-[10px] font-bold uppercase">Complete</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <Modal isOpen={showScannerModal} onClose={() => setShowScannerModal(false)} title="Laboratory Scanner Console">
+        <div className="space-y-6">
+          {/* Scanning Animation Header */}
+          <div className="bg-gray-900 rounded-3xl p-8 text-center relative overflow-hidden group">
+            <div className="absolute inset-0 bg-blue-500/10 animate-pulse"></div>
+            <div className="relative z-10">
+              <div className="w-24 h-24 mx-auto mb-4 border-2 border-blue-500/30 rounded-2xl flex items-center justify-center relative">
+                <div className="absolute top-0 left-0 w-full h-1 bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.8)] animate-scan-line"></div>
+                <i className="fas fa-barcode text-4xl text-blue-400"></i>
+              </div>
+              <p className="text-xs font-bold text-blue-400 uppercase tracking-[0.2em]">Ready for Input</p>
             </div>
-            <div className="flex gap-3 pt-2">
-              <Button
-                variant="outline"
-                icon="fas fa-print"
-                onClick={handlePrintQR}
-                className="flex-1"
-              >
-                Print QR Code
-              </Button>
-              <Button
-                variant="primary"
-                icon="fas fa-download"
-                onClick={() => {
-                  setToast({
-                    message: `QR Code for ${qrSample.id} saved`,
-                    type: "success",
-                  });
-                }}
-                className="flex-1"
-              >
-                Download QR
-              </Button>
+          </div>
+
+          <div className="space-y-4">
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl blur opacity-20 group-focus-within:opacity-40 transition-opacity"></div>
+              <div className="relative">
+                <input 
+                  type="text" 
+                  className="w-full pl-6 pr-32 py-5 bg-white border-2 border-gray-100 rounded-2xl outline-none focus:border-blue-500 font-mono text-xl text-center tracking-[0.3em] text-gray-800 placeholder:tracking-normal placeholder:text-gray-300 transition-all" 
+                  placeholder="SCAN OR TYPE ID" 
+                  value={scannedCode} 
+                  onChange={(e) => setScannedCode(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === 'Enter' && performBarcodeLookup(scannedCode, false)}
+                />
+                <button 
+                  className="absolute right-2 top-2 bottom-2 px-6 bg-blue-600 text-white rounded-xl font-bold text-xs shadow-lg shadow-blue-100 hover:bg-blue-700 active:scale-95 transition-all" 
+                  onClick={() => performBarcodeLookup(scannedCode, false)}
+                >
+                  LOOKUP
+                </button>
+              </div>
+            </div>
+
+            <div className="relative py-4">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
+              <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-widest text-gray-400 bg-white px-4">Development Tools</div>
+            </div>
+
+            <button 
+              className="w-full py-4 bg-gradient-to-r from-gray-800 to-gray-900 text-white rounded-2xl font-bold text-xs hover:from-black hover:to-gray-800 transition-all active:scale-95 flex items-center justify-center gap-3 shadow-xl" 
+              onClick={() => performBarcodeLookup(scannedCode, true)}
+            >
+              <i className="fas fa-bolt text-yellow-400"></i>
+              <span>SIMULATE HARDWARE SCAN (POST)</span>
+            </button>
+            <p className="text-center text-[10px] text-gray-400 leading-relaxed">
+              Use simulation to bypass physical hardware requirements and trigger backend sample state transitions directly.
+            </p>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={showQRModal} onClose={() => setShowQRModal(false)} title="Laboratory QR Code" size="sm">
+        {qrSample && (
+          <div className="text-center p-2">
+            <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-50 inline-block"><QRCodeSVG value={qrSample.qrCodeData} size={220} level="H" includeMargin={true} /></div>
+            <h4 className="text-xl font-bold text-gray-800 mt-6">{qrSample.patientName}</h4>
+            <p className="text-xs font-bold text-blue-500 font-mono uppercase tracking-widest">{qrSample.barcode}</p>
+            <div className="grid grid-cols-2 gap-3 mt-8">
+              <Button variant="outline" icon="fas fa-print" onClick={handlePrintQR} className="flex-1 rounded-xl py-3 text-xs">Print</Button>
+              <Button variant="primary" icon="fas fa-download" onClick={() => setToast({ message: `Saved QR for ${qrSample.id}`, type: "success" })} className="flex-1 rounded-xl py-3 text-xs shadow-lg shadow-blue-100">Download</Button>
             </div>
           </div>
         )}
       </Modal>
 
-      {/* Toast Notification */}
-      {toast && (
-        <Toast
-          key={toast.message + Date.now()}
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
+      {toast && <Toast key={toast.message + Date.now()} message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </>
   );
 };

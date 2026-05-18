@@ -1,461 +1,184 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
-import { Pill, Search, Filter, Plus, Eye, Pencil, Trash2 } from "lucide-react";
-import Modal from "../../../../components/common/Modal/Modal";
+import { Pill, Search, Loader2, AlertTriangle } from "lucide-react";
+import { getInventory, getMedicines } from "../../../../services/pharmacyApi";
 
 export default function Inventory() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
-  const [status, setStatus] = useState("All");
   const [page, setPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [medicines, setMedicines] = useState([]);
+  const [masterMedicines, setMasterMedicines] = useState([]);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [mode, setMode] = useState("add"); // add | view | edit
-  const [selectedIndex, setSelectedIndex] = useState(null);
-
-  const [formData, setFormData] = useState({
-    name: "",
-    code: "",
-    category: "",
-    stock: "",
-    price: "",
-    expiry: "",
-  });
-
-  const [medicines, setMedicines] = useState([
-    {
-      name: "Amoxicillin 500mg",
-      code: "AMX-500",
-      category: "Antibiotic",
-      stock: 12,
-      price: 85.5,
-      expiry: "15 Nov 2023",
-      status: "Low Stock",
-    },
-    {
-      name: "Paracetamol 650mg",
-      code: "PAR-650",
-      category: "Analgesic",
-      stock: 8,
-      price: 15,
-      expiry: "10 Dec 2024",
-      status: "Low Stock",
-    },
-    {
-      name: "Losartan 50mg",
-      code: "LOS-50",
-      category: "Hypertension",
-      stock: 15,
-      price: 120,
-      expiry: "20 Mar 2024",
-      status: "Low Stock",
-    },
-    {
-      name: "Cetirizine 10mg",
-      code: "CET-10",
-      category: "Antihistamine",
-      stock: 45,
-      price: 25.5,
-      expiry: "23 Nov 2023",
-      status: "In Stock",
-    },
-    {
-      name: "Metformin 500mg",
-      code: "MET-500",
-      category: "Diabetes",
-      stock: 0,
-      price: 65,
-      expiry: "8 Dec 2023",
-      status: "Out of Stock",
-    },
-  ]);
-
-  // ---------------- HELPERS ----------------
-
-  const getStatus = (stock) => {
-    const value = Number(stock);
-    if (value === 0) return "Out of Stock";
-    if (value <= 10) return "Low Stock";
-    return "In Stock";
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      code: "",
-      category: "",
-      stock: "",
-      price: "",
-      expiry: "",
-    });
-    setMode("add");
-    setSelectedIndex(null);
-  };
-
-  // ---------------- HANDLERS ----------------
-
-  const handleAddMedicine = () => {
-    resetForm();
-    setMode("add");
-    setIsModalOpen(true);
-  };
-
-  const handleFormChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const handleSaveMedicine = () => {
-    if (
-      !formData.name ||
-      !formData.code ||
-      !formData.category ||
-      formData.stock === "" ||
-      formData.price === "" ||
-      !formData.expiry
-    ) {
-      toast.error("Please fill all fields");
-      return;
-    }
-
-    const medicineData = {
-      name: formData.name,
-      code: formData.code,
-      category: formData.category,
-      stock: Number(formData.stock),
-      price: Number(formData.price),
-      expiry: new Date(formData.expiry).toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }),
-      status: getStatus(formData.stock),
+  useEffect(() => {
+    const init = async () => {
+      await fetchMasterData();
+      await fetchInventory();
     };
+    init();
+  }, [page]);
 
-    if (mode === "edit") {
-      setMedicines((prev) =>
-        prev.map((m, i) =>
-          i === selectedIndex ? medicineData : m
-        )
-      );
-      toast.success("Medicine updated");
-    } else {
-      setMedicines((prev) => [...prev, medicineData]);
-      toast.success("Medicine added");
+  const fetchMasterData = async () => {
+    try {
+      const data = await getMedicines(0, 1000);
+      const items = Array.isArray(data) ? data : (data?.medicines || data?.items || data?.data || []);
+      setMasterMedicines(items.map(m => ({ 
+        ...m, 
+        id: m.id || m._id, 
+        displayName: m.brand_name || m.name || m.item_name || "Unknown" 
+      })));
+    } catch (err) {
+      console.error("Failed to fetch medicine master data", err);
     }
-
-    setIsModalOpen(false);
-    resetForm();
   };
 
-  const handleView = (medicine, index) => {
-    setFormData({
-      name: medicine.name,
-      code: medicine.code,
-      category: medicine.category,
-      stock: medicine.stock,
-      price: medicine.price,
-      expiry: "",
-    });
-    setSelectedIndex(index);
-    setMode("view");
-    setIsModalOpen(true);
+  const fetchInventory = async () => {
+    setIsLoading(true);
+    try {
+      const skip = (page - 1) * 100;
+      const data = await getInventory(skip, 100);
+      const items = Array.isArray(data) ? data : (data?.items || data?.data || []);
+
+      const formattedItems = items.map(item => {
+        const mId = item.medicine_id || item.id || item._id;
+        const master = masterMedicines.find(m => m.id === mId);
+        
+        return {
+          id: mId,
+          name: item.medicine_name || item.brand_name || item.name || item.item_name || master?.displayName || '-',
+          code: item.code || item.item_code || master?.sku || (mId ? mId.slice(-8).toUpperCase() : 'N/A'),
+          category: item.category || master?.category || 'General',
+          stock: item.stock !== undefined ? item.stock : (item.quantity_in_stock !== undefined ? item.quantity_in_stock : 0),
+          price: item.price !== undefined ? item.price : (item.unit_price !== undefined ? item.unit_price : 0),
+          status: item.stock <= 10 ? (item.stock === 0 ? "Out of Stock" : "Low Stock") : "In Stock"
+        };
+      });
+      setMedicines(formattedItems);
+    } catch (error) {
+      toast.error(error.message || "Failed to fetch inventory");
+    } finally {
+      setIsLoading(false);
+    }
   };
-
-  const handleEdit = (medicine, index) => {
-    setFormData({
-      name: medicine.name,
-      code: medicine.code,
-      category: medicine.category,
-      stock: medicine.stock,
-      price: medicine.price,
-      expiry: "",
-    });
-    setSelectedIndex(index);
-    setMode("edit");
-    setIsModalOpen(true);
-  };
-
-  const handleDelete = (index) => {
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this medicine?"
-    );
-    if (!confirmDelete) return;
-
-    setMedicines((prev) => prev.filter((_, i) => i !== index));
-    toast.success("Medicine deleted");
-  };
-
-  const handleApplyFilters = () => toast.info("Filters applied");
-  const handlePageChange = (direction) =>
-    toast(`Page ${direction}`);
-
-  // ---------------- FILTER ----------------
 
   const filteredMedicines = medicines.filter(
     (m) =>
-      m.name.toLowerCase().includes(search.toLowerCase()) &&
-      (category === "All" || m.category === category) &&
-      (status === "All" || m.status === status)
+      (m.name.toLowerCase().includes(search.toLowerCase()) || m.code.toLowerCase().includes(search.toLowerCase())) &&
+      (category === "All" || m.category === category)
   );
-
-  // ---------------- UI ----------------
 
   return (
     <div className="bg-slate-100 min-h-screen space-y-6 px-3 sm:px-6 py-4">
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold">
-            Inventory Management
-          </h1>
-          <p className="text-slate-500 text-sm sm:text-base">
-            Manage all medicines in your pharmacy stock
-          </p>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Inventory Overview</h1>
+          <p className="text-slate-500 text-sm">Real-time stock levels and availability</p>
         </div>
-
-        <button
-          onClick={handleAddMedicine}
-          className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 w-full sm:w-auto"
-        >
-          <Plus size={16} />
-          Add New Medicine
-        </button>
       </div>
 
       {/* FILTERS */}
-      <div className="bg-white rounded-xl shadow p-4 grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="relative">
-          <Search
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-          />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search medicine"
-            className="border rounded-lg pl-9 pr-3 py-2 w-full"
-          />
-        </div>
-
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="border rounded-lg px-3 py-2"
-        >
-          <option>All</option>
-          <option>Antibiotic</option>
-          <option>Analgesic</option>
-          <option>Hypertension</option>
-          <option>Antihistamine</option>
-          <option>Diabetes</option>
-        </select>
-
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="border rounded-lg px-3 py-2"
-        >
-          <option>All</option>
-          <option>In Stock</option>
-          <option>Low Stock</option>
-          <option>Out of Stock</option>
-        </select>
-
-        <button
-          onClick={handleApplyFilters}
-          className="flex items-center justify-center gap-2 bg-slate-800 text-white rounded-lg"
-        >
-          <Filter size={16} />
-          Apply Filters
-        </button>
-      </div>
-
-      {/* TABLE */}
-      <div className="bg-white rounded-xl shadow">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[900px]">
-            <thead className="bg-slate-50 text-slate-600">
-              <tr>
-                <th className="p-4 text-left">Medicine Details</th>
-                <th className="text-left px-2">Category</th>
-                <th className="text-left px-2">Stock</th>
-                <th className="text-left px-2">Price</th>
-                <th className="text-left px-2">Expiry</th>
-                <th className="text-left px-3">Status</th>
-                <th className="text-center px-2">Actions</th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y">
-              {filteredMedicines.map((m, i) => (
-                <tr key={i} className="hover:bg-slate-50">
-                  <td className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
-                        <Pill size={16} />
-                      </div>
-                      <div>
-                        <p className="font-medium">{m.name}</p>
-                        <p className="text-xs text-slate-500">{m.code}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td>{m.category}</td>
-                  <td>{m.stock} units</td>
-                  <td>₹{m.price}</td>
-                  <td>{m.expiry}</td>
-                  <td>
-                    <span className="px-3 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">
-                      {m.status}
-                    </span>
-                  </td>
-                  <td className="flex justify-center gap-3 py-4">
-                    <Eye
-                      size={16}
-                      className="text-blue-600 cursor-pointer"
-                      onClick={() => handleView(m, i)}
-                    />
-                    <Pencil
-                      size={16}
-                      className="text-green-600 cursor-pointer"
-                      onClick={() => handleEdit(m, i)}
-                    />
-                    <Trash2
-                      size={16}
-                      className="text-red-600 cursor-pointer"
-                      onClick={() => handleDelete(i)}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* FOOTER */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 text-sm text-slate-500">
-          <p>Page {page}</p>
-          <div className="flex gap-2">
-            <button
-              className="px-3 py-1 border rounded"
-              onClick={() => handlePageChange("previous")}
-            >
-              Previous
-            </button>
-
-            <button className="px-3 py-1 bg-blue-600 text-white rounded">
-              {page}
-            </button>
-
-            <button
-              className="px-3 py-1 border rounded"
-              onClick={() => handlePageChange("next")}
-            >
-              Next
-            </button>
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="relative md:col-span-2">
+            <Search
+              size={18}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search medicine name or code..."
+              className="w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm"
+            />
           </div>
-        </div>
-      </div>
-
-      {/* MODAL */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={
-          mode === "view"
-            ? "View Medicine"
-            : mode === "edit"
-            ? "Edit Medicine"
-            : "Add New Medicine"
-        }
-        size="md"
-      >
-        <div className="space-y-4">
-          <input
-            name="name"
-            value={formData.name}
-            onChange={handleFormChange}
-            disabled={mode === "view"}
-            placeholder="Medicine Name"
-            className="w-full border px-3 py-2 rounded disabled:bg-slate-100"
-          />
-
-          <input
-            name="code"
-            value={formData.code}
-            onChange={handleFormChange}
-            disabled={mode === "view"}
-            placeholder="Medicine Code"
-            className="w-full border px-3 py-2 rounded disabled:bg-slate-100"
-          />
 
           <select
-            name="category"
-            value={formData.category}
-            onChange={handleFormChange}
-            disabled={mode === "view"}
-            className="w-full border px-3 py-2 rounded disabled:bg-slate-100"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="border rounded-xl px-4 py-2.5 text-sm outline-none bg-slate-50 focus:bg-white transition-all"
           >
-            <option value="">Select Category</option>
+            <option>All</option>
             <option>Antibiotic</option>
             <option>Analgesic</option>
             <option>Hypertension</option>
             <option>Antihistamine</option>
             <option>Diabetes</option>
           </select>
-
-          <div className="grid grid-cols-2 gap-3">
-            <input
-              name="stock"
-              type="number"
-              value={formData.stock}
-              onChange={handleFormChange}
-              disabled={mode === "view"}
-              placeholder="Stock"
-              className="w-full border px-3 py-2 rounded disabled:bg-slate-100"
-            />
-            <input
-              name="price"
-              type="number"
-              value={formData.price}
-              onChange={handleFormChange}
-              disabled={mode === "view"}
-              placeholder="Price"
-              className="w-full border px-3 py-2 rounded disabled:bg-slate-100"
-            />
-          </div>
-
-          <input
-            name="expiry"
-            type="date"
-            value={formData.expiry}
-            onChange={handleFormChange}
-            disabled={mode === "view"}
-            className="w-full border px-3 py-2 rounded disabled:bg-slate-100"
-          />
-
-          <div className="flex justify-end gap-3 pt-4">
-            <button
-              onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 border rounded"
-            >
-              Close
-            </button>
-
-            {mode !== "view" && (
-              <button
-                onClick={handleSaveMedicine}
-                className="px-4 py-2 bg-blue-600 text-white rounded"
-              >
-                {mode === "edit" ? "Update Medicine" : "Save Medicine"}
-              </button>
-            )}
-          </div>
         </div>
-      </Modal>
+      </div>
+
+      {/* TABLE */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[800px]">
+            <thead className="bg-slate-50/50 text-slate-500 font-bold uppercase text-[10px] tracking-widest border-b">
+              <tr>
+                <th className="px-6 py-4 text-left">Medicine</th>
+                <th className="px-6 py-4 text-left">Code</th>
+                <th className="px-2 py-4 text-left">Category</th>
+                <th className="px-2 py-4 text-center">Available Stock</th>
+                <th className="px-6 py-4 text-center">Unit Price</th>
+                <th className="px-6 py-4 text-center">Status</th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-slate-100">
+              {isLoading ? (
+                <tr>
+                  <td colSpan="6" className="py-20 text-center">
+                    <div className="flex flex-col items-center gap-3 text-slate-400">
+                      <Loader2 className="animate-spin" size={32} />
+                      <p className="font-medium">Fetching real-time stock...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredMedicines.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="py-20 text-center text-slate-500 italic">
+                    No medicine found in inventory.
+                  </td>
+                </tr>
+              ) : (
+                filteredMedicines.map((m) => (
+                  <tr key={m.id} className="hover:bg-slate-50/50 transition-all group">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-sm">
+                          <Pill size={20} />
+                        </div>
+                        <span className="font-bold text-slate-800">{m.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-slate-500 font-mono text-xs uppercase">{m.code}</td>
+                    <td className="px-2 py-4 text-left">
+                      <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[10px] font-bold uppercase">
+                        {m.category}
+                      </span>
+                    </td>
+                    <td className="px-2 py-4 text-center">
+                      <span className={`font-black ${m.stock <= 10 ? 'text-red-600' : 'text-slate-900'}`}>
+                        {m.stock}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center font-medium text-slate-700">₹{m.price}</td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase flex items-center justify-center gap-1 w-fit mx-auto ${
+                        m.status === 'In Stock' ? 'bg-green-100 text-green-700' :
+                        m.status === 'Low Stock' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                      }`}>
+                        {m.status === 'Low Stock' && <AlertTriangle size={10} />}
+                        {m.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

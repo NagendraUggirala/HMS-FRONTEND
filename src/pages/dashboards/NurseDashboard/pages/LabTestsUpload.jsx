@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../../../../components/common/Modal/Modal';
+import { apiFetch } from '../../../../services/apiClient';
+import { NURSE_LAB_TESTS, NURSE_ASSIGNED_PATIENTS } from '../../../../config/api';
 
 const LabTestsUpload = () => {
   const [labs, setLabs] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [patients, setPatients] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     patient: '',
@@ -12,29 +16,49 @@ const LabTestsUpload = () => {
     doctor: 'Dr. Meena Rao'
   });
 
-  useEffect(() => {
-    const fetchLabs = async () => {
-      try {
-        const response = await fetch('https://jsonplaceholder.typicode.com/comments?_limit=6');
+  const fetchLabTests = async () => {
+    setLoading(true);
+    try {
+      const response = await apiFetch(NURSE_LAB_TESTS);
+      if (response && response.ok) {
         const data = await response.json();
-
-        const labsData = data.map((lab, index) => ({
-          id: index,
-          patient: `Patient ${index + 1}`,
-          testType: ['Blood Test', 'Urine Test', 'X-Ray', 'CT Scan', 'MRI', 'Ultrasound'][index % 6],
-          doctor: 'Dr. Meena Rao',
-          orderedDate: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-          status: index % 3 === 0 ? 'completed' : index % 3 === 1 ? 'pending' : 'urgent',
-          result: index % 3 === 0 ? ['Normal', 'Abnormal', 'Inconclusive'][index % 3] : null
+        console.log('Raw Lab Tests data:', data);
+        const rawLabs = Array.isArray(data?.data) ? data.data : [];
+        
+        const mappedLabs = rawLabs.map(lab => ({
+          id: lab.id,
+          patient: lab.patient_name || lab.patient || lab.patient_id || 'N/A',
+          testType: lab.test_name || lab.test_type || lab.lab_test_name || lab.testType || lab.test || lab.name || 'N/A',
+          doctor: lab.doctor_name || lab.doctor || lab.requested_by || 'N/A',
+          orderedDate: lab.ordered_at ? new Date(lab.ordered_at).toLocaleDateString() : (lab.created_at ? new Date(lab.created_at).toLocaleDateString() : (lab.orderedDate || 'N/A')),
+          status: (lab.status || 'pending').toLowerCase(),
+          result: lab.result || lab.conclusion || lab.remarks || null
         }));
-
-        setLabs(labsData);
-      } catch (error) {
-        console.error('Error fetching lab data:', error);
+        
+        setLabs(mappedLabs);
       }
-    };
+    } catch (error) {
+      console.error('Error fetching lab data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchLabs();
+  const fetchPatients = async () => {
+    try {
+      const response = await apiFetch(NURSE_ASSIGNED_PATIENTS);
+      if (response && response.ok) {
+        const data = await response.json();
+        setPatients(data?.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching patients:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchLabTests();
+    fetchPatients();
   }, []);
 
   const handleInputChange = (e) => {
@@ -45,32 +69,44 @@ const LabTestsUpload = () => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    try {
+      const payload = {
+        admission_number: formData.patient,
+        test_type: formData.testType,
+        reason: formData.reason,
+        priority: formData.priority,
+        requesting_doctor: formData.doctor
+      };
 
-    const newLabTest = {
-      id: labs.length > 0 ? Math.max(...labs.map(l => l.id)) + 1 : 0,
-      patient: formData.patient,
-      testType: formData.testType,
-      doctor: formData.doctor,
-      orderedDate: new Date().toLocaleDateString(),
-      status: 'pending',
-      reason: formData.reason,
-      priority: formData.priority
-    };
+      const response = await apiFetch(NURSE_LAB_TESTS, {
+        method: 'POST',
+        body: payload
+      });
 
-    setLabs(prev => [newLabTest, ...prev]);
-
-    console.log('Lab test requested successfully');
-
-    setFormData({
-      patient: '',
-      testType: '',
-      reason: '',
-      priority: 'Routine',
-      doctor: 'Dr. Meena Rao'
-    });
-    setIsModalOpen(false);
+      if (response && response.ok) {
+        alert('Lab test request saved successfully');
+        fetchLabTests(); // Refresh the list
+        setFormData({
+          patient: '',
+          testType: '',
+          reason: '',
+          priority: 'Routine',
+          doctor: 'Dr. Meena Rao'
+        });
+        setIsModalOpen(false);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        alert(errorData.message || 'Failed to save lab test request');
+      }
+    } catch (error) {
+      console.error('Error requesting lab test:', error);
+      alert('Error requesting lab test');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFileUpload = (patientId, testType) => {
@@ -122,8 +158,27 @@ const LabTestsUpload = () => {
     <div className="space-y-6 animate-fade-in">
       <div className="w-full mx-auto max-w-7xl px-3 sm:px-0 space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center sticky top-0 z-10 bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/40 py-2 sm:py-0">
-          <h2 className="text-lg sm:text-2xl font-semibold text-gray-700"> Lab Tests & Upload Reports</h2>
+        <div className="flex justify-between items-center sticky top-0 z-10 bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/40 py-2 sm:py-0 border-b mb-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg sm:text-2xl font-semibold text-gray-700">Lab Tests & Reports</h2>
+            {loading && <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={fetchLabTests}
+              className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+              title="Refresh Data"
+            >
+              <i className={`fas fa-sync-alt ${loading ? 'animate-spin' : ''}`}></i>
+            </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm font-medium transition-all shadow-sm"
+            >
+              <i className="fas fa-plus"></i>
+              <span>New Test</span>
+            </button>
+          </div>
         </div>
 
         {/* Request New Lab Test Modal */}
@@ -141,16 +196,15 @@ const LabTestsUpload = () => {
                   name="patient"
                   value={formData.patient}
                   onChange={handleInputChange}
-                  className="w-full border rounded-lg p-2.5 text-sm"
+                  className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
                   required
                 >
                   <option value="">Select Patient</option>
-                  <option>Patient 1</option>
-                  <option>Patient 2</option>
-                  <option>Patient 3</option>
-                  <option>Patient 4</option>
-                  <option>Patient 5</option>
-                  <option>Patient 6</option>
+                  {patients.map(p => (
+                    <option key={p.admission_number} value={p.admission_number}>
+                      {p.patient_name} ({p.admission_number})
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -209,8 +263,9 @@ const LabTestsUpload = () => {
                     name="doctor"
                     value={formData.doctor}
                     onChange={handleInputChange}
-                    className="w-full border rounded-lg p-2.5 text-sm"
-                    readOnly
+                    className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
+                    placeholder="Enter doctor's name"
+                    required
                   />
                 </div>
               </div>
@@ -220,15 +275,17 @@ const LabTestsUpload = () => {
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2.5 border rounded-lg text-gray-700 hover:bg-gray-100 text-sm"
+                className="px-4 py-2.5 border rounded-lg text-gray-700 hover:bg-gray-100 text-sm font-medium transition-all"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                disabled={loading}
+                className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-all shadow-md active:transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Request Test
+                {loading && <i className="fas fa-spinner animate-spin"></i>}
+                <span>{loading ? 'Processing...' : 'Request Test'}</span>
               </button>
             </div>
           </form>
@@ -236,68 +293,86 @@ const LabTestsUpload = () => {
 
         {/* Lab Tests Grid - tighter gaps on mobile */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          {labs.map((lab) => (
-            <div key={lab.id} className="bg-white border rounded-xl p-3 sm:p-4 card-shadow fade-in w-full">
-              {/* Header with Test Type and Status */}
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-3">
-                <h3 className="font-semibold text-blue-700 text-base sm:text-lg leading-snug">{lab.testType}</h3>
-                <span className={`px-2.5 py-1.5 rounded-full text-[11px] sm:text-xs font-medium w-fit self-start sm:self-auto ${getStatusClass(lab.status)}`}>
-                  {getStatusText(lab.status)}
-                </span>
-              </div>
-
-              {/* Patient Info - compact rows on mobile */}
-              <div className="space-y-2.5 mb-3">
-                <div className="flex items-center gap-2">
-                  <i className="fas fa-user text-gray-400 text-sm w-4 shrink-0"></i>
-                  <span className="text-sm text-gray-700 truncate">{lab.patient}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <i className="fas fa-user-md text-gray-400 text-sm w-4 shrink-0"></i>
-                  <span className="text-sm text-gray-700 truncate">{lab.doctor}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <i className="fas fa-calendar text-gray-400 text-sm w-4 shrink-0"></i>
-                  <span className="text-sm text-gray-700">{lab.orderedDate}</span>
-                </div>
-              </div>
-
-              {/* Result or Upload Section */}
-              {lab.status === 'completed' ? (
-                <div className="border-t pt-3">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium text-gray-700">Result:</span>
-                    <span className={`px-2 py-1 rounded text-[11px] sm:text-xs font-medium ${getResultClass(lab.result)}`}>
-                      {lab.result}
-                    </span>
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <button className="w-full sm:flex-1 bg-blue-50 text-blue-700 px-3 py-2.5 rounded-lg hover:bg-blue-100 flex items-center justify-center gap-1 text-sm font-medium">
-                      <i className="fas fa-eye text-xs"></i>
-                      <span>View</span>
-                    </button>
-                    <button className="w-full sm:flex-1 bg-green-50 text-green-700 px-3 py-2.5 rounded-lg hover:bg-green-100 flex items-center justify-center gap-1 text-sm font-medium">
-                      <i className="fas fa-print text-xs"></i>
-                      <span>Print</span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="border-t pt-3">
-                  <label className="w-full bg-blue-50 text-blue-700 px-3 py-3 rounded-lg hover:bg-blue-100 flex items-center justify-center gap-2 text-sm font-medium cursor-pointer border border-blue-200">
-                    <i className="fas fa-upload text-sm"></i>
-                    <span className="truncate">Upload Report (PDF)</span>
-                    <input
-                      type="file"
-                      className="hidden"
-                      onChange={() => handleFileUpload(lab.id, lab.testType)}
-                      accept=".pdf"
-                    />
-                  </label>
-                </div>
-              )}
+          {loading && labs.length === 0 ? (
+            <div className="col-span-full py-20 text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-500">Loading lab tests...</p>
             </div>
-          ))}
+          ) : labs.length > 0 ? (
+            labs.map((lab) => (
+              <div key={lab.id} className="bg-white border rounded-xl p-3 sm:p-4 card-shadow fade-in w-full">
+                {/* Header with Test Type and Status */}
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-3">
+                  <h3 className="font-semibold text-blue-700 text-base sm:text-lg leading-snug">{lab.testType}</h3>
+                  <span className={`px-2.5 py-1.5 rounded-full text-[11px] sm:text-xs font-medium w-fit self-start sm:self-auto ${getStatusClass(lab.status)}`}>
+                    {getStatusText(lab.status)}
+                  </span>
+                </div>
+
+                {/* Patient Info - compact rows on mobile */}
+                <div className="space-y-2.5 mb-3">
+                  <div className="flex items-center gap-2">
+                    <i className="fas fa-user text-gray-400 text-sm w-4 shrink-0"></i>
+                    <span className="text-sm text-gray-700 truncate">{lab.patient}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <i className="fas fa-user-md text-gray-400 text-sm w-4 shrink-0"></i>
+                    <span className="text-sm text-gray-700 truncate">{lab.doctor}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <i className="fas fa-calendar text-gray-400 text-sm w-4 shrink-0"></i>
+                    <span className="text-sm text-gray-700">{lab.orderedDate}</span>
+                  </div>
+                </div>
+
+                {/* Result or Upload Section */}
+                {lab.status === 'completed' || lab.status === 'ready' ? (
+                  <div className="border-t pt-3">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-medium text-gray-700">Result:</span>
+                      <span className={`px-2 py-1 rounded text-[11px] sm:text-xs font-medium ${getResultClass(lab.result)}`}>
+                        {lab.result || 'Available'}
+                      </span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <button className="w-full sm:flex-1 bg-blue-50 text-blue-700 px-3 py-2.5 rounded-lg hover:bg-blue-100 flex items-center justify-center gap-1 text-sm font-medium">
+                        <i className="fas fa-eye text-xs"></i>
+                        <span>View</span>
+                      </button>
+                      <button className="w-full sm:flex-1 bg-green-50 text-green-700 px-3 py-2.5 rounded-lg hover:bg-green-100 flex items-center justify-center gap-1 text-sm font-medium">
+                        <i className="fas fa-print text-xs"></i>
+                        <span>Print</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border-t pt-3">
+                    <label className="w-full bg-blue-50 text-blue-700 px-3 py-3 rounded-lg hover:bg-blue-100 flex items-center justify-center gap-2 text-sm font-medium cursor-pointer border border-blue-200">
+                      <i className="fas fa-upload text-sm"></i>
+                      <span className="truncate">Upload Report (PDF)</span>
+                      <input
+                        type="file"
+                        className="hidden"
+                        onChange={() => handleFileUpload(lab.id, lab.testType)}
+                        accept=".pdf"
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+            ))
+          ) : (
+            <div className="col-span-full py-20 text-center bg-white border rounded-xl border-dashed">
+              <i className="fas fa-flask text-4xl text-gray-300 mb-3"></i>
+              <p className="text-gray-500 font-medium">No lab tests found</p>
+              <button 
+                onClick={() => setIsModalOpen(true)}
+                className="mt-2 text-blue-600 hover:text-blue-800 font-medium text-sm"
+              >
+                Request New Test
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Recent Lab Results Table */}
@@ -351,61 +426,6 @@ const LabTestsUpload = () => {
           </div>
         </div>
 
-        {/* Request New Lab Test Section */}
-        <div className="bg-white p-3 sm:p-4 border rounded-xl card-shadow w-full">
-          <h3 className="text-lg font-semibold mb-3">Request New Lab Test</h3>
-          <form className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Patient</label>
-              <select className="w-full border rounded-lg p-2.5 text-sm">
-                <option>Patient 1</option>
-                <option>Patient 2</option>
-                <option>Patient 3</option>
-                <option>Patient 4</option>
-                <option>Patient 5</option>
-                <option>Patient 6</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Test Type</label>
-              <select className="w-full border rounded-lg p-2.5 text-sm">
-                <option>Blood Test</option>
-                <option>Urine Test</option>
-                <option>X-Ray</option>
-                <option>CT Scan</option>
-                <option>MRI</option>
-                <option>Ultrasound</option>
-                <option>ECG</option>
-                <option>Other</option>
-              </select>
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Test</label>
-              <textarea className="w-full border rounded-lg p-2.5 text-sm" rows="2" placeholder="Describe the reason for this test"></textarea>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-              <select className="w-full border rounded-lg p-2.5 text-sm">
-                <option>Routine</option>
-                <option>Urgent</option>
-                <option>Emergency</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Requesting Doctor</label>
-              <input type="text" className="w-full border rounded-lg p-2.5 text-sm" value="Dr. Meena Rao" readOnly />
-            </div>
-            <div className="md:col-span-2">
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(true)}
-                className="w-full sm:w-auto bg-blue-600 text-white px-4 py-2.5 rounded-lg hover:bg-blue-700 flex items-center justify-center text-sm"
-              >
-                <i className="fas fa-plus mr-1"></i>Request Test
-              </button>
-            </div>
-          </form>
-        </div>
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import SearchBar from "../../../../components/common/SearchBar/SearchBar";
 import Button from "../../../../components/common/Button/Button";
 import Modal from "../../../../components/common/Modal/Modal";
 import LoadingSpinner from "../../../../components/common/LoadingSpinner/LoadingSpinner";
+import { apiFetch } from "../../../../services/apiClient";
 import {
   Visibility,
   Edit,
@@ -23,58 +24,6 @@ import {
   PersonAdd,
 } from "@mui/icons-material";
 
-const mockPatients = [
-  {
-    id: "PAT-001",
-    name: "Rajesh Kumar",
-    age: 45,
-    gender: "Male",
-    phone: "9876543210",
-    email: "rajesh@example.com",
-    doctor: "Dr. Sharma",
-    department: "Cardiology",
-  },
-  {
-    id: "PAT-002",
-    name: "Priya Sharma",
-    age: 32,
-    gender: "Female",
-    phone: "8765432109",
-    email: "priya@example.com",
-    doctor: "Dr. Verma",
-    department: "Neurology",
-  },
-  {
-    id: "PAT-003",
-    name: "Suresh Patel",
-    age: 58,
-    gender: "Male",
-    phone: "7654321098",
-    email: "suresh@example.com",
-    doctor: "Dr. Gupta",
-    department: "Orthopedics",
-  },
-  {
-    id: "PAT-004",
-    name: "Anita Mehta",
-    age: 29,
-    gender: "Female",
-    phone: "6543210987",
-    email: "anita@example.com",
-    doctor: "Dr. Reddy",
-    department: "Pediatrics",
-  },
-  {
-    id: "PAT-005",
-    name: "Vikram Singh",
-    age: 52,
-    gender: "Male",
-    phone: "9988776655",
-    email: "vikram@example.com",
-    doctor: "Dr. Das",
-    department: "General Medicine",
-  },
-];
 
 const TestRegistration = () => {
   const [loading, setLoading] = useState(true);
@@ -103,6 +52,54 @@ const TestRegistration = () => {
   const [patientSearch, setPatientSearch] = useState("");
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedTestData, setSelectedTestData] = useState(null);
+  const [filters, setFilters] = useState({
+    for_date: "",
+    search: "",
+    status: "",
+    priority: "",
+  });
+  const [summary, setSummary] = useState({
+    total_tests_today: 0,
+    completed_tests: 0,
+    in_progress_tests: 0,
+    urgent_tests: 0,
+  });
+  const [filteredPatients, setFilteredPatients] = useState([]);
+
+  useEffect(() => {
+    if (patientSearch && patientSearch.length >= 2) {
+      const fetchPatients = async () => {
+        try {
+          const res = await apiFetch(`/api/v1/lab/patients?search=${encodeURIComponent(patientSearch)}&query=${encodeURIComponent(patientSearch)}`);
+          if (res.ok) {
+            const data = await res.json().catch(() => ({}));
+            const apiPayload = data?.data ?? data?.patients ?? data?.rows ?? [];
+            const mappedPatients = Array.isArray(apiPayload) ? apiPayload.map(p => ({
+              id: p.patient_id || p.id,
+              name: p.patient_name || p.name,
+              age: p.age,
+              gender: p.gender,
+              phone: p.phone_number || p.phone,
+              email: p.email,
+              doctor: p.referring_doctor || p.doctor,
+              department: p.department,
+            })) : [];
+            setFilteredPatients(mappedPatients);
+          } else {
+            setFilteredPatients([]);
+          }
+        } catch (error) {
+          console.error("Failed to fetch patients:", error);
+          setFilteredPatients([]);
+        }
+      };
+
+      const timer = setTimeout(() => fetchPatients(), 300);
+      return () => clearTimeout(timer);
+    } else {
+      setFilteredPatients([]);
+    }
+  }, [patientSearch]);
 
   useEffect(() => {
     loadTestData();
@@ -110,160 +107,108 @@ const TestRegistration = () => {
 
   const loadTestData = async () => {
     setLoading(true);
-    setTimeout(() => {
-      const sampleData = [
-        {
-          id: "TEST-2024-001",
-          patientName: "Rajesh Kumar",
-          patientId: "PAT-001",
-          age: 45,
-          gender: "Male",
-          phoneNumber: "9876543210",
-          email: "rajesh@example.com",
-          testType: "CBC",
-          sampleType: "Blood",
-          registeredDate: "2024-01-15",
-          status: "Sample Pending",
-          priority: "urgent",
-          barcode: "BC001",
-          referringDoctor: "Dr. Sharma",
-          department: "Hematology",
-          instructions: "Fast for 12 hours before sample collection.",
-          selectedTests: [{ id: 101, testType: "CBC", sampleType: "Blood" }],
-        },
-        {
-          id: "TEST-2024-002",
-          patientName: "Priya Sharma",
-          patientId: "PAT-002",
-          age: 32,
-          gender: "Female",
-          phoneNumber: "8765432109",
-          email: "priya@example.com",
-          testType: "Lipid Profile",
-          sampleType: "Blood",
-          registeredDate: "2024-01-15",
-          status: "Sample Collected",
-          priority: "routine",
-          barcode: "BC002",
-          referringDoctor: "Dr. Verma",
-          department: "Cardiology",
-          instructions: "Patient is on blood thinners.",
-          selectedTests: [
-            { id: 102, testType: "Lipid Profile", sampleType: "Blood" },
-          ],
-        },
-        {
-          id: "TEST-2024-003",
-          patientName: "Suresh Patel",
-          patientId: "PAT-003",
-          age: 58,
-          gender: "Male",
-          phoneNumber: "7654321098",
-          email: "suresh@example.com",
-          testType: "Urine Culture",
-          sampleType: "Urine",
-          registeredDate: "2024-01-14",
-          status: "In Progress",
-          priority: "routine",
-          barcode: "BC003",
-          referringDoctor: "Dr. Gupta",
-          department: "Urology",
-          instructions: "Collect mid-stream sample.",
-          selectedTests: [
-            { id: 103, testType: "Urine Culture", sampleType: "Urine" },
-          ],
-        },
-        {
-          id: "TEST-2024-004",
-          patientName: "Anita Mehta",
-          patientId: "PAT-004",
-          age: 29,
-          gender: "Female",
-          phoneNumber: "6543210987",
-          email: "anita@example.com",
-          testType: "Liver Function",
-          sampleType: "Blood",
-          registeredDate: "2024-01-14",
-          status: "Completed",
-          priority: "urgent",
-          barcode: "BC004",
-          referringDoctor: "Dr. Reddy",
-          department: "Gastroenterology",
-          instructions: "None",
-          selectedTests: [
-            { id: 104, testType: "Liver Function", sampleType: "Blood" },
-          ],
-        },
-        {
-          id: "TEST-2024-005",
-          patientName: "Vikram Singh",
-          patientId: "PAT-005",
-          age: 52,
-          gender: "Male",
-          phoneNumber: "9988776655",
-          email: "vikram@example.com",
-          testType: "Thyroid Profile",
-          sampleType: "Blood",
-          registeredDate: "2024-04-21",
-          status: "Sample Pending",
-          priority: "routine",
-          barcode: "BC005",
-          referringDoctor: "Dr. Das",
-          department: "Endocrinology",
-          instructions: "Early morning sample preferred.",
-          selectedTests: [
-            { id: 105, testType: "Thyroid Profile", sampleType: "Blood" },
-          ],
-        },
-        {
-          id: "TEST-2024-006",
-          patientName: "Meera Nair",
-          patientId: "PAT-006",
-          age: 38,
-          gender: "Female",
-          phoneNumber: "9123456780",
-          email: "meera@example.com",
-          testType: "Kidney Function",
-          sampleType: "Blood",
-          registeredDate: "2024-04-21",
-          status: "In Progress",
-          priority: "stat",
-          barcode: "BC006",
-          referringDoctor: "Dr. Krishnan",
-          department: "Nephrology",
-          instructions: "Urgent processing requested.",
-          selectedTests: [
-            { id: 106, testType: "Kidney Function", sampleType: "Blood" },
-          ],
-        },
-        {
-          id: "TEST-2024-007",
-          patientName: "Rohan Das",
-          patientId: "PAT-007",
-          age: 12,
-          gender: "Male",
-          phoneNumber: "8899001122",
-          email: "rohan@example.com",
-          testType: "Blood Culture",
-          sampleType: "Blood",
-          registeredDate: "2024-04-20",
-          status: "Sample Collected",
-          priority: "urgent",
-          barcode: "BC007",
-          referringDoctor: "Dr. Bose",
-          department: "Pediatrics",
-          instructions: "Pediatric sample container used.",
-          selectedTests: [
-            { id: 107, testType: "Blood Culture", sampleType: "Blood" },
-          ],
-        },
-      ];
-      setTests(sampleData);
+    try {
+      const params = new URLSearchParams();
+      if (filters.for_date) params.append("for_date", filters.for_date);
+      if (filters.search) params.append("search", filters.search);
+      if (filters.status) params.append("status", filters.status);
+      if (filters.priority) params.append("priority", filters.priority);
+
+      const query = params.toString();
+      const url = query ? `/api/v1/lab/test-registration?${query}` : "/api/v1/lab/test-registration";
+
+      const res = await apiFetch(url);
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.detail?.message || data?.message || `Failed to fetch test registrations (${res.status})`);
+      }
+
+      const apiPayload = data?.rows ?? data?.data ?? data?.tests ?? [];
+      const mappedData = Array.isArray(apiPayload)
+        ? apiPayload.map((test) => ({
+          ...test,
+          id: test.test_id || test.id,
+          patientId: test.patient_id || test.patientId,
+          patientName: test.patient_name || test.patientName,
+          testType: test.test_type || test.testType,
+          sampleType: test.sample_type || test.sampleType,
+          registeredDate: test.registered_date || test.registeredDate,
+          status: test.status || "SAMPLE_PENDING",
+          priority: test.priority ? String(test.priority).toLowerCase() : "routine",
+          selectedTests: Array.isArray(test.selectedTests)
+            ? test.selectedTests
+            : Array.isArray(test.selected_tests)
+              ? test.selected_tests
+              : [{
+                id: Date.now(),
+                testType: test.test_type || test.testType,
+                sampleType: test.sample_type || test.sampleType,
+              }],
+        }))
+        : [];
+      setTests(mappedData);
+      setSummary({
+        total_tests_today: data?.summary?.total_tests_today ?? 0,
+        completed_tests: data?.summary?.completed_tests ?? 0,
+        in_progress_tests: data?.summary?.in_progress_tests ?? 0,
+        urgent_tests: data?.summary?.urgent_tests ?? 0,
+      });
+    } catch (error) {
+      console.error("Failed to load test registrations:", error);
+      setTests([]);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
-  const handleRegisterTest = () => {
+  const handleFilterChange = (filterName, value) => {
+    setFilters(prev => ({ ...prev, [filterName]: value }));
+  };
+
+  const handleApplyFilters = () => {
+    loadTestData();
+  };
+
+  const handleStatusChange = async (testId, newStatus) => {
+    try {
+      let res = await apiFetch(`/api/v1/lab/test-registration/${testId}/status`, {
+        method: "PATCH",
+        body: { status: newStatus },
+      });
+
+      // Fallback for plural endpoint if 404
+      if (res.status === 404) {
+        res = await apiFetch(`/api/v1/lab/test-registrations/${testId}/status`, {
+          method: "PATCH",
+          body: { status: newStatus },
+        });
+      }
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        let errorMsg = `HTTP Error ${res.status}`;
+        if (data?.detail) {
+          errorMsg = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+        } else if (data?.message) {
+          errorMsg = data.message;
+        }
+        throw new Error(errorMsg);
+      }
+
+      setTests((prevTests) =>
+        prevTests.map((t) =>
+          t.id === testId ? { ...t, status: newStatus } : t
+        )
+      );
+    } catch (error) {
+      console.error("Error updating status:", error);
+      alert("Failed to update status: " + error.message);
+    }
+  };
+
+  const handleRegisterTest = async () => {
     const aggregatedTestType =
       newTest.selectedTests
         .map((t) => t.testType)
@@ -275,52 +220,99 @@ const TestRegistration = () => {
         .filter(Boolean)
         .join(", ") || "N/A";
 
+    const payload = {
+      patient_id: newTest.patientId || undefined,
+      patient_name: newTest.patientName,
+      age: newTest.age ? parseInt(newTest.age, 10) : undefined,
+      gender: newTest.gender || undefined,
+      phone_number: newTest.phoneNumber || undefined,
+      email: newTest.email || undefined,
+      registered_date: newTest.registrationDate,
+      test_type: aggregatedTestType,
+      sample_type: aggregatedSampleType,
+      priority: newTest.priority ? newTest.priority.toUpperCase() : "ROUTINE",
+      referring_doctor: newTest.referringDoctor || undefined,
+      department: newTest.department || undefined,
+      instructions: newTest.instructions || undefined,
+      selected_tests: newTest.selectedTests.map((t) => ({
+        test_type: t.testType,
+        sample_type: t.sampleType,
+      })),
+    };
+
     if (isEditing) {
       setTests(
         tests.map((t) =>
           t.id === editingTestId
             ? {
-                ...t,
-                ...newTest,
-                testType: aggregatedTestType,
-                sampleType: aggregatedSampleType,
-                registeredDate: t.registeredDate, // Preserve original date
-              }
+              ...t,
+              ...newTest,
+              testType: aggregatedTestType,
+              sampleType: aggregatedSampleType,
+              registeredDate: t.registeredDate, // Preserve original date
+            }
             : t,
         ),
       );
       alert(`Test updated successfully! ID: ${editingTestId}`);
     } else {
-      // Generate barcode/QR code here
-      const barcode = `BC${Math.floor(Math.random() * 10000)
-        .toString()
-        .padStart(3, "0")}`;
+      try {
+        let res = await apiFetch("/api/v1/lab/test-registration", {
+          method: "POST",
+          body: payload,
+        });
 
-      const testId = `TEST-${new Date().getFullYear()}-${(tests.length + 1).toString().padStart(3, "0")}`;
+        if (res.status === 404) {
+          res = await apiFetch("/api/v1/lab/test-registrations", {
+            method: "POST",
+            body: payload,
+          });
+        }
 
-      const newTestEntry = {
-        id: testId,
-        patientName: newTest.patientName,
-        patientId:
-          newTest.patientId || `PAT-${Math.floor(Math.random() * 1000)}`,
-        testType: aggregatedTestType,
-        sampleType: aggregatedSampleType,
-        registeredDate: new Date().toISOString().split("T")[0],
-        status: "Sample Pending",
-        priority: newTest.priority,
-        barcode: barcode,
-        age: newTest.age,
-        gender: newTest.gender,
-        phoneNumber: newTest.phoneNumber,
-        email: newTest.email,
-        referringDoctor: newTest.referringDoctor,
-        department: newTest.department,
-        instructions: newTest.instructions,
-        selectedTests: newTest.selectedTests,
-      };
+        const responseData = await res.json().catch(() => ({}));
 
-      setTests([newTestEntry, ...tests]);
-      alert(`Test registered successfully! Barcode: ${barcode}`);
+        if (!res.ok) {
+          let errorMsg = `HTTP Error ${res.status}`;
+          if (responseData?.detail) {
+            errorMsg = typeof responseData.detail === 'string' ? responseData.detail : JSON.stringify(responseData.detail);
+          } else if (responseData?.message) {
+            errorMsg = responseData.message;
+          }
+          throw new Error(errorMsg);
+        }
+
+        const savedTest = responseData?.data ?? responseData?.row ?? responseData;
+        const newTestEntry = {
+          id: savedTest?.test_id || savedTest?.id || `TEST-${new Date().getFullYear()}-${(tests.length + 1).toString().padStart(3, "0")}`,
+          patientName: savedTest?.patient_name || savedTest?.patientName || newTest.patientName,
+          patientId: savedTest?.patient_id || savedTest?.patientId || newTest.patientId || `PAT-${Math.floor(Math.random() * 1000)}`,
+          age: savedTest?.age || savedTest?.age || newTest.age,
+          gender: savedTest?.gender || newTest.gender,
+          phoneNumber: savedTest?.phone_number || savedTest?.phoneNumber,
+          email: savedTest?.email || newTest.email,
+          testType: savedTest?.test_type || savedTest?.testType || aggregatedTestType,
+          sampleType: savedTest?.sample_type || savedTest?.sampleType || aggregatedSampleType,
+          registeredDate: savedTest?.registered_date || savedTest?.registeredDate || newTest.registrationDate,
+          status: savedTest?.status || "SAMPLE_PENDING",
+          priority: savedTest?.priority ? String(savedTest.priority).toLowerCase() : newTest.priority,
+          referringDoctor: savedTest?.referring_doctor || savedTest?.referringDoctor || newTest.referringDoctor,
+          department: savedTest?.department || newTest.department,
+          instructions: savedTest?.instructions || newTest.instructions,
+          selectedTests: Array.isArray(savedTest?.selected_tests)
+            ? savedTest.selected_tests.map((t, index) => ({
+              id: Date.now() + index,
+              testType: t.test_type || t.testType,
+              sampleType: t.sample_type || t.sampleType,
+            }))
+            : newTest.selectedTests,
+        };
+
+        setTests([newTestEntry, ...tests]);
+        alert(`Test registered successfully! ID: ${newTestEntry.id}`);
+      } catch (error) {
+        console.error("Failed to register test:", error);
+        alert(`Unable to register test: ${error.message}`);
+      }
     }
 
     setShowRegistrationModal(false);
@@ -361,12 +353,6 @@ const TestRegistration = () => {
     setShowPatientDropdown(false);
   };
 
-  const filteredPatients = mockPatients.filter(
-    (p) =>
-      p.name.toLowerCase().includes(patientSearch.toLowerCase()) ||
-      p.id.toLowerCase().includes(patientSearch.toLowerCase()),
-  );
-
   const handleSearch = (term) => {
     setSearchTerm(term);
   };
@@ -378,13 +364,6 @@ const TestRegistration = () => {
     );
   };
 
-  // const handleGenerateBarcode = (testId) => {
-  //   const test = tests.find((t) => t.id === testId);
-  //   if (test) {
-  //     alert(`Generating barcode/QR for: ${test.id}\nBarcode: ${test.barcode}`);
-  //     // In real app, this would open barcode/QR generation modal
-  //   }
-  // };
 
   const handleViewTest = (test) => {
     setSelectedTestData(test);
@@ -736,11 +715,10 @@ const TestRegistration = () => {
               </tr>
             </thead>
             <tbody>
-              ${
-                testData.selectedTests && testData.selectedTests.length > 0
-                  ? testData.selectedTests
-                      .map(
-                        (t, i) => `
+              ${testData.selectedTests && testData.selectedTests.length > 0
+        ? testData.selectedTests
+          .map(
+            (t, i) => `
                       <tr>
                         <td style="text-align: center;">${(i + 1).toString().padStart(2, '0')}</td>
                         <td><strong>${t.testType}</strong></td>
@@ -748,29 +726,28 @@ const TestRegistration = () => {
                         <td style="text-align: center; color: #059669; font-weight: 700;">REGISTERED</td>
                       </tr>
                     `,
-                      )
-                      .join("")
-                  : `<tr>
+          )
+          .join("")
+        : `<tr>
                       <td style="text-align: center;">01</td>
                       <td><strong>${testData.testType || "N/A"}</strong></td>
                       <td>${testData.sampleType || "N/A"}</td>
                       <td style="text-align: center; color: #059669; font-weight: 700;">REGISTERED</td>
                     </tr>`
-              }
+      }
             </tbody>
           </table>
 
           <!-- Clinical Instructions Section -->
-          ${
-            testData.instructions && testData.instructions !== "None"
-              ? `
+          ${testData.instructions && testData.instructions !== "None"
+        ? `
             <div class="section-heading">Clinical Instructions / Patient Preparation</div>
             <div class="instructions-box">
               ${testData.instructions}
             </div>
           `
-              : ""
-          }
+        : ""
+      }
 
  
         </div>
@@ -791,20 +768,20 @@ const TestRegistration = () => {
     };
   };
 
-const handleBulkPrint = () => {
-  if (!filteredTests || filteredTests.length === 0) return;
+  const handleBulkPrint = () => {
+    if (!filteredTests || filteredTests.length === 0) return;
 
-  const iframe = document.createElement("iframe");
-  iframe.style.position = "fixed";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
-  iframe.style.border = "0";
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
 
-  document.body.appendChild(iframe);
+    document.body.appendChild(iframe);
 
-  const doc = iframe.contentWindow.document;
+    const doc = iframe.contentWindow.document;
 
-  const html = `
+    const html = `
   <html>
     <head>
 
@@ -1027,19 +1004,19 @@ body {
   </html>
   `;
 
-  doc.open();
-  doc.write(html);
-  doc.close();
+    doc.open();
+    doc.write(html);
+    doc.close();
 
-  iframe.onload = () => {
-    iframe.contentWindow.focus();
-    iframe.contentWindow.print();
+    iframe.onload = () => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
 
-    setTimeout(() => {
-      document.body.removeChild(iframe);
-    }, 500);
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 500);
+    };
   };
-};
 
   const filteredTests = tests.filter(
     (test) =>
@@ -1070,8 +1047,6 @@ body {
     "Tissue",
   ];
 
-  if (loading) return <LoadingSpinner />;
-
   return (
     <>
       <div className="space-y-6 animate-fade-in">
@@ -1087,14 +1062,14 @@ body {
           </div>
           <div className="flex gap-3">
             <Button
-  variant="outline"
-  icon={<Print sx={{ fontSize: 18 }} />}
-  onClick={handleBulkPrint}
-  className="border-blue-200 text-blue-600 hover:bg-blue-50"
->
-  Print Labels
-</Button>
-            
+              variant="outline"
+              icon={<Print sx={{ fontSize: 18 }} />}
+              onClick={handleBulkPrint}
+              className="border-blue-200 text-blue-600 hover:bg-blue-50"
+            >
+              Print Labels
+            </Button>
+
             <Button
               variant="primary"
               icon={<Add />}
@@ -1130,29 +1105,48 @@ body {
 
         {/* Search and Filters */}
         <div className="bg-white p-4 rounded border card-shadow">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <SearchBar
-                placeholder="Search by patient name, test ID, or test type..."
-                onSearch={handleSearch}
-                className="w-full"
-              />
-            </div>
-            <div className="flex gap-2">
-              <select className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                <option value="">All Status</option>
-                <option value="pending">Sample Pending</option>
-                <option value="collected">Sample Collected</option>
-                <option value="progress">In Progress</option>
-                <option value="completed">Completed</option>
-              </select>
-              <select className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                <option value="">All Priority</option>
-                <option value="urgent">Urgent</option>
-                <option value="routine">Routine</option>
-                <option value="stat">STAT</option>
-              </select>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <input
+              type="date"
+              value={filters.for_date}
+              onChange={(e) => handleFilterChange("for_date", e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Filter by date"
+            />
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(e) => handleFilterChange("search", e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Search patient/test"
+            />
+            <select
+              value={filters.status}
+              onChange={(e) => handleFilterChange("status", e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">All Status</option>
+              <option value="SAMPLE_PENDING">Sample Pending</option>
+              <option value="SAMPLE_COLLECTED">Sample Collected</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="COMPLETED">Completed</option>
+            </select>
+            <select
+              value={filters.priority}
+              onChange={(e) => handleFilterChange("priority", e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">All Priority</option>
+              <option value="ROUTINE">Routine</option>
+              <option value="URGENT">Urgent</option>
+            </select>
+            <button
+              onClick={handleApplyFilters}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+              disabled={loading}
+            >
+              Apply Filters
+            </button>
           </div>
         </div>
 
@@ -1169,13 +1163,11 @@ body {
               <div>
                 <p className="text-gray-500 text-sm">Total Tests Today</p>
                 <p className="text-2xl font-bold text-blue-600 mt-1">
-                  {
-                    tests.filter(
-                      (t) =>
-                        t.registeredDate ===
-                        new Date().toISOString().split("T")[0],
-                    ).length
-                  }
+                  {summary.total_tests_today || tests.filter(
+                    (t) =>
+                      t.registeredDate ===
+                      new Date().toISOString().split("T")[0],
+                  ).length}
                 </p>
               </div>
             </div>
@@ -1189,7 +1181,7 @@ body {
               <div>
                 <p className="text-gray-500 text-sm">Completed Tests</p>
                 <p className="text-2xl font-bold text-green-600 mt-1">
-                  {tests.filter((t) => t.status === "Completed").length}
+                  {summary.completed_tests || tests.filter((t) => t.status === "Completed" || t.status === "COMPLETED").length}
                 </p>
               </div>
             </div>
@@ -1206,7 +1198,7 @@ body {
               <div>
                 <p className="text-gray-500 text-sm">In Progress</p>
                 <p className="text-2xl font-bold text-yellow-600 mt-1">
-                  {tests.filter((t) => t.status === "In Progress").length}
+                  {summary.in_progress_tests || tests.filter((t) => t.status === "In Progress" || t.status === "IN_PROGRESS").length}
                 </p>
               </div>
             </div>
@@ -1220,7 +1212,7 @@ body {
               <div>
                 <p className="text-gray-500 text-sm">Urgent Tests</p>
                 <p className="text-2xl font-bold text-red-600 mt-1">
-                  {tests.filter((t) => t.priority === "urgent").length}
+                  {summary.urgent_tests || tests.filter((t) => t.priority === "urgent" || t.priority === "URGENT").length}
                 </p>
               </div>
             </div>
@@ -1228,8 +1220,14 @@ body {
         </div>
 
         {/* Tests Table */}
-        <div className="bg-white rounded border card-shadow overflow-hidden">
-          <DataTable
+        <div className="relative bg-white rounded border card-shadow overflow-hidden min-h-[300px]">
+          {loading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/50 backdrop-blur-[1px]">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          )}
+          <div className={`transition-opacity duration-200 ${loading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+            <DataTable
             columns={[
               { key: "id", title: "Test ID", sortable: true },
               { key: "patientName", title: "Patient Name", sortable: true },
@@ -1244,21 +1242,35 @@ body {
                 key: "status",
                 title: "Status",
                 sortable: true,
-                render: (value) => (
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs ${
-                      value === "Completed"
-                        ? "bg-green-100 text-green-800"
-                        : value === "In Progress"
-                          ? "bg-blue-100 text-blue-800"
-                          : value === "Sample Collected"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : "bg-red-100 text-red-800"
-                    }`}
-                  >
-                    {value}
-                  </span>
-                ),
+                render: (value, row) => {
+                  const statusMap = {
+                    "SAMPLE_PENDING": "Sample Pending",
+                    "SAMPLE_COLLECTED": "Sample Collected",
+                    "IN_PROGRESS": "In Progress",
+                    "COMPLETED": "Completed",
+                  };
+                  const displayValue = statusMap[value] || value;
+                  return (
+                    <select
+                      className={`px-2 py-1 rounded-full text-xs font-semibold appearance-none cursor-pointer outline-none border-none text-center ${displayValue === "Completed"
+                          ? "bg-green-100 text-green-800"
+                          : displayValue === "In Progress"
+                            ? "bg-blue-100 text-blue-800"
+                            : displayValue === "Sample Collected"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-red-100 text-red-800"
+                        }`}
+                      value={value}
+                      onChange={(e) => handleStatusChange(row.id, e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <option value="SAMPLE_PENDING">Sample Pending</option>
+                      <option value="SAMPLE_COLLECTED">Sample Collected</option>
+                      <option value="IN_PROGRESS">In Progress</option>
+                      <option value="COMPLETED">Completed</option>
+                    </select>
+                  );
+                },
               },
               {
                 key: "priority",
@@ -1266,11 +1278,10 @@ body {
                 sortable: true,
                 render: (value) => (
                   <span
-                    className={`px-2 py-1 rounded-full text-xs ${
-                      value === "urgent"
+                    className={`px-2 py-1 rounded-full text-xs ${value === "urgent"
                         ? "bg-red-100 text-red-800"
                         : "bg-gray-100 text-gray-800"
-                    }`}
+                      }`}
                   >
                     {value.charAt(0).toUpperCase() + value.slice(1)}
                   </span>
@@ -1289,7 +1300,7 @@ body {
                       className="px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200 flex items-center transition-colors"
                       title="View Details"
                     >
-                      <Visibility sx={{ fontSize: 16, mr: 0.5 }} /> 
+                      <Visibility sx={{ fontSize: 16, mr: 0.5 }} />
                     </button>
                     <button
                       onClick={(e) => {
@@ -1299,7 +1310,7 @@ body {
                       className="px-3 py-1 text-xs font-semibold bg-amber-100 text-amber-800 rounded-md hover:bg-amber-200 flex items-center transition-colors"
                       title="Edit Test"
                     >
-                      <Edit sx={{ fontSize: 16, mr: 0.5 }} /> 
+                      <Edit sx={{ fontSize: 16, mr: 0.5 }} />
                     </button>
                     {/* <button
                       onClick={(e) => {
@@ -1319,7 +1330,7 @@ body {
                       className="px-3 py-1 text-xs font-semibold bg-emerald-100 text-emerald-800 rounded-md hover:bg-emerald-200 flex items-center transition-colors"
                       title="Print Labels"
                     >
-                      <Print sx={{ fontSize: 16, mr: 0.5 }} /> 
+                      <Print sx={{ fontSize: 16, mr: 0.5 }} />
                     </button>
                   </div>
                 ),
@@ -1329,6 +1340,7 @@ body {
             onRowClick={handleRowClick}
             emptyMessage="No tests found. Register a new test to get started."
           />
+          </div>
         </div>
       </div>
 
@@ -1792,15 +1804,14 @@ body {
                   Status
                 </p>
                 <span
-                  className={`px-3 py-1 rounded-full text-xs font-bold ${
-                    selectedTestData.status === "Completed"
+                  className={`px-3 py-1 rounded-full text-xs font-bold ${selectedTestData.status === "Completed"
                       ? "bg-green-100 text-green-700"
                       : selectedTestData.status === "In Progress"
                         ? "bg-blue-100 text-blue-700"
                         : selectedTestData.status === "Sample Collected"
                           ? "bg-amber-100 text-amber-700"
                           : "bg-red-100 text-red-700"
-                  }`}
+                    }`}
                 >
                   {selectedTestData.status}
                 </span>
@@ -1879,11 +1890,10 @@ body {
                   <div className="flex justify-between items-center py-1 border-b border-gray-50">
                     <p className="text-sm text-gray-500">Priority Level</p>
                     <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold  ${
-                        selectedTestData.priority === "urgent"
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold  ${selectedTestData.priority === "urgent"
                           ? "text-red-600 bg-red-50"
                           : "text-blue-600 bg-blue-50"
-                      }`}
+                        }`}
                     >
                       {selectedTestData.priority}
                     </span>
@@ -1967,7 +1977,7 @@ body {
             </div>
           </div>
         )}
-      </Modal>      
+      </Modal>
 
     </>
   );

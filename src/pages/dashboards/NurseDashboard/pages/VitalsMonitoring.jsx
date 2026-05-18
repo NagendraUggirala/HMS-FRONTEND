@@ -1,34 +1,104 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Chart from 'chart.js/auto';
+import { apiFetch } from '../../../../services/apiClient';
+import { NURSE_ADD_VITALS, NURSE_GET_VITALS, NURSE_ASSIGNED_PATIENTS } from '../../../../config/api';
+import Modal from '../../../../components/common/Modal/Modal';
 
 const VitalsMonitoring = () => {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
 
+  const [selectedAdmission, setSelectedAdmission] = useState('');
+  const [patientsList, setPatientsList] = useState([]);
+  const [vitals, setVitals] = useState([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
+  const fetchPatients = async () => {
+    try {
+      const response = await apiFetch(NURSE_ASSIGNED_PATIENTS);
+      if (response && response.ok) {
+        const data = await response.json();
+        const pList = Array.isArray(data?.data) ? data.data : [];
+        setPatientsList(pList);
+        
+        if (pList.length > 0) {
+          // If no admission selected yet, pick the first patient
+          if (!selectedAdmission) {
+            const firstAdmission = pList[0].admission_number || pList[0].admissionNumber || pList[0].id?.toString();
+            setSelectedAdmission(firstAdmission);
+            setFormData(prev => ({ ...prev, admission_number: firstAdmission }));
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching patients:', error);
+    }
+  };
+
+  const fetchVitals = async (admissionNumber) => {
+    if (!admissionNumber) return;
+    setIsLoadingData(true);
+    try {
+      const response = await apiFetch(`${NURSE_GET_VITALS}?admission_number=${admissionNumber}`);
+      if (response && response.ok) {
+        const data = await response.json();
+        setVitals(Array.isArray(data?.data) ? data.data : []);
+      } else {
+        setVitals([]);
+      }
+    } catch (error) {
+      console.error('Error fetching vitals:', error);
+      setVitals([]);
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+
   useEffect(() => {
-    // Initialize chart when component mounts
+    fetchPatients();
+  }, []);
+
+  useEffect(() => {
+    if (selectedAdmission) {
+      fetchVitals(selectedAdmission);
+    }
+  }, [selectedAdmission]);
+
+  const fetchData = () => {
+    fetchPatients();
+    if (selectedAdmission) {
+      fetchVitals(selectedAdmission);
+    }
+  };
+
+  useEffect(() => {
     if (chartRef.current) {
       const ctx = chartRef.current.getContext('2d');
-      
-      // Destroy previous chart instance if exists
+
       if (chartInstance.current) {
         chartInstance.current.destroy();
       }
 
+      // Generate chart data from fetched vitals (last 10 readings or fallback)
+      const chartVitals = vitals.length > 0 ? [...vitals].reverse().slice(-10) : [];
+      const labels = chartVitals.length > 0 ? chartVitals.map(v => v.time || new Date(v.timestamp || v.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) : [];
+      const tempData = chartVitals.length > 0 ? chartVitals.map(v => v.temperature || v.temp) : [];
+      const hrData = chartVitals.length > 0 ? chartVitals.map(v => v.pulse || v.heart_rate) : [];
+
       chartInstance.current = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: ['8:00', '10:00', '12:00', '14:00', '16:00', '18:00'],
+          labels: labels,
           datasets: [
             {
               label: 'Temperature (°F)',
-              data: [98.6, 98.9, 99.2, 98.8, 98.5, 98.4],
+              data: tempData,
               borderColor: 'rgb(239, 68, 68)',
               tension: 0.1
             },
             {
               label: 'Heart Rate (bpm)',
-              data: [72, 75, 78, 76, 74, 72],
+              data: hrData,
               borderColor: 'rgb(59, 130, 246)',
               tension: 0.1
             }
@@ -46,95 +116,136 @@ const VitalsMonitoring = () => {
       });
     }
 
-    // Cleanup function
     return () => {
       if (chartInstance.current) {
         chartInstance.current.destroy();
       }
     };
-  }, []);
+  }, [vitals]);
 
-  // Exact data from HTML - using the high temperatures as shown in the table
-  const patients = [
-    { 
-      id: 1, 
-      name: "Leanne Graham", 
-      temp: 971.2, 
-      bpSystolic: 119, 
-      bpDiastolic: 72, 
-      pulse: 72, 
-      oxygen: 99,
-      time: "11:58:17"
-    },
-    { 
-      id: 2, 
-      name: "Ervin Howell", 
-      temp: 972.1, 
-      bpSystolic: 115, 
-      bpDiastolic: 71, 
-      pulse: 70, 
-      oxygen: 96,
-      time: "11:58:17"
-    },
-    { 
-      id: 3, 
-      name: "Clementine Bauch", 
-      temp: 970.2, 
-      bpSystolic: 110, 
-      bpDiastolic: 70, 
-      pulse: 62, 
-      oxygen: 97,
-      time: "11:58:17"
-    },
-    { 
-      id: 4, 
-      name: "Patricia Lebsack", 
-      temp: 971.5, 
-      bpSystolic: 117, 
-      bpDiastolic: 72, 
-      pulse: 68, 
-      oxygen: 97,
-      time: "11:58:17"
-    },
-    { 
-      id: 5, 
-      name: "Chelsey Dietrich", 
-      temp: 972.4, 
-      bpSystolic: 115, 
-      bpDiastolic: 74, 
-      pulse: 73, 
-      oxygen: 95,
-      time: "11:58:17"
-    },
-    { 
-      id: 6, 
-      name: "Mrs. Dennis Schulist", 
-      temp: 972.6, 
-      bpSystolic: 115, 
-      bpDiastolic: 71, 
-      pulse: 69, 
-      oxygen: 96,
-      time: "11:58:17"
-    }
-  ];
-
-  // All patients are marked as Critical as per HTML
-  const getStatus = () => {
-    return { status: 'Critical', class: 'status-critical' };
+  const getStatus = (vital) => {
+    const temp = vital?.temperature || vital?.temp || 98.6;
+    if (temp > 100 || temp < 97) return { status: 'Critical', class: 'bg-red-100 text-red-800' };
+    return { status: 'Stable', class: 'bg-green-100 text-green-800' };
   };
 
-  const handleVitalsSubmit = (e) => {
+  const [formData, setFormData] = useState({
+    admission_number: '',
+    temperature: '',
+    pulse: '',
+    bp_systolic: '',
+    bp_diastolic: '',
+    oxygen_saturation: '',
+    respiratory_rate: '',
+    weight: '',
+    height: '',
+    notes: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
+  const [showAddVitalsModal, setShowAddVitalsModal] = useState(false);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleVitalsSubmit = async (e) => {
     e.preventDefault();
-    // Show notification (you can implement your notification system here)
-    console.log('Vitals recorded successfully');
-    e.target.reset();
+    setLoading(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      const payloadData = {
+        admission_number: formData.admission_number,
+        temperature: parseFloat(formData.temperature),
+        pulse: parseInt(formData.pulse),
+        bp_systolic: formData.bp_systolic ? parseInt(formData.bp_systolic) : null,
+        bp_diastolic: formData.bp_diastolic ? parseInt(formData.bp_diastolic) : null,
+        oxygen_saturation: formData.oxygen_saturation ? parseInt(formData.oxygen_saturation) : null,
+        respiratory_rate: formData.respiratory_rate ? parseInt(formData.respiratory_rate) : null,
+        weight: formData.weight ? parseFloat(formData.weight) : null,
+        height: formData.height ? parseFloat(formData.height) : null,
+        notes: formData.notes || ''
+      };
+
+      const response = await apiFetch(NURSE_ADD_VITALS, {
+        method: 'POST',
+        body: payloadData
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.detail || payload?.message || 'Failed to record vitals');
+      }
+
+      setMessage({ type: 'success', text: 'Vitals recorded successfully' });
+      setFormData({
+        admission_number: formData.admission_number,
+        temperature: '',
+        pulse: '',
+        bp_systolic: '',
+        bp_diastolic: '',
+        oxygen_saturation: '',
+        respiratory_rate: '',
+        weight: '',
+        height: '',
+        notes: ''
+      });
+      // Refresh vitals list after submission
+      fetchData();
+      setShowAddVitalsModal(false);
+    } catch (error) {
+      console.error(error);
+      setMessage({ type: 'error', text: error.message || 'Failed to record vitals' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="space-y-6">
       {/* Vitals Table - Mobile Optimized */}
       <div>
-        <h2 className="text-2xl font-semibold text-gray-700 mb-3">Vitals Monitoring</h2>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-3">
+          <h2 className="text-2xl font-semibold text-gray-700">Vitals Monitoring</h2>
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:w-64">
+              <select
+                value={selectedAdmission}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedAdmission(val);
+                  const patient = patientsList.find(p => (p.admission_number || p.admissionNumber || p.id?.toString()) === val);
+                  if (patient) {
+                    setFormData(prev => ({ ...prev, admission_number: val }));
+                  }
+                }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm appearance-none pr-8"
+              >
+                <option value="">Select Patient</option>
+                {patientsList.map(patient => (
+                  <option key={patient.id} value={patient.admission_number || patient.admissionNumber || patient.id}>
+                    {patient.name || patient.patient_name} ({patient.admission_number || patient.admissionNumber || patient.id})
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                <i className="fas fa-chevron-down text-xs"></i>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowAddVitalsModal(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm font-medium shadow-sm whitespace-nowrap"
+            >
+              <i className="fas fa-plus"></i>
+              <span>Add Vitals</span>
+            </button>
+          </div>
+        </div>
         <div className="bg-white border rounded card-shadow overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-100 text-gray-600">
@@ -150,63 +261,69 @@ const VitalsMonitoring = () => {
               </tr>
             </thead>
             <tbody>
-              {patients.map(patient => {
-                const statusInfo = getStatus();
-                
+              {isLoadingData ? (
+                <tr><td colSpan="8" className="px-3 py-4 text-center text-gray-500">Loading vitals...</td></tr>
+              ) : vitals.length === 0 ? (
+                <tr><td colSpan="8" className="px-3 py-4 text-center text-gray-500">No vitals recorded yet.</td></tr>
+              ) : vitals.map((vital, index) => {
+                const statusInfo = getStatus(vital);
+
                 return (
-                  <tr key={patient.id} className="border-t hover:bg-gray-50 fade-in">
+                  <tr key={vital.id || index} className="border-t hover:bg-gray-50 fade-in">
                     {/* Patient Name - Truncated on mobile */}
                     <td className="px-3 py-2 text-left max-w-[100px]">
-                      <div className="truncate" title={patient.name}>
-                        {patient.name}
+                      <div className="truncate" title={vital.patient_name || vital.name || 'Unknown Patient'}>
+                        {vital.patient_name || vital.name || 'Unknown Patient'}
                       </div>
                     </td>
-                    
+
                     {/* Temperature */}
                     <td className="px-3 py-2 text-center text-red-600 font-semibold whitespace-nowrap">
-                      {patient.temp}°F
+                      {vital.temperature || vital.temp || 'N/A'}°F
                     </td>
-                    
+
                     {/* Blood Pressure */}
                     <td className="px-3 py-2 text-center whitespace-nowrap">
-                      {patient.bpSystolic}/{patient.bpDiastolic}
+                      {vital.bp_systolic || vital.bpSystolic || '--'}/{vital.bp_diastolic || vital.bpDiastolic || '--'}
                     </td>
-                    
+
                     {/* Pulse */}
                     <td className="px-3 py-2 text-center whitespace-nowrap">
-                      {patient.pulse} bpm
+                      {vital.pulse || vital.heart_rate || '--'} bpm
                     </td>
-                    
+
                     {/* Oxygen */}
                     <td className="px-3 py-2 text-center whitespace-nowrap">
-                      {patient.oxygen}%
+                      {vital.oxygen_saturation || vital.oxygen || '--'}%
                     </td>
-                    
+
                     {/* Time - Compact on mobile */}
                     <td className="px-3 py-2 text-center whitespace-nowrap">
-                      <span className="hidden sm:inline">{patient.time}</span>
+                      <span className="hidden sm:inline">
+                        {vital.time || (vital.timestamp ? new Date(vital.timestamp).toLocaleTimeString() : new Date(vital.created_at).toLocaleTimeString())}
+                      </span>
                       <span className="sm:hidden text-xs">
-                        {patient.time.split(':').slice(0, 2).join(':')}
+                        {(vital.time || (vital.timestamp ? new Date(vital.timestamp).toLocaleTimeString() : new Date(vital.created_at).toLocaleTimeString())).split(':').slice(0, 2).join(':')}
                       </span>
                     </td>
-                    
+
                     {/* Status */}
                     <td className="px-3 py-2 text-center">
                       <span className={`px-2 py-1 rounded-full text-xs ${statusInfo.class} whitespace-nowrap`}>
                         {statusInfo.status}
                       </span>
                     </td>
-                    
+
                     {/* Actions - Compact on mobile */}
                     <td className="px-3 py-2 text-center">
                       <div className="flex gap-1 justify-center">
-                        <button 
+                        <button
                           className="text-blue-500 hover:text-blue-700 p-1 transition-colors"
                           title="Edit Vitals"
                         >
                           <i className="fas fa-edit text-sm"></i>
                         </button>
-                        <button 
+                        <button
                           className="text-green-500 hover:text-green-700 p-1 transition-colors"
                           title="View Trends"
                         >
@@ -230,99 +347,185 @@ const VitalsMonitoring = () => {
         </div>
       </div>
 
-      {/* Side by Side Section - Vitals Trends and Add Vitals Reading */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Vitals Trends - Left Side */}
-        <div className="bg-white p-4 border rounded card-shadow">
-          <h3 className="text-lg font-semibold mb-3">Vitals Trends</h3>
-          <div className="flex flex-wrap gap-4 mb-4">
-            <span className="text-sm font-medium flex items-center gap-1">
-              <div className="w-3 h-3 bg-red-500 rounded"></div>
-              Temperature (°F)
-            </span>
-            <span className="text-sm font-medium flex items-center gap-1">
-              <div className="w-3 h-3 bg-blue-500 rounded"></div>
-              Heart Rate (bpm)
-            </span>
-          </div>
-          <div className="h-64">
-            <canvas ref={chartRef} id="vitalsChart"></canvas>
-          </div>
+      {/* Vitals Trends Section */}
+      <div className="bg-white p-4 border rounded card-shadow mt-6">
+        <h3 className="text-lg font-semibold mb-3">Vitals Trends</h3>
+        <div className="flex flex-wrap gap-4 mb-4">
+          <span className="text-sm font-medium flex items-center gap-1">
+            <div className="w-3 h-3 bg-red-500 rounded"></div>
+            Temperature (°F)
+          </span>
+          <span className="text-sm font-medium flex items-center gap-1">
+            <div className="w-3 h-3 bg-blue-500 rounded"></div>
+            Heart Rate (bpm)
+          </span>
         </div>
-
-        {/* Add Vitals Reading - Right Side */}
-        <div className="bg-white p-4 border rounded card-shadow">
-          <h3 className="text-lg font-semibold mb-3">Add Vitals Reading</h3>
-          <form id="vitalsForm" className="space-y-4" onSubmit={handleVitalsSubmit}>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Patient</label>
-              <select className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500">
-                <option>Leanne Graham</option>
-                {patients.slice(1).map(patient => (
-                  <option key={patient.id}>{patient.name}</option>
-                ))}
-              </select>
-            </div>
-            
-            {/* Complete form fields from HTML */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Temperature (°F)</label>
-              <input 
-                type="number" 
-                step="0.1" 
-                className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500" 
-                placeholder="Enter temperature"
-                required 
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Pulse (bpm)</label>
-              <input 
-                type="number" 
-                className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500" 
-                placeholder="Enter pulse"
-                required 
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">BP Systolic</label>
-                <input 
-                  type="number" 
-                  className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500" 
-                  placeholder="Systolic"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">BP Diastolic</label>
-                <input 
-                  type="number" 
-                  className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500" 
-                  placeholder="Diastolic"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Oxygen Saturation (%)</label>
-              <input 
-                type="number" 
-                className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500" 
-                placeholder="Enter oxygen level"
-              />
-            </div>
-
-            <button 
-              type="submit" 
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full transition-colors text-sm font-medium"
-            >
-              <i className="fas fa-save mr-1"></i>Save Vitals
-            </button>
-          </form>
+        <div className="h-64">
+          <canvas ref={chartRef} id="vitalsChart"></canvas>
         </div>
       </div>
+
+      {/* Add Vitals Modal */}
+      <Modal
+        isOpen={showAddVitalsModal}
+        onClose={() => setShowAddVitalsModal(false)}
+        title="Add Vitals Reading"
+        size="md"
+      >
+        {message.text && (
+          <div className={`p-3 rounded mb-4 text-sm ${message.type === 'error' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-green-50 text-green-600 border border-green-200'}`}>
+            {message.text}
+          </div>
+        )}
+        <form id="vitalsForm" className="space-y-4" onSubmit={handleVitalsSubmit}>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Admission Number</label>
+            <input
+              type="text"
+              name="admission_number"
+              value={formData.admission_number}
+              onChange={handleInputChange}
+              className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Enter Admission Number"
+              required
+            />
+            {patientsList.length > 0 && (
+               <p className="text-xs text-gray-500 mt-1">
+                 Current Selection: {patientsList.find(p => (p.admission_number || p.admissionNumber || p.id?.toString()) === selectedAdmission)?.name || 'None'}
+               </p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Temperature (°F)</label>
+            <input
+              type="number"
+              step="0.1"
+              name="temperature"
+              value={formData.temperature}
+              onChange={handleInputChange}
+              className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Enter temperature"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Pulse (bpm)</label>
+            <input
+              type="number"
+              name="pulse"
+              value={formData.pulse}
+              onChange={handleInputChange}
+              className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Enter pulse"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">BP Systolic</label>
+              <input
+                type="number"
+                name="bp_systolic"
+                value={formData.bp_systolic}
+                onChange={handleInputChange}
+                className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Systolic"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">BP Diastolic</label>
+              <input
+                type="number"
+                name="bp_diastolic"
+                value={formData.bp_diastolic}
+                onChange={handleInputChange}
+                className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Diastolic"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Oxygen Saturation (%)</label>
+              <input
+                type="number"
+                name="oxygen_saturation"
+                value={formData.oxygen_saturation}
+                onChange={handleInputChange}
+                className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Oxygen %"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Resp. Rate (bpm)</label>
+              <input
+                type="number"
+                name="respiratory_rate"
+                value={formData.respiratory_rate}
+                onChange={handleInputChange}
+                className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Resp Rate"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Weight (kg)</label>
+              <input
+                type="number"
+                step="0.1"
+                name="weight"
+                value={formData.weight}
+                onChange={handleInputChange}
+                className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Weight"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Height (cm)</label>
+              <input
+                type="number"
+                step="0.1"
+                name="height"
+                value={formData.height}
+                onChange={handleInputChange}
+                className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Height"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <textarea
+              name="notes"
+              value={formData.notes}
+              onChange={handleInputChange}
+              className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Any additional observations..."
+              rows="2"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className={`text-white px-4 py-2 rounded w-full transition-colors text-sm font-medium flex justify-center items-center ${loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+          >
+            {loading ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+            ) : (
+              <i className="fas fa-save mr-1"></i>
+            )}
+            {loading ? 'Saving...' : 'Save Vitals'}
+          </button>
+        </form>
+      </Modal>
     </div>
   );
 };

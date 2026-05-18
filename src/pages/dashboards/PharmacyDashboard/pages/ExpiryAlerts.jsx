@@ -8,82 +8,123 @@ import {
   Download,
   Trash2,
   ArrowRightCircle,
+  Loader2,
 } from "lucide-react";
+import {
+  getAlerts,
+  acknowledgeAlert,
+  runExpiryScan
+} from "../../../../services/pharmacyApi";
 
 export default function ExpiryAlerts() {
+  const [alerts, setAlerts] = React.useState([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    fetchExpiryReport();
+  }, []);
+
+  const fetchExpiryReport = async () => {
+    setIsLoading(true);
+    try {
+      // Use getAlerts with EXPIRY type as requested by the documentation link
+      const data = await getAlerts(0, 100, 'EXPIRY', 'PENDING');
+      const items = Array.isArray(data) ? data : (data?.items || data?.data || []);
+      
+      const formatted = items.map(item => {
+        // Handle metadata structure if present (typical for the new alerts system)
+        const meta = item.metadata || {};
+        const daysLeft = meta.days_left ?? item.days_left ?? item.days_until_expiry;
+        
+        return {
+          id: item.id,
+          name: meta.medicine_name || item.name || item.item_name || item.message || 'Unknown',
+          code: meta.item_code || item.code || item.item_code || 'N/A',
+          batch: meta.batch_number || item.batch_number || item.batch || 'N/A',
+          qty: meta.stock || item.stock || item.quantity || 0,
+          expiry: (meta.expiry_date || item.expiry_date) 
+            ? new Date(meta.expiry_date || item.expiry_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) 
+            : 'N/A',
+          days: daysLeft !== undefined ? `${daysLeft} days` : 'N/A',
+          level: item.priority || meta.expiry_status || item.level || getLevel(daysLeft),
+          status: item.status,
+          _original: item
+        };
+      });
+      setAlerts(formatted);
+    } catch (error) {
+      console.error("Fetch alerts error:", error);
+      toast.error("Failed to load expiry alerts");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getLevel = (days) => {
+    if (days <= 0) return "Expired";
+    if (days <= 15) return "Critical";
+    if (days <= 30) return "Warning";
+    return "Monitor";
+  };
+
   const handleExport = () =>
     toast.success("Expiry report exported successfully");
 
-  const handleSummaryClick = (title) =>
-    toast.info(`Viewing ${title.toLowerCase()}`);
+  const handleRunScan = async () => {
+    setIsLoading(true);
+    try {
+      await runExpiryScan();
+      toast.success("Expiry scan completed");
+      fetchExpiryReport();
+    } catch (error) {
+      if (error.message?.includes("Access denied") || error.message?.includes("HOSPITAL_ADMIN")) {
+         toast.error("Only Hospital Admins have permission to run manual scans.");
+      } else {
+         toast.error(error.message || "Failed to run expiry scan");
+      }
+      setIsLoading(false);
+    }
+  };
 
-  const handleDiscard = (name) => toast.error(`${name} discarded (expired)`);
+  const handleDiscard = async (alert) => {
+    try {
+      await acknowledgeAlert(alert.id);
+      toast.success(`${alert.name} alert acknowledged`);
+      fetchExpiryReport();
+    } catch (error) {
+      toast.error("Failed to acknowledge alert");
+    }
+  };
 
-  const handleTakeAction = (name) =>
-    toast.warning(`Action required for ${name}`);
-
-  const alerts = [
-    {
-      name: "Amoxicillin 500mg",
-      code: "AMX-500",
-      batch: "#AMX-7842",
-      qty: 25,
-      expiry: "15 Nov 2023",
-      days: "7 days",
-      level: "Critical",
-    },
-    {
-      name: "Cetirizine 10mg",
-      code: "CET-10",
-      batch: "#CET-4521",
-      qty: 40,
-      expiry: "23 Nov 2023",
-      days: "15 days",
-      level: "Warning",
-    },
-    {
-      name: "Metformin 500mg",
-      code: "MET-500",
-      batch: "#MET-9854",
-      qty: 32,
-      expiry: "8 Dec 2023",
-      days: "30 days",
-      level: "Warning",
-    },
-    {
-      name: "Atorvastatin 20mg",
-      code: "ATO-20",
-      batch: "#ATO-3214",
-      qty: 18,
-      expiry: "15 Dec 2023",
-      days: "37 days",
-      level: "Monitor",
-    },
-    {
-      name: "Ibuprofen 400mg",
-      code: "IBU-400",
-      batch: "#IBU-1254",
-      qty: 12,
-      expiry: "5 Nov 2023",
-      days: "Expired",
-      level: "Expired",
-    },
-  ];
+  const handleTakeAction = async (alert) => {
+    try {
+      await acknowledgeAlert(alert.id);
+      toast.info(`Action initiated for ${alert.name}`);
+      fetchExpiryReport();
+    } catch (error) {
+      toast.error("Failed to process action");
+    }
+  };
 
   const badgeStyle = (level) => {
     if (level === "Critical") return "bg-red-100 text-red-700";
     if (level === "Warning") return "bg-yellow-100 text-yellow-700";
     if (level === "Monitor") return "bg-green-100 text-green-700";
+    if (level === "Expired") return "bg-gray-200 text-gray-700";
     return "bg-gray-200 text-gray-700";
   };
 
   const daysStyle = (days) => {
-    if (days.includes("Expired")) return "text-gray-600 font-semibold";
-    if (days.includes("7")) return "text-red-600 font-semibold";
-    if (days.includes("15") || days.includes("30"))
-      return "text-yellow-600 font-semibold";
+    if (!days || days.includes("Expired") || days.startsWith("0") || days.startsWith("-")) return "text-gray-600 font-semibold";
+    const d = parseInt(days);
+    if (d <= 7) return "text-red-600 font-semibold";
+    if (d <= 30) return "text-yellow-600 font-semibold";
     return "text-green-600 font-semibold";
   };
+
+  const criticalCount = alerts.filter(a => a.level === "Critical").length;
+  const warningCount = alerts.filter(a => a.level === "Warning").length;
+  const expiredCount = alerts.filter(a => a.level === "Expired").length;
 
   return (
     <div className="bg-slate-100 min-h-screen space-y-6 px-3 sm:px-6 py-4">
@@ -96,51 +137,61 @@ export default function ExpiryAlerts() {
           </p>
         </div>
 
-        <button
-          onClick={handleExport}
-          className="flex items-center justify-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 w-full sm:w-auto"
-        >
-          <Download size={16} />
-          Export Expiry Report
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <button
+            onClick={handleRunScan}
+            disabled={isLoading}
+            className="flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 w-full sm:w-auto disabled:opacity-50"
+          >
+            {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Clock size={16} />}
+            Run Scan
+          </button>
+          <button
+            onClick={handleExport}
+            className="flex items-center justify-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 w-full sm:w-auto"
+          >
+            <Download size={16} />
+            Export Report
+          </button>
+        </div>
       </div>
 
-    {/* SUMMARY (Modern Analytics Style) */}
-<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* SUMMARY (Modern Analytics Style) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
-  <ExpiryStat
-    title="Expiring in 30 days"
-    value="8"
-    percent="Critical"
-    icon={AlertTriangle}
-    iconBg="bg-red-600"
-    gradient="from-red-50"
-    bars={[12, 10, 14, 16, 18]}
-  />
+        <ExpiryStat
+          title="Expiring in 15 days"
+          value={criticalCount}
+          percent="Critical"
+          icon={AlertTriangle}
+          iconBg="bg-red-600"
+          gradient="from-red-50"
+          bars={[12, 10, 14, 16, 18]}
+        />
 
-  <ExpiryStat
-    title="Expiring in 60 days"
-    value="15"
-    percent="Warning"
-    icon={Clock}
-    iconBg="bg-yellow-500"
-    gradient="from-yellow-50"
-    lineColor="#f59e0b"
-    linePoints="0,28 12,24 24,26 36,20 48,18 60,14"
-  />
+        <ExpiryStat
+          title="Expiring in 30 days"
+          value={warningCount}
+          percent="Warning"
+          icon={Clock}
+          iconBg="bg-yellow-500"
+          gradient="from-yellow-50"
+          lineColor="#f59e0b"
+          linePoints="0,28 12,24 24,26 36,20 48,18 60,14"
+        />
 
-  <ExpiryStat
-    title="Already Expired"
-    value="3"
-    percent="Expired"
-    danger
-    icon={Ban}
-    iconBg="bg-gray-600"
-    gradient="from-gray-100"
-    bars={[6, 5, 4, 3, 2]}
-  />
+        <ExpiryStat
+          title="Already Expired"
+          value={expiredCount}
+          percent="Expired"
+          danger
+          icon={Ban}
+          iconBg="bg-gray-600"
+          gradient="from-gray-100"
+          bars={[6, 5, 4, 3, 2]}
+        />
 
-</div>
+      </div>
 
 
       {/* TABLE */}
@@ -161,44 +212,61 @@ export default function ExpiryAlerts() {
             </thead>
 
             <tbody className="divide-y">
-              {alerts.map((a, i) => (
-                <tr key={i} className="hover:bg-slate-50">
-                  <td className="px-6 py-4">
-                    <p className="font-medium">{a.name}</p>
-                    <p className="text-xs text-slate-500">{a.code}</p>
-                  </td>
-                  <td className="px-6 py-4">{a.batch}</td>
-                  <td className="px-6 py-4 text-center">{a.qty}</td>
-                  <td className="px-6 py-4 text-center">{a.expiry}</td>
-                  <td className={`px-6 py-4 text-center ${daysStyle(a.days)}`}>
-                    {a.days}
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span
-                      className={`px-3 py-1 text-xs rounded-full ${badgeStyle(
-                        a.level
-                      )}`}
-                    >
-                      {a.level}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    {a.level === "Expired" ? (
-                      <Trash2
-                        size={16}
-                        className="text-red-600 cursor-pointer"
-                        onClick={() => handleDiscard(a.name)}
-                      />
-                    ) : (
-                      <ArrowRightCircle
-                        size={16}
-                        className="text-blue-600 cursor-pointer"
-                        onClick={() => handleTakeAction(a.name)}
-                      />
-                    )}
+              {isLoading ? (
+                <tr>
+                  <td colSpan="7" className="text-center py-8">
+                    <div className="flex flex-col items-center justify-center text-slate-500">
+                      <Loader2 className="animate-spin mb-2" size={24} />
+                      Loading report...
+                    </div>
                   </td>
                 </tr>
-              ))}
+              ) : alerts.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="text-center py-8 text-slate-500">
+                    No expiry alerts found.
+                  </td>
+                </tr>
+              ) : (
+                alerts.map((a, i) => (
+                  <tr key={i} className="hover:bg-slate-50">
+                    <td className="px-6 py-4">
+                      <p className="font-medium">{a.name}</p>
+                      <p className="text-xs text-slate-500">{a.code}</p>
+                    </td>
+                    <td className="px-6 py-4">{a.batch}</td>
+                    <td className="px-6 py-4 text-center">{a.qty}</td>
+                    <td className="px-6 py-4 text-center">{a.expiry}</td>
+                    <td className={`px-6 py-4 text-center ${daysStyle(a.days)}`}>
+                      {a.days}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span
+                        className={`px-3 py-1 text-xs rounded-full ${badgeStyle(
+                          a.level
+                        )}`}
+                      >
+                        {a.level}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      {a.level === "Expired" ? (
+                        <Trash2
+                          size={16}
+                          className="text-red-600 cursor-pointer"
+                          onClick={() => handleDiscard(a)}
+                        />
+                      ) : (
+                        <ArrowRightCircle
+                          size={16}
+                          className="text-blue-600 cursor-pointer"
+                          onClick={() => handleTakeAction(a)}
+                        />
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

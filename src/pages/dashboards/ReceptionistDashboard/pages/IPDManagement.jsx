@@ -82,6 +82,7 @@ const IPDManagement = () => {
     'Gastroenterology'
   ];
 
+  
   const filteredPatients = allPatients.filter(p =>
     p.name.toLowerCase().includes(patientNameSearch.toLowerCase()) ||
     p.id.toLowerCase().includes(patientNameSearch.toLowerCase())
@@ -855,7 +856,7 @@ const IPDManagement = () => {
                 <input
                   ref={patientNameRef}
                   type="text"
-                  className="form-input pl-10 pr-16"
+                  className="form-input pl-10 pr-10"
                   placeholder="Search by name or ID..."
                   value={patientNameSearch}
                   onChange={(e) => {
@@ -872,17 +873,8 @@ const IPDManagement = () => {
                   onFocus={() => setShowPatientDropdown(true)}
                   required
                 />
-                {/* Clear + Arrow toggle buttons */}
-                <div className="absolute inset-y-0 right-0 flex items-center pr-1 gap-0.5">
-                  {patientNameSearch && (
-                    <button
-                      type="button"
-                      onClick={clearPatientSelection}
-                      className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                      <Close style={{ fontSize: 16 }} />
-                    </button>
-                  )}
+                {/* Arrow toggle button */}
+                <div className="absolute inset-y-0 right-0 flex items-center pr-1">
                   <button
                     type="button"
                     onClick={() => setShowPatientDropdown(prev => !prev)}
@@ -1357,7 +1349,7 @@ const IPDManagement = () => {
                   type="date"
                   value={transferForm.transferDate}
                   onChange={(e) => setTransferForm({ ...transferForm, transferDate: e.target.value })}
-                  className="w-full text-sm py-2.5 rounded-xl border-gray-200 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50/30"
+                  className="w-full text-sm px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50/30"
                   required
                 />
               </div>
@@ -1366,7 +1358,7 @@ const IPDManagement = () => {
                 <select
                   value={transferForm.priority}
                   onChange={(e) => setTransferForm({ ...transferForm, priority: e.target.value })}
-                  className="w-full text-sm py-2.5 rounded-xl border-gray-200 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50/30"
+                  className="w-full text-sm px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50/30"
                   required
                 >
                   <option value="Routine">Routine</option>
@@ -1379,7 +1371,7 @@ const IPDManagement = () => {
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Target Ward Location</label>
               <select
-                className="w-full text-sm py-2.5 rounded-xl border-gray-200 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50/30 font-semibold text-gray-900"
+                className="w-full text-sm px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50/30 font-semibold text-gray-900"
                 value={transferForm.newWard}
                 onChange={(e) => setTransferForm({ ...transferForm, newWard: e.target.value })}
                 required
@@ -1398,7 +1390,7 @@ const IPDManagement = () => {
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Clinical Reason</label>
               <textarea
-                className="w-full text-sm py-2.5 rounded-xl border-gray-200 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50/30"
+                className="w-full text-sm px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50/30"
                 rows="3"
                 value={transferForm.reason}
                 onChange={(e) => setTransferForm({ ...transferForm, reason: e.target.value })}

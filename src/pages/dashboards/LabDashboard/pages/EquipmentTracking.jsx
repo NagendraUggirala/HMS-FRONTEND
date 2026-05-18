@@ -23,6 +23,27 @@ const EquipmentTracking = () => {
   const [loadingLogs, setLoadingLogs] = useState(false)
   const [logsPagination, setLogsPagination] = useState({ page: 1, limit: 10, total: 0, pages: 0 })
   const [logsFilterType, setLogsFilterType] = useState('')
+
+  const [maintenanceForm, setMaintenanceForm] = useState({
+    maintenanceType: 'preventive',
+    scheduledDate: new Date().toISOString().split('T')[0],
+    technician: '',
+    description: '',
+    cost: 0,
+    status: 'scheduled',
+    notes: ''
+  })
+
+  const [calibrationForm, setCalibrationForm] = useState({
+    calibrationType: 'routine',
+    scheduledDate: new Date().toISOString().split('T')[0],
+    standard: '',
+    description: '',
+    cost: 0,
+    status: 'scheduled',
+    notes: ''
+  })
+
   const [newEquipment, setNewEquipment] = useState({
     id: '',
     name: '',
@@ -36,8 +57,7 @@ const EquipmentTracking = () => {
     nextMaintenance: '',
     calibrationDue: '',
     installationDate: '',
-    notes: '',
-    specificationsJson: ''
+    notes: ''
   })
   const [editEquipment, setEditEquipment] = useState({
     equipmentId: '',
@@ -51,12 +71,12 @@ const EquipmentTracking = () => {
     installation_date: '',
     last_calibrated_at: '',
     next_calibration_due_at: '',
-    notes: '',
-    specificationsJson: ''
+    notes: ''
   })
 
   useEffect(() => {
     loadEquipmentData()
+    fetchEquipmentLogs(null, 1, 10, '')
   }, [])
 
   const mapBackendStatusToUi = (backendStatus, nextCalibrationDueAt) => {
@@ -134,20 +154,32 @@ const EquipmentTracking = () => {
   }
 
   const fetchEquipmentLogs = async (equipmentUuid, page = 1, limit = 10, maintenanceType = null) => {
-    if (!equipmentUuid) {
-      setMaintenanceLogs([])
-      setLogsPagination({ page: 1, limit: 10, total: 0, pages: 0 })
-      return
-    }
-
     try {
       setLoadingLogs(true)
+      if (!equipmentUuid) {
+        // Fallback to global logs if no equipment is selected
+        const globalData = await getGlobalMaintenanceLogs(page, limit, maintenanceType)
+        setMaintenanceLogs(globalData.logs.map(log => ({
+          id: log.logId,
+          equipmentId: log.equipmentId,
+          equipmentName: log.equipmentName || 'Unknown Equipment',
+          type: log.maintenanceType || log.logType || 'Maintenance',
+          date: log.performedAt ? new Date(log.performedAt).toISOString().split('T')[0] : '',
+          performedBy: log.performedBy || 'Unknown',
+          cost: log.cost || 0,
+          description: log.description || log.notes || '',
+          status: log.status || 'completed'
+        })))
+        setLogsPagination(globalData.pagination)
+        return
+      }
+
       const params = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString()
       })
       if (maintenanceType && maintenanceType.trim()) {
-        params.append('maintenance_type', maintenanceType.trim().toUpperCase())
+        params.append('maintenance_type', maintenanceType.trim())
       }
 
       const endpoint = `/api/v1/lab/equipment-qc/equipment/${encodeURIComponent(equipmentUuid)}/logs?${params.toString()}`
@@ -192,15 +224,20 @@ const EquipmentTracking = () => {
     }
   }
 
-  const loadEquipmentData = async (searchTerm = '') => {
+  const loadEquipmentData = async (searchTerm = '', page = 1, limit = 50) => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        active_only: 'true'
+      })
       if (searchTerm.trim()) {
+        // Assuming backend supports search, add it if available
         params.append('search', searchTerm.trim())
       }
 
-      const apiUrl = `/api/v1/lab/equipment-tracking${params.toString() ? '?' + params.toString() : ''}`
+      const apiUrl = `/api/v1/lab/equipment-qc/equipment?${params.toString()}`
       const res = await apiFetch(apiUrl, {
         method: 'GET'
       })
@@ -211,8 +248,10 @@ const EquipmentTracking = () => {
         throw new Error(typeof detail === 'string' ? detail : 'Failed to load equipment')
       }
 
-      const stats = data?.stats || {}
-      const mapped = (data?.equipment_list || []).map((e) => {
+      const equipmentList = data?.equipment || []
+      const pagination = data?.pagination || { page: 1, limit: 50, total: 0, pages: 0 }
+
+      const mapped = equipmentList.map((e) => {
         const uiStatus = mapBackendStatusToUi(e?.status, e?.next_calibration_due_at)
 
         const nextDueDateOnly = formatIsoToDateOnly(e?.next_calibration_due_at)
@@ -244,12 +283,12 @@ const EquipmentTracking = () => {
 
       setEquipment(mapped)
       setEquipmentStats({
-        total_equipment: stats.total_equipment ?? mapped.length,
-        operational: stats.operational ?? mapped.filter((item) => item.status === 'operational').length,
-        maintenance: stats.maintenance ?? mapped.filter((item) => item.status === 'maintenance').length,
-        calibration_due: stats.calibration_due ?? mapped.filter((item) => item.status === 'calibration_due').length
+        total_equipment: pagination.total || mapped.length,
+        operational: mapped.filter((item) => item.status === 'operational').length,
+        maintenance: mapped.filter((item) => item.status === 'maintenance').length,
+        calibration_due: mapped.filter((item) => item.status === 'calibration_due').length
       })
-      setMaintenanceLogs(data?.maintenance_logs || [])
+      setMaintenanceLogs([]) // Reset logs as they are per equipment
       setLogsPagination({ page: 1, limit: 10, total: 0, pages: 0 })
     } catch (err) {
       console.error('loadEquipmentData error:', err)
@@ -283,33 +322,18 @@ const EquipmentTracking = () => {
 
       const equipmentCode = `EQP-${(equipment.length + 1).toString().padStart(3, '0')}`
 
-      let specificationsObj = {}
-      if ((newEquipment.specificationsJson || '').trim()) {
-        try {
-          const parsed = JSON.parse(newEquipment.specificationsJson)
-          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-            specificationsObj = parsed
-          } else {
-            throw new Error('Specifications must be a JSON object')
-          }
-        } catch (err) {
-          throw new Error(`Invalid Specifications JSON: ${err?.message || 'Parse error'}`)
-        }
-      }
-
-      // IMPORTANT: Align request payload with backend `EquipmentCreateRequest`.
+      // Align request payload with backend `EquipmentCreateRequest`.
       const payload = {
         equipment_code: equipmentCode,
         equipment_name: newEquipment.name,
-        category: newEquipment.type, // backend stores this as Equipment.category
+        category: newEquipment.type,
         manufacturer: newEquipment.brand,
         model: newEquipment.model,
         serial_number: newEquipment.serialNumber,
         location: newEquipment.location,
         installation_date: toIsoDateTimeUtc(newEquipment.installationDate) || new Date().toISOString(),
         next_calibration_due_at: toIsoDateTimeUtc(newEquipment.nextMaintenance),
-        notes: (newEquipment.notes || '').trim() || null,
-        specifications: specificationsObj
+        notes: (newEquipment.notes || '').trim() || null
       }
 
       const res = await apiFetch('/api/v1/lab/equipment-qc/equipment', { method: 'POST', body: payload })
@@ -334,8 +358,7 @@ const EquipmentTracking = () => {
         nextMaintenance: '',
         calibrationDue: '',
         installationDate: '',
-        notes: '',
-        specificationsJson: ''
+        notes: ''
       })
 
       await loadEquipmentData()
@@ -365,10 +388,7 @@ const EquipmentTracking = () => {
       installation_date: selectedEquipment.installationDate || '',
       last_calibrated_at: selectedEquipment.lastMaintenance || '',
       next_calibration_due_at: selectedEquipment.nextMaintenance || '',
-      notes: selectedEquipment.notes || '',
-      specificationsJson: selectedEquipment.specifications
-        ? JSON.stringify(selectedEquipment.specifications, null, 2)
-        : ''
+      notes: selectedEquipment.notes || ''
     })
     setShowEditModal(true)
   }
@@ -387,20 +407,7 @@ const EquipmentTracking = () => {
       return d.toISOString()
     }
 
-    let specificationsObj = null
-    if ((editEquipment.specificationsJson || '').trim()) {
-      try {
-        const parsed = JSON.parse(editEquipment.specificationsJson)
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          specificationsObj = parsed
-        } else {
-          throw new Error('Specifications must be a JSON object')
-        }
-      } catch (err) {
-        alert(`Invalid Specifications JSON: ${err?.message || 'Parse error'}`)
-        return
-      }
-    }
+
 
     // Backend EquipmentUpdateRequest supports partial updates.
     const payload = {
@@ -413,8 +420,7 @@ const EquipmentTracking = () => {
       installation_date: toIsoDateTimeUtc(editEquipment.installation_date),
       last_calibrated_at: toIsoDateTimeUtc(editEquipment.last_calibrated_at),
       next_calibration_due_at: toIsoDateTimeUtc(editEquipment.next_calibration_due_at),
-      notes: (editEquipment.notes || '').trim() || undefined,
-      specifications: specificationsObj === null ? undefined : specificationsObj
+      notes: (editEquipment.notes || '').trim() || undefined
     }
 
     // Remove undefined keys so backend gets only fields you changed
@@ -459,24 +465,35 @@ const EquipmentTracking = () => {
 
     try {
       const payload = {
-        type: 'preventive',
-        description: 'Routine maintenance as scheduled',
-        cost: 0,
-        status: 'scheduled'
+        log_type: maintenanceForm.maintenanceType.toUpperCase(),
+        maintenance_type: maintenanceForm.maintenanceType,
+        description: maintenanceForm.description || `Scheduled ${maintenanceForm.maintenanceType} maintenance`,
+        notes: maintenanceForm.notes || 'Equipment maintenance logged via dashboard',
+        cost: Number(maintenanceForm.cost) || 0,
+        status: maintenanceForm.status || 'scheduled',
+        performed_at: new Date(maintenanceForm.scheduledDate).toISOString(),
+        performed_by: maintenanceForm.technician || 'dashboard',
+        remarks: `Assigned to: ${maintenanceForm.technician || 'unassigned'}`
       }
 
-      await apiFetch(`/api/v1/lab/equipment-qc/equipment/${selectedEquipment.equipmentId}/logs`, {
+      const res = await apiFetch(`/api/v1/lab/equipment-qc/equipment/${selectedEquipment.equipmentId}/logs`, {
         method: 'POST',
         body: payload
       })
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        const detail = data?.detail?.message || data?.detail || data?.message || 'Failed to create maintenance log'
+        throw new Error(typeof detail === 'string' ? detail : 'Failed to create maintenance log')
+      }
 
       setShowMaintenanceModal(false)
       alert(`Maintenance scheduled for ${selectedEquipment.name}`)
-      
+
       // Refresh logs from backend
       fetchEquipmentLogs(selectedEquipment.equipmentId, logsPagination.page, logsPagination.limit, logsFilterType)
       // Refresh equipment details
-      fetchEquipment()
+      fetchEquipmentDetails(selectedEquipment.equipmentId, selectedEquipment)
     } catch (err) {
       console.error('Failed to log maintenance:', err)
       alert(err?.message || 'Failed to schedule maintenance')
@@ -488,16 +505,27 @@ const EquipmentTracking = () => {
 
     try {
       const payload = {
-        type: 'calibration',
-        description: 'Routine calibration as scheduled',
-        cost: 0,
-        status: 'scheduled'
+        log_type: 'CALIBRATION',
+        maintenance_type: 'calibration',
+        description: calibrationForm.description || `${calibrationForm.calibrationType} calibration scheduled`,
+        notes: calibrationForm.notes || `Standard: ${calibrationForm.standard}`,
+        cost: Number(calibrationForm.cost) || 0,
+        status: calibrationForm.status || 'scheduled',
+        performed_at: new Date(calibrationForm.scheduledDate).toISOString(),
+        performed_by: 'dashboard',
+        remarks: `Standard: ${calibrationForm.standard || 'None specified'}`
       }
 
-      await apiFetch(`/api/v1/lab/equipment-qc/equipment/${selectedEquipment.equipmentId}/logs`, {
+      const res = await apiFetch(`/api/v1/lab/equipment-qc/equipment/${selectedEquipment.equipmentId}/logs`, {
         method: 'POST',
         body: payload
       })
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        const detail = data?.detail?.message || data?.detail || data?.message || 'Failed to create calibration log'
+        throw new Error(typeof detail === 'string' ? detail : 'Failed to create calibration log')
+      }
 
       setShowCalibrationModal(false)
       alert(`Calibration logged for ${selectedEquipment.name}`)
@@ -505,7 +533,7 @@ const EquipmentTracking = () => {
       // Refresh logs from backend
       fetchEquipmentLogs(selectedEquipment.equipmentId, logsPagination.page, logsPagination.limit, logsFilterType)
       // Refresh equipment details
-      fetchEquipment()
+      fetchEquipmentDetails(selectedEquipment.equipmentId, selectedEquipment)
     } catch (err) {
       console.error('Failed to log calibration:', err)
       alert(err?.message || 'Failed to log calibration')
@@ -554,6 +582,92 @@ const EquipmentTracking = () => {
     }
   }
 
+  const getGlobalMaintenanceLogs = async (page = 1, limit = 10, maintenanceType = null, dateFrom = null, dateTo = null) => {
+    try {
+      const params = new URLSearchParams()
+      params.append('page', page)
+      params.append('limit', Math.min(limit, 100))
+      if (maintenanceType) params.append('maintenance_type', maintenanceType)
+      if (dateFrom) params.append('date_from', dateFrom)
+      if (dateTo) params.append('date_to', dateTo)
+
+      const response = await apiFetch(`/api/v1/lab/equipment-qc/equipment/logs?${params.toString()}`, {
+        method: 'GET'
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        const detail = data?.detail?.message || data?.detail || data?.message || 'Failed to fetch global maintenance logs'
+        throw new Error(typeof detail === 'string' ? detail : 'Failed to fetch global maintenance logs')
+      }
+
+      return {
+        logs: (data?.logs || []).map(log => ({
+          logId: log.id,
+          equipmentId: log.equipment_id,
+          equipmentName: log.equipment_name,
+          logType: log.log_type,
+          maintenanceType: log.maintenance_type,
+          description: log.description,
+          notes: log.notes,
+          cost: log.cost,
+          status: log.status,
+          performedAt: log.performed_at,
+          performedBy: log.performed_by,
+          remarks: log.remarks,
+          createdAt: log.created_at
+        })),
+        pagination: {
+          page: data?.page || page,
+          limit: data?.limit || limit,
+          total: data?.total || 0,
+          pages: data?.pages || Math.ceil((data?.total || 0) / limit)
+        }
+      }
+    } catch (err) {
+      console.error('getGlobalMaintenanceLogs error:', err)
+      throw err
+    }
+  }
+
+  const getMaintenanceLogDetail = async (logId) => {
+    if (!logId) {
+      throw new Error('Log ID is required')
+    }
+
+    try {
+      const response = await apiFetch(`/api/v1/lab/equipment-qc/equipment/logs/${encodeURIComponent(logId)}`, {
+        method: 'GET'
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        const detail = data?.detail?.message || data?.detail || data?.message || 'Failed to fetch maintenance log details'
+        throw new Error(typeof detail === 'string' ? detail : 'Failed to fetch maintenance log details')
+      }
+
+      return {
+        logId: data.id,
+        equipmentId: data.equipment_id,
+        equipmentName: data.equipment_name,
+        logType: data.log_type,
+        maintenanceType: data.maintenance_type,
+        description: data.description,
+        notes: data.notes,
+        cost: data.cost,
+        status: data.status,
+        performedAt: data.performed_at,
+        performedBy: data.performed_by,
+        remarks: data.remarks,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
+      }
+    } catch (err) {
+      console.error('getMaintenanceLogDetail error:', err)
+      throw err
+    }
+  }
+
   const handleGenerateQR = (equipmentId) => {
     const eqp = equipment.find(e => e.id === equipmentId)
     if (eqp) {
@@ -586,7 +700,7 @@ const EquipmentTracking = () => {
         <div className="flex flex-col md:flex-row justify-between items-start gap-3 md:gap-4">
           <div className="w-full md:w-auto">
             <h2 className="text-xl md:text-2xl font-semibold text-gray-700 flex items-center gap-2">
-                
+
               Equipment Tracking
             </h2>
             <p className="text-sm md:text-base text-gray-500 mt-1">Track laboratory equipment, maintenance, and calibration schedules</p>
@@ -604,84 +718,84 @@ const EquipmentTracking = () => {
           </div>
         </div>
 
-{/* Equipment Stats - Glass Morphism Design */}
-<div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-  {/* Total Equipment Card */}
-  <div className="relative bg-gradient-to-br from-white to-blue-50 p-5 rounded-2xl border border-blue-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
-    <div className="absolute top-0 right-0 w-20 h-20 bg-blue-200 rounded-full -translate-y-8 translate-x-8 opacity-20"></div>
-    <div className="absolute bottom-0 left-0 w-16 h-16 bg-blue-300 rounded-full translate-y-8 -translate-x-8 opacity-10"></div>
+        {/* Equipment Stats - Glass Morphism Design */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Total Equipment Card */}
+          <div className="relative bg-gradient-to-br from-white to-blue-50 p-5 rounded-2xl border border-blue-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-blue-200 rounded-full -translate-y-8 translate-x-8 opacity-20"></div>
+            <div className="absolute bottom-0 left-0 w-16 h-16 bg-blue-300 rounded-full translate-y-8 -translate-x-8 opacity-10"></div>
 
-    <div className="relative flex items-center justify-between">
-      <div>
-        <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Total Equipment</p>
-        <p className="text-2xl font-bold text-gray-900 mt-1">{equipment.length}</p>
-      </div>
-      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
-        <i className="fas fa-microscope text-white text-lg"></i>
-      </div>
-    </div>
-    <div className="relative mt-4 pt-3 border-t border-blue-100">
-      <p className="text-xs text-blue-700 font-medium">All equipment items</p>
-    </div>
-  </div>
+            <div className="relative flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Total Equipment</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{equipment.length}</p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
+                <i className="fas fa-microscope text-white text-lg"></i>
+              </div>
+            </div>
+            <div className="relative mt-4 pt-3 border-t border-blue-100">
+              <p className="text-xs text-blue-700 font-medium">All equipment items</p>
+            </div>
+          </div>
 
-  {/* Operational Card */}
-  <div className="relative bg-gradient-to-br from-white to-emerald-50 p-5 rounded-2xl border border-emerald-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
-    <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-200 rounded-full -translate-y-8 translate-x-8 opacity-20"></div>
-    <div className="absolute bottom-0 left-0 w-16 h-16 bg-emerald-300 rounded-full translate-y-8 -translate-x-8 opacity-10"></div>
+          {/* Operational Card */}
+          <div className="relative bg-gradient-to-br from-white to-emerald-50 p-5 rounded-2xl border border-emerald-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-200 rounded-full -translate-y-8 translate-x-8 opacity-20"></div>
+            <div className="absolute bottom-0 left-0 w-16 h-16 bg-emerald-300 rounded-full translate-y-8 -translate-x-8 opacity-10"></div>
 
-    <div className="relative flex items-center justify-between">
-      <div>
-        <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Operational</p>
-        <p className="text-2xl font-bold text-gray-900 mt-1">{equipment.filter(e => e.status === 'operational').length}</p>
-      </div>
-      <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
-        <i className="fas fa-check-circle text-white text-lg"></i>
-      </div>
-    </div>
-    <div className="relative mt-4 pt-3 border-t border-emerald-100">
-      <p className="text-xs text-emerald-700 font-medium">Fully functional</p>
-    </div>
-  </div>
+            <div className="relative flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Operational</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{equipment.filter(e => e.status === 'operational').length}</p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
+                <i className="fas fa-check-circle text-white text-lg"></i>
+              </div>
+            </div>
+            <div className="relative mt-4 pt-3 border-t border-emerald-100">
+              <p className="text-xs text-emerald-700 font-medium">Fully functional</p>
+            </div>
+          </div>
 
-  {/* Maintenance Card */}
-  <div className="relative bg-gradient-to-br from-white to-yellow-50 p-5 rounded-2xl border border-yellow-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
-    <div className="absolute top-0 right-0 w-20 h-20 bg-yellow-200 rounded-full -translate-y-8 translate-x-8 opacity-20"></div>
-    <div className="absolute bottom-0 left-0 w-16 h-16 bg-yellow-300 rounded-full translate-y-8 -translate-x-8 opacity-10"></div>
+          {/* Maintenance Card */}
+          <div className="relative bg-gradient-to-br from-white to-yellow-50 p-5 rounded-2xl border border-yellow-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-yellow-200 rounded-full -translate-y-8 translate-x-8 opacity-20"></div>
+            <div className="absolute bottom-0 left-0 w-16 h-16 bg-yellow-300 rounded-full translate-y-8 -translate-x-8 opacity-10"></div>
 
-    <div className="relative flex items-center justify-between">
-      <div>
-        <p className="text-xs font-semibold text-yellow-600 uppercase tracking-wider">Maintenance</p>
-        <p className="text-2xl font-bold text-gray-900 mt-1">{equipment.filter(e => e.status === 'maintenance').length}</p>
-      </div>
-      <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-md">
-        <i className="fas fa-tools text-white text-lg"></i>
-      </div>
-    </div>
-    <div className="relative mt-4 pt-3 border-t border-yellow-100">
-      <p className="text-xs text-yellow-700 font-medium">Under maintenance</p>
-    </div>
-  </div>
+            <div className="relative flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-yellow-600 uppercase tracking-wider">Maintenance</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{equipment.filter(e => e.status === 'maintenance').length}</p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-md">
+                <i className="fas fa-tools text-white text-lg"></i>
+              </div>
+            </div>
+            <div className="relative mt-4 pt-3 border-t border-yellow-100">
+              <p className="text-xs text-yellow-700 font-medium">Under maintenance</p>
+            </div>
+          </div>
 
-  {/* Calibration Due Card */}
-  <div className="relative bg-gradient-to-br from-white to-red-50 p-5 rounded-2xl border border-red-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
-    <div className="absolute top-0 right-0 w-20 h-20 bg-red-200 rounded-full -translate-y-8 translate-x-8 opacity-20"></div>
-    <div className="absolute bottom-0 left-0 w-16 h-16 bg-red-300 rounded-full translate-y-8 -translate-x-8 opacity-10"></div>
+          {/* Calibration Due Card */}
+          <div className="relative bg-gradient-to-br from-white to-red-50 p-5 rounded-2xl border border-red-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-red-200 rounded-full -translate-y-8 translate-x-8 opacity-20"></div>
+            <div className="absolute bottom-0 left-0 w-16 h-16 bg-red-300 rounded-full translate-y-8 -translate-x-8 opacity-10"></div>
 
-    <div className="relative flex items-center justify-between">
-      <div>
-        <p className="text-xs font-semibold text-red-600 uppercase tracking-wider">Calibration Due</p>
-        <p className="text-2xl font-bold text-gray-900 mt-1">{equipment.filter(e => e.status === 'calibration_due').length}</p>
-      </div>
-      <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center shadow-md">
-        <i className="fas fa-exclamation-triangle text-white text-lg"></i>
-      </div>
-    </div>
-    <div className="relative mt-4 pt-3 border-t border-red-100">
-      <p className="text-xs text-red-700 font-medium">Requires calibration</p>
-    </div>
-  </div>
-</div>
+            <div className="relative flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-red-600 uppercase tracking-wider">Calibration Due</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{equipment.filter(e => e.status === 'calibration_due').length}</p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center shadow-md">
+                <i className="fas fa-exclamation-triangle text-white text-lg"></i>
+              </div>
+            </div>
+            <div className="relative mt-4 pt-3 border-t border-red-100">
+              <p className="text-xs text-red-700 font-medium">Requires calibration</p>
+            </div>
+          </div>
+        </div>
 
         {/* Search and Filters - Improved responsive layout */}
         <div className="bg-white p-3 md:p-4 rounded-lg border card-shadow">
@@ -719,51 +833,51 @@ const EquipmentTracking = () => {
           <div className="overflow-x-auto">
             <DataTable
               columns={[
-                { 
-                  key: 'id', 
-                  title: 'Equipment ID', 
+                {
+                  key: 'id',
+                  title: 'Equipment ID',
                   sortable: true,
                   className: 'min-w-[100px]'
                 },
-                { 
-                  key: 'name', 
-                  title: 'Name', 
+                {
+                  key: 'name',
+                  title: 'Name',
                   sortable: true,
                   className: 'min-w-[150px]'
                 },
-                { 
-                  key: 'type', 
-                  title: 'Type', 
+                {
+                  key: 'type',
+                  title: 'Type',
                   sortable: true,
                   className: 'hidden sm:table-cell'
                 },
-                { 
-                  key: 'brand', 
-                  title: 'Brand', 
+                {
+                  key: 'brand',
+                  title: 'Brand',
                   sortable: true,
                   className: 'hidden md:table-cell'
                 },
-                { 
-                  key: 'model', 
-                  title: 'Model', 
+                {
+                  key: 'model',
+                  title: 'Model',
                   sortable: true,
                   className: 'hidden lg:table-cell'
                 },
-                { 
-                  key: 'serialNumber', 
-                  title: 'Serial No.', 
+                {
+                  key: 'serialNumber',
+                  title: 'Serial No.',
                   sortable: true,
                   className: 'hidden lg:table-cell'
                 },
-                { 
-                  key: 'location', 
-                  title: 'Location', 
+                {
+                  key: 'location',
+                  title: 'Location',
                   sortable: true,
                   className: 'hidden md:table-cell'
                 },
-                { 
-                  key: 'status', 
-                  title: 'Status', 
+                {
+                  key: 'status',
+                  title: 'Status',
                   sortable: true,
                   className: 'min-w-[100px]',
                   render: (value) => (
@@ -862,7 +976,7 @@ const EquipmentTracking = () => {
                 </button>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
               <div className="p-3 bg-blue-50 rounded-lg">
                 <p className="text-xs md:text-sm text-gray-500">Serial Number</p>
@@ -891,11 +1005,10 @@ const EquipmentTracking = () => {
                 <div className="p-3 bg-gray-50 rounded-lg border">
                   <p className="text-xs md:text-sm text-gray-500">Active Status</p>
                   <p className="text-xs md:text-sm font-medium">
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      selectedEquipment.isActive 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span className={`px-2 py-1 rounded-full text-xs ${selectedEquipment.isActive
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
+                      }`}>
                       {selectedEquipment.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </p>
@@ -969,51 +1082,50 @@ const EquipmentTracking = () => {
           <div className="overflow-x-auto">
             <DataTable
               columns={[
-                { 
-                  key: 'equipmentName', 
-                  title: 'Equipment', 
+                {
+                  key: 'equipmentName',
+                  title: 'Equipment',
                   sortable: true,
                   className: 'min-w-[120px]'
                 },
-                { 
-                  key: 'type', 
-                  title: 'Type', 
+                {
+                  key: 'type',
+                  title: 'Type',
                   sortable: true,
                   className: 'hidden sm:table-cell'
                 },
-                { 
-                  key: 'date', 
-                  title: 'Date', 
+                {
+                  key: 'date',
+                  title: 'Date',
                   sortable: true,
                   className: 'min-w-[90px]'
                 },
-                { 
-                  key: 'performedBy', 
-                  title: 'Performed By', 
+                {
+                  key: 'performedBy',
+                  title: 'Performed By',
                   sortable: true,
                   className: 'hidden md:table-cell'
                 },
-                { 
-                  key: 'cost', 
-                  title: 'Cost (₹)', 
+                {
+                  key: 'cost',
+                  title: 'Cost (₹)',
                   sortable: true,
                   className: 'hidden sm:table-cell'
                 },
-                { 
-                  key: 'description', 
-                  title: 'Description', 
+                {
+                  key: 'description',
+                  title: 'Description',
                   sortable: true,
                   className: 'hidden lg:table-cell'
                 },
-                { 
-                  key: 'status', 
-                  title: 'Status', 
+                {
+                  key: 'status',
+                  title: 'Status',
                   sortable: true,
                   className: 'min-w-[90px]',
                   render: (value) => (
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      value === 'completed' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                    }`}>
+                    <span className={`px-2 py-1 rounded-full text-xs ${value === 'completed' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                      }`}>
                       {value.charAt(0).toUpperCase() + value.slice(1)}
                     </span>
                   )
@@ -1024,7 +1136,7 @@ const EquipmentTracking = () => {
               responsive={true}
             />
           </div>
-          
+
           {logsPagination.pages > 1 && (
             <div className="p-4 flex items-center justify-between border-t">
               <span className="text-sm text-gray-500">
@@ -1054,7 +1166,7 @@ const EquipmentTracking = () => {
         <div className="bg-white p-4 rounded-lg border card-shadow">
           <h3 className="text-lg font-semibold mb-3">Quick Actions</h3>
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-            <button 
+            <button
               className="p-3 md:p-4 border rounded-lg hover:bg-blue-50 transition-colors text-center group"
               onClick={() => alert('Generate QR codes for all equipment')}
             >
@@ -1063,8 +1175,8 @@ const EquipmentTracking = () => {
               </div>
               <p className="font-medium text-sm md:text-base">Bulk QR Codes</p>
             </button>
-            
-            <button 
+
+            <button
               className="p-3 md:p-4 border rounded-lg hover:bg-green-50 transition-colors text-center group"
               onClick={() => alert('Generate maintenance schedule report')}
             >
@@ -1073,8 +1185,8 @@ const EquipmentTracking = () => {
               </div>
               <p className="font-medium text-sm md:text-base">Maintenance Schedule</p>
             </button>
-            
-            <button 
+
+            <button
               className="p-3 md:p-4 border rounded-lg hover:bg-yellow-50 transition-colors text-center group"
               onClick={() => alert('Generate calibration due report')}
             >
@@ -1083,8 +1195,8 @@ const EquipmentTracking = () => {
               </div>
               <p className="font-medium text-sm md:text-base">Calibration Report</p>
             </button>
-            
-            <button 
+
+            <button
               className="p-3 md:p-4 border rounded-lg hover:bg-purple-50 transition-colors text-center group"
               onClick={() => alert('Export equipment inventory')}
             >
@@ -1115,7 +1227,7 @@ const EquipmentTracking = () => {
                 className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
                 placeholder="e.g., Hematology Analyzer"
                 value={newEquipment.name}
-                onChange={(e) => setNewEquipment({...newEquipment, name: e.target.value})}
+                onChange={(e) => setNewEquipment({ ...newEquipment, name: e.target.value })}
                 required
               />
             </div>
@@ -1126,7 +1238,7 @@ const EquipmentTracking = () => {
               <select
                 className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
                 value={newEquipment.type}
-                onChange={(e) => setNewEquipment({...newEquipment, type: e.target.value})}
+                onChange={(e) => setNewEquipment({ ...newEquipment, type: e.target.value })}
                 required
               >
                 <option value="">Select type</option>
@@ -1147,7 +1259,7 @@ const EquipmentTracking = () => {
                 className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
                 placeholder="e.g., Sysmex, Roche, etc."
                 value={newEquipment.brand}
-                onChange={(e) => setNewEquipment({...newEquipment, brand: e.target.value})}
+                onChange={(e) => setNewEquipment({ ...newEquipment, brand: e.target.value })}
                 required
               />
             </div>
@@ -1160,7 +1272,7 @@ const EquipmentTracking = () => {
                 className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
                 placeholder="e.g., XN-1000, Cobas 6000"
                 value={newEquipment.model}
-                onChange={(e) => setNewEquipment({...newEquipment, model: e.target.value})}
+                onChange={(e) => setNewEquipment({ ...newEquipment, model: e.target.value })}
                 required
               />
             </div>
@@ -1176,7 +1288,7 @@ const EquipmentTracking = () => {
                 className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
                 placeholder="Unique serial number"
                 value={newEquipment.serialNumber}
-                onChange={(e) => setNewEquipment({...newEquipment, serialNumber: e.target.value})}
+                onChange={(e) => setNewEquipment({ ...newEquipment, serialNumber: e.target.value })}
                 required
               />
             </div>
@@ -1189,7 +1301,7 @@ const EquipmentTracking = () => {
                 className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
                 placeholder="e.g., Hematology Lab, Room 101"
                 value={newEquipment.location}
-                onChange={(e) => setNewEquipment({...newEquipment, location: e.target.value})}
+                onChange={(e) => setNewEquipment({ ...newEquipment, location: e.target.value })}
                 required
               />
             </div>
@@ -1203,7 +1315,7 @@ const EquipmentTracking = () => {
               <select
                 className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
                 value={newEquipment.status}
-                onChange={(e) => setNewEquipment({...newEquipment, status: e.target.value})}
+                onChange={(e) => setNewEquipment({ ...newEquipment, status: e.target.value })}
               >
                 <option value="operational">Operational</option>
                 <option value="maintenance">Under Maintenance</option>
@@ -1219,7 +1331,7 @@ const EquipmentTracking = () => {
                 type="date"
                 className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
                 value={newEquipment.nextMaintenance}
-                onChange={(e) => setNewEquipment({...newEquipment, nextMaintenance: e.target.value})}
+                onChange={(e) => setNewEquipment({ ...newEquipment, nextMaintenance: e.target.value })}
               />
             </div>
           </div>
@@ -1250,18 +1362,7 @@ const EquipmentTracking = () => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Specifications (JSON)
-            </label>
-            <textarea
-              className="w-full px-3 py-2 border rounded-lg text-sm md:text-base font-mono"
-              rows={3}
-              placeholder='Example: {"power":"230V","warranty":"2 years"}'
-              value={newEquipment.specificationsJson}
-              onChange={(e) => setNewEquipment({ ...newEquipment, specificationsJson: e.target.value })}
-            />
-          </div>
+
 
           <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
             <Button
@@ -1403,16 +1504,7 @@ const EquipmentTracking = () => {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Specifications (JSON)</label>
-            <textarea
-              className="w-full px-3 py-2 border rounded-lg text-sm md:text-base font-mono"
-              rows={4}
-              value={editEquipment.specificationsJson}
-              onChange={(e) => setEditEquipment({ ...editEquipment, specificationsJson: e.target.value })}
-              placeholder='Example: {"power":"230V","warranty":"2 years"}'
-            />
-          </div>
+
 
           <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
             <Button
@@ -1454,7 +1546,11 @@ const EquipmentTracking = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Maintenance Type
                 </label>
-                <select className="w-full px-3 py-2 border rounded-lg text-sm md:text-base">
+                <select
+                  className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
+                  value={maintenanceForm.maintenanceType}
+                  onChange={e => setMaintenanceForm({ ...maintenanceForm, maintenanceType: e.target.value })}
+                >
                   <option value="preventive">Preventive Maintenance</option>
                   <option value="corrective">Corrective Maintenance</option>
                   <option value="calibration">Calibration</option>
@@ -1468,31 +1564,82 @@ const EquipmentTracking = () => {
                 <input
                   type="date"
                   className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
-                  defaultValue={new Date().toISOString().split('T')[0]}
+                  value={maintenanceForm.scheduledDate}
+                  onChange={e => setMaintenanceForm({ ...maintenanceForm, scheduledDate: e.target.value })}
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Assigned Technician
-              </label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
-                placeholder="Enter technician name"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Assigned Technician
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
+                  placeholder="Enter technician name"
+                  value={maintenanceForm.technician}
+                  onChange={e => setMaintenanceForm({ ...maintenanceForm, technician: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cost (₹)
+                </label>
+                <input
+                  type="number"
+                  className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
+                  placeholder="0"
+                  value={maintenanceForm.cost}
+                  onChange={e => setMaintenanceForm({ ...maintenanceForm, cost: e.target.value })}
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
-              <textarea
-                className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
-                rows="3"
-                placeholder="Describe the maintenance required..."
-              />
+            <div className="grid grid-cols-1 gap-3 md:gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status
+                </label>
+                <select
+                  className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
+                  value={maintenanceForm.status}
+                  onChange={e => setMaintenanceForm({ ...maintenanceForm, status: e.target.value })}
+                >
+                  <option value="scheduled">Scheduled</option>
+                  <option value="completed">Completed</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <textarea
+                  className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
+                  rows="3"
+                  placeholder="Describe the maintenance..."
+                  value={maintenanceForm.description}
+                  onChange={e => setMaintenanceForm({ ...maintenanceForm, description: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes
+                </label>
+                <textarea
+                  className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
+                  rows="3"
+                  placeholder="Additional notes..."
+                  value={maintenanceForm.notes}
+                  onChange={e => setMaintenanceForm({ ...maintenanceForm, notes: e.target.value })}
+                />
+              </div>
             </div>
 
             <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
@@ -1535,7 +1682,11 @@ const EquipmentTracking = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Calibration Type
                 </label>
-                <select className="w-full px-3 py-2 border rounded-lg text-sm md:text-base">
+                <select
+                  className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
+                  value={calibrationForm.calibrationType}
+                  onChange={e => setCalibrationForm({ ...calibrationForm, calibrationType: e.target.value })}
+                >
                   <option value="routine">Routine Calibration</option>
                   <option value="annual">Annual Calibration</option>
                   <option value="after_repair">Post-Repair Calibration</option>
@@ -1549,20 +1700,82 @@ const EquipmentTracking = () => {
                 <input
                   type="date"
                   className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
-                  defaultValue={selectedEquipment.calibrationDue}
+                  value={calibrationForm.scheduledDate}
+                  onChange={e => setCalibrationForm({ ...calibrationForm, scheduledDate: e.target.value })}
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Calibration Standard
-              </label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
-                placeholder="e.g., NIST Traceable, ISO Standard"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Calibration Standard
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
+                  placeholder="e.g., NIST Traceable, ISO Standard"
+                  value={calibrationForm.standard}
+                  onChange={e => setCalibrationForm({ ...calibrationForm, standard: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cost (₹)
+                </label>
+                <input
+                  type="number"
+                  className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
+                  placeholder="0"
+                  value={calibrationForm.cost}
+                  onChange={e => setCalibrationForm({ ...calibrationForm, cost: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status
+                </label>
+                <select
+                  className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
+                  value={calibrationForm.status}
+                  onChange={e => setCalibrationForm({ ...calibrationForm, status: e.target.value })}
+                >
+                  <option value="scheduled">Scheduled</option>
+                  <option value="completed">Completed</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <textarea
+                  className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
+                  rows="3"
+                  placeholder="Describe the calibration..."
+                  value={calibrationForm.description}
+                  onChange={e => setCalibrationForm({ ...calibrationForm, description: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes
+                </label>
+                <textarea
+                  className="w-full px-3 py-2 border rounded-lg text-sm md:text-base"
+                  rows="3"
+                  placeholder="Additional notes..."
+                  value={calibrationForm.notes}
+                  onChange={e => setCalibrationForm({ ...calibrationForm, notes: e.target.value })}
+                />
+              </div>
             </div>
 
             <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">

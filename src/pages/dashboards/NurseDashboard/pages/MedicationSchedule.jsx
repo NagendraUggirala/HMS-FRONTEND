@@ -1,45 +1,97 @@
 // MedicationSchedule.jsx
 import React, { useState, useEffect } from 'react';
 import Modal from '../../../../components/common/Modal/Modal';
+import { apiFetch } from '../../../../services/apiClient';
+import { NURSE_MEDICATIONS, NURSE_ASSIGNED_PATIENTS } from '../../../../config/api';
 
 const MedicationSchedule = () => {
+  const [selectedAdmission, setSelectedAdmission] = useState('');
   const [medications, setMedications] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [patientsList, setPatientsList] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
   const [formData, setFormData] = useState({
-    patient: '',
-    medicine: '',
+    admission_number: '',
+    medication_name: '',
     dose: '',
-    time: '',
+    scheduled_time: '',
     instructions: '',
     frequency: 'Once daily',
-    startDate: ''
+    start_date: ''
   });
 
-  useEffect(() => {
-    // Simulate API call to fetch medication data
-    const fetchMedications = async () => {
-      try {
-        const response = await fetch('https://jsonplaceholder.typicode.com/posts?_limit=8');
+  const fetchPatients = async () => {
+    try {
+      const response = await apiFetch(NURSE_ASSIGNED_PATIENTS);
+      if (response && response.ok) {
         const data = await response.json();
+        const pList = Array.isArray(data?.data) ? data.data : [];
+        setPatientsList(pList);
         
-        const medsData = data.map((med, index) => ({
-          id: index,
-          patient: `Patient ${index + 1}`,
-          medicine: ['Paracetamol', 'Ibuprofen', 'Amoxicillin', 'Cetirizine', 'Omeprazole'][index % 5],
-          dose: ['500mg', '400mg', '250mg', '10mg', '20mg'][index % 5],
-          time: ['08:00', '12:00', '18:00', '20:00', '06:00'][index % 5],
-          frequency: ['Once daily', 'Twice daily', 'Three times', 'With meals', 'At bedtime'][index % 5],
-          status: index % 3 === 0 ? 'Given' : index % 3 === 1 ? 'Pending' : 'Missed'
-        }));
-        
-        setMedications(medsData);
-      } catch (error) {
-        console.error('Error fetching medications:', error);
+        if (pList.length > 0 && !selectedAdmission) {
+          const firstAdmission = pList[0].admission_number || pList[0].admissionNumber || pList[0].id?.toString();
+          setSelectedAdmission(firstAdmission);
+          setFormData(prev => ({ ...prev, admission_number: firstAdmission }));
+        }
       }
-    };
+    } catch (error) {
+      console.error('Error fetching patients:', error);
+    }
+  };
 
-    fetchMedications();
+  const fetchMedications = async (admissionNumber) => {
+    if (!admissionNumber) return;
+    try {
+      const response = await apiFetch(`${NURSE_MEDICATIONS}?admission_number=${admissionNumber}`);
+      if (response && response.ok) {
+        const data = await response.json();
+        const rawData = Array.isArray(data?.data) ? data.data : [];
+        
+        // Flatten the prescriptions array from each record
+        const flattenedMeds = rawData.flatMap(record => {
+          // Find the patient name from our existing patientsList
+          const patient = patientsList.find(p => p.id === record.patient_id || p.admission_number === admissionNumber);
+          const pName = patient ? (patient.name || patient.patient_name) : 'Unknown Patient';
+          
+          const prescriptions = Array.isArray(record.prescriptions) ? record.prescriptions : [];
+          return prescriptions.map((presc, idx) => ({
+            ...presc,
+            id: presc.id || `${record.id || 'rec'}-${idx}`,
+            patient_name: pName,
+            // Ensure fields exist for the table
+            medication_name: presc.medication_name || presc.medicine_name || presc.medicine || presc.medication || presc.name || 'N/A',
+            scheduled_time: presc.scheduled_time || presc.time || presc.schedule || 'N/A',
+            dose: presc.dose || presc.dosage || 'N/A'
+          }));
+        });
+
+        setMedications(flattenedMeds);
+      } else {
+        setMedications([]);
+      }
+    } catch (error) {
+      console.error('Error fetching medications:', error);
+      setMedications([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchPatients();
   }, []);
+
+  useEffect(() => {
+    if (selectedAdmission) {
+      fetchMedications(selectedAdmission);
+    }
+  }, [selectedAdmission]);
+
+  const fetchData = () => {
+    fetchPatients();
+    if (selectedAdmission) {
+      fetchMedications(selectedAdmission);
+    }
+  };
 
   const handleMedAction = (action, id) => {
     let message = '';
@@ -74,47 +126,65 @@ const MedicationSchedule = () => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    setMessage({ type: '', text: '' });
     
-    const newMedication = {
-      id: medications.length > 0 ? Math.max(...medications.map(m => m.id)) + 1 : 0,
-      patient: formData.patient,
-      medicine: formData.medicine,
-      dose: formData.dose,
-      time: formData.time,
-      frequency: formData.frequency,
-      instructions: formData.instructions,
-      status: 'Pending'
-    };
-    
-    setMedications(prev => [newMedication, ...prev]);
-    
-    // Show success notification
-    console.log('Medication added to schedule');
-    
-    // Reset form and close modal
-    setFormData({
-      patient: '',
-      medicine: '',
-      dose: '',
-      time: '',
-      instructions: '',
-      frequency: 'Once daily',
-      startDate: ''
-    });
-    setIsModalOpen(false);
+    try {
+      const payloadData = {
+        admission_number: formData.admission_number,
+        medication_name: formData.medication_name,
+        dose: formData.dose,
+        scheduled_time: formData.scheduled_time,
+        frequency: formData.frequency,
+        instructions: formData.instructions,
+        start_date: formData.start_date
+      };
+
+      const response = await apiFetch(NURSE_MEDICATIONS, {
+        method: 'POST',
+        body: payloadData
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.detail || payload?.message || 'Failed to add medication');
+      }
+
+      setMessage({ type: 'success', text: 'Medication added successfully' });
+      
+      // Reset form and close modal
+      setFormData({
+        admission_number: formData.admission_number,
+        medication_name: '',
+        dose: '',
+        scheduled_time: '',
+        instructions: '',
+        frequency: 'Once daily',
+        start_date: ''
+      });
+      setIsModalOpen(false);
+      
+      // Refresh medications list after submission
+      fetchData();
+    } catch (error) {
+      console.error(error);
+      setMessage({ type: 'error', text: error.message || 'Failed to add medication' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancel = () => {
     setFormData({
-      patient: '',
-      medicine: '',
+      admission_number: selectedAdmission,
+      medication_name: '',
       dose: '',
-      time: '',
+      scheduled_time: '',
       instructions: '',
       frequency: 'Once daily',
-      startDate: ''
+      start_date: ''
     });
     setIsModalOpen(false);
   };
@@ -133,14 +203,38 @@ const MedicationSchedule = () => {
 
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-3">
           <h2 className="text-2xl font-semibold text-gray-700">Medication Schedule</h2>
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center transition-colors duration-200 w-full sm:w-auto justify-center"
-          >
-            <i className="fas fa-plus mr-2"></i> Add Medication
-          </button>
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:w-64">
+              <select
+                value={selectedAdmission}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedAdmission(val);
+                  setFormData(prev => ({ ...prev, admission_number: val }));
+                }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm appearance-none pr-8"
+              >
+                <option value="">Select Patient</option>
+                {patientsList.map(patient => (
+                  <option key={patient.id} value={patient.admission_number || patient.admissionNumber || patient.id}>
+                    {patient.name || patient.patient_name} ({patient.admission_number || patient.admissionNumber || patient.id})
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                <i className="fas fa-chevron-down text-xs"></i>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm font-medium shadow-sm whitespace-nowrap"
+            >
+              <i className="fas fa-plus"></i>
+              <span>Add Medication</span>
+            </button>
+          </div>
         </div>
 
         {/* Add Medication Modal */}
@@ -150,36 +244,35 @@ const MedicationSchedule = () => {
           title="Add New Medication"
           size="lg"
         >
+          {message.text && (
+            <div className={`p-3 rounded mb-4 text-sm ${message.type === 'error' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-green-50 text-green-600 border border-green-200'}`}>
+              {message.text}
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Patient</label>
-                <select 
-                  name="patient"
-                  value={formData.patient}
+                <label className="block text-sm font-medium text-gray-700 mb-1">Admission Number</label>
+                <input 
+                  type="text" 
+                  name="admission_number"
+                  value={formData.admission_number}
                   onChange={handleInputChange}
                   className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter Admission Number"
                   required
-                >
-                  <option value="">Select Patient</option>
-                  <option>Patient 1</option>
-                  <option>Patient 2</option>
-                  <option>Patient 3</option>
-                  <option>Patient 4</option>
-                  <option>Patient 5</option>
-                  <option>Patient 6</option>
-                </select>
+                />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Medicine</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Medication Name</label>
                 <input 
                   type="text" 
-                  name="medicine"
-                  value={formData.medicine}
+                  name="medication_name"
+                  value={formData.medication_name}
                   onChange={handleInputChange}
                   className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-                  placeholder="Medicine name" 
+                  placeholder="Medication name" 
                   required 
                 />
               </div>
@@ -201,8 +294,8 @@ const MedicationSchedule = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
                 <input 
                   type="time" 
-                  name="time"
-                  value={formData.time}
+                  name="scheduled_time"
+                  value={formData.scheduled_time}
                   onChange={handleInputChange}
                   className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
                   required 
@@ -230,8 +323,8 @@ const MedicationSchedule = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
                 <input 
                   type="date" 
-                  name="startDate"
-                  value={formData.startDate}
+                  name="start_date"
+                  value={formData.start_date}
                   onChange={handleInputChange}
                   className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
                   required 
@@ -261,10 +354,16 @@ const MedicationSchedule = () => {
                 Cancel
               </button>
               <button 
-                type="submit" 
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center"
+                type="submit"
+                disabled={loading}
+                className={`text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center ${loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
               >
-                <i className="fas fa-plus mr-2"></i>Add Medication
+                {loading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                ) : (
+                  <i className="fas fa-plus mr-2"></i>
+                )}
+                {loading ? 'Adding...' : 'Add Medication'}
               </button>
             </div>
           </form>
@@ -274,105 +373,131 @@ const MedicationSchedule = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           <div className="bg-blue-50 p-4 rounded-lg card-shadow border border-blue-100">
             <h4 className="font-semibold text-blue-700 text-sm">Pending</h4>
-            <p className="text-2xl font-bold text-blue-600">{medications.filter(m => m.status === 'Pending').length}</p>
+            <p className="text-2xl font-bold text-blue-600">
+              {medications.filter(m => (m.status || '').toLowerCase() === 'pending').length}
+            </p>
           </div>
           <div className="bg-green-50 p-4 rounded-lg card-shadow border border-green-100">
             <h4 className="font-semibold text-green-700 text-sm">Given</h4>
-            <p className="text-2xl font-bold text-green-600">{medications.filter(m => m.status === 'Given').length}</p>
+            <p className="text-2xl font-bold text-green-600">
+              {medications.filter(m => (m.status || '').toLowerCase() === 'given').length}
+            </p>
           </div>
           <div className="bg-yellow-50 p-4 rounded-lg card-shadow border border-yellow-100">
             <h4 className="font-semibold text-yellow-700 text-sm">Missed</h4>
-            <p className="text-2xl font-bold text-yellow-600">{medications.filter(m => m.status === 'Missed').length}</p>
+            <p className="text-2xl font-bold text-yellow-600">
+              {medications.filter(m => (m.status || '').toLowerCase() === 'missed').length}
+            </p>
           </div>
           <div className="bg-purple-50 p-4 rounded-lg card-shadow border border-purple-100">
             <h4 className="font-semibold text-purple-700 text-sm">Delayed</h4>
-            <p className="text-2xl font-bold text-purple-600">2</p>
+            <p className="text-2xl font-bold text-purple-600">
+              {medications.filter(m => (m.status || '').toLowerCase() === 'delayed').length}
+            </p>
           </div>
         </div>
 
-        {/* Medications Table */}
-        <div className="bg-white p-4 md:p-6 border rounded-lg card-shadow overflow-hidden">
-          <div className="overflow-x-auto overscroll-x-contain">
-
-<table className="min-w-[720px] w-full text-sm">
-
-              <thead className="bg-gray-50 text-gray-600">
+        {/* Medications Table Section */}
+        <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+          <div className="p-4 border-b bg-gray-50/50">
+            <h3 className="font-semibold text-gray-700">Scheduled Medications</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider">Patient</th>
-                  <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider">Medicine</th>
-                  <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider">Dose</th>
-                  <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider">Time</th>
-                  <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider">Frequency</th>
-                  <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider">Status</th>
-                  <th className="px-7 py-7 text-left text-xs font-medium uppercase tracking-wider">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Patient</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Medicine</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Dose</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Schedule</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
-                {medications.map((med) => (
-                  <tr key={med.id} className="hover:bg-gray-50 transition-colors duration-150">
-                    <td className="px-3 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{med.patient}</div>
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{med.medicine}</div>
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{med.dose}</div>
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{med.time}</div>
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{med.frequency}</div>
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusClass(med.status)}`}>
-                        {med.status}
-                      </span>
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap">
-                      <div className="flex gap-2">
+              <tbody className="bg-white divide-y divide-gray-200">
+                {medications.length > 0 ? (
+                  medications.map((med) => (
+                    <tr key={med.id} className="hover:bg-gray-50/80 transition-colors">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-3 text-xs font-bold">
+                            {med.patient_name?.charAt(0) || 'P'}
+                          </div>
+                          <span className="text-sm font-medium text-gray-900">{med.patient_name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900 font-semibold">{med.medication_name}</div>
+                        <div className="text-xs text-gray-500">{med.instructions || 'Standard protocol'}</div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {med.dose}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{med.scheduled_time}</div>
+                        <div className="text-xs text-gray-500">{med.frequency}</div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusClass(med.status)}`}>
+                          {med.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-center text-sm font-medium">
+                        <div className="flex justify-center items-center gap-2">
+                          <button 
+                            className="bg-green-50 text-green-600 hover:bg-green-600 hover:text-white p-2 rounded-lg transition-all duration-200 shadow-sm"
+                            onClick={() => handleMedAction('give', med.id)}
+                            title="Mark as Given"
+                          >
+                            <i className="fas fa-check"></i>
+                          </button>
+                          <button 
+                            className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white p-2 rounded-lg transition-all duration-200 shadow-sm"
+                            onClick={() => handleMedAction('delay', med.id)}
+                            title="Delay 1hr"
+                          >
+                            <i className="fas fa-clock"></i>
+                          </button>
+                          <button 
+                            className="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white p-2 rounded-lg transition-all duration-200 shadow-sm"
+                            onClick={() => handleMedAction('skip', med.id)}
+                            title="Mark as Missed"
+                          >
+                            <i className="fas fa-times"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="6" className="px-4 py-12 text-center text-gray-500">
+                      <div className="flex flex-col items-center">
+                        <div className="bg-gray-100 p-4 rounded-full mb-3">
+                          <i className="fas fa-pills text-3xl text-gray-400"></i>
+                        </div>
+                        <p className="text-lg font-medium text-gray-900">No medications scheduled</p>
+                        <p className="text-sm text-gray-500 mb-4">You haven't added any medications for this patient yet.</p>
                         <button 
-                          className="text-green-600 hover:text-green-800 p-1 rounded transition-colors duration-200"
-                          onClick={() => handleMedAction('give', med.id)}
-                          title="Mark as Given"
+                          onClick={() => setIsModalOpen(true)}
+                          className="text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-2"
                         >
-                          <i className="fas fa-check-circle text-lg"></i>
-                        </button>
-                        <button 
-                          className="text-blue-600 hover:text-blue-800 p-1 rounded transition-colors duration-200"
-                          onClick={() => handleMedAction('delay', med.id)}
-                          title="Delay Medication"
-                        >
-                          <i className="fas fa-clock text-lg"></i>
-                        </button>
-                        <button 
-                          className="text-red-600 hover:text-red-800 p-1 rounded transition-colors duration-200"
-                          onClick={() => handleMedAction('skip', med.id)}
-                          title="Mark as Missed"
-                        >
-                          <i className="fas fa-times-circle text-lg"></i>
+                          <i className="fas fa-plus-circle"></i>
+                          Add First Medication
                         </button>
                       </div>
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
-          
-          {medications.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              <i className="fas fa-pills text-4xl mb-3 text-gray-300"></i>
-              <p>No medications scheduled</p>
-              <button 
-                onClick={() => setIsModalOpen(true)}
-                className="mt-2 text-blue-600 hover:text-blue-800 font-medium"
-              >
-                Add your first medication
-              </button>
-            </div>
-          )}
+        </div>
+
+        {/* Mobile Scroll Indicator */}
+        <div className="md:hidden flex items-center justify-center gap-2 text-xs text-gray-400 py-2">
+          <i className="fas fa-arrows-alt-h"></i>
+          <span>Swipe left to see more columns</span>
         </div>
       </div>
     </div>

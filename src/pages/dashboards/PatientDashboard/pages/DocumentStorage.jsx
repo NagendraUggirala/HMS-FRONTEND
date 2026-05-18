@@ -220,8 +220,8 @@ export default function DocumentStorage() {
       {/* HEADER SECTION */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-1">
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Document Vault</h1>
-          <p className="text-slate-500 font-medium">Securely store and manage your personal medical records and IDs</p>
+          <h1 className="text-2xl font-semibold text-slate-800 tracking-tight">Document Vault</h1>
+          <p className="text-slate-500 text-sm mt-1">Securely store and manage your personal medical records and IDs</p>
         </div>
 
         <button
@@ -242,8 +242,8 @@ export default function DocumentStorage() {
                 <FileText size={24} />
               </div>
               <div>
-                <p className="text-slate-500 text-sm font-semibold uppercase tracking-wider">Total Documents</p>
-                <p className="text-2xl font-black text-slate-900">{stats.total_documents}</p>
+                <p className="text-slate-500 text-[10px] font-medium uppercase tracking-wider">Total Documents</p>
+                <p className="text-2xl font-bold text-slate-900">{stats.total_documents}</p>
               </div>
             </div>
           </div>
@@ -254,8 +254,8 @@ export default function DocumentStorage() {
                 <Shield size={24} />
               </div>
               <div>
-                <p className="text-slate-500 text-sm font-semibold uppercase tracking-wider">Storage Used</p>
-                <p className="text-2xl font-black text-slate-900">{(stats.total_size / (1024 * 1024)).toFixed(2)} MB</p>
+                <p className="text-slate-500 text-[10px] font-medium uppercase tracking-wider">Storage Used</p>
+                <p className="text-2xl font-bold text-slate-900">{(stats.total_size / (1024 * 1024)).toFixed(2)} MB</p>
               </div>
             </div>
           </div>
@@ -305,7 +305,7 @@ export default function DocumentStorage() {
               <Loader2 size={24} className="text-indigo-600 animate-pulse" />
             </div>
           </div>
-          <p className="text-slate-500 font-bold text-lg animate-pulse">Syncing with secure vault...</p>
+          <p className="text-slate-500 font-medium text-lg animate-pulse">Syncing with secure vault...</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
@@ -346,15 +346,15 @@ export default function DocumentStorage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 pt-2">
-                  <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                  <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-medium uppercase tracking-widest">
                     {doc.document_type.replace(/_/g, ' ')}
                   </span>
                   {doc.is_sensitive && (
-                    <span className="px-3 py-1 bg-rose-100 text-rose-600 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
+                    <span className="px-3 py-1 bg-rose-100 text-rose-600 rounded-lg text-[10px] font-medium uppercase tracking-widest flex items-center gap-1">
                       <Lock size={10} /> Sensitive
                     </span>
                   )}
-                  <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                  <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-medium uppercase tracking-widest">
                     {(doc.file_size / 1024).toFixed(0)} KB
                   </span>
                 </div>
@@ -426,7 +426,7 @@ export default function DocumentStorage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-2">
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+              <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
                 Document Title <span className="text-rose-500">*</span>
               </label>
               <input
@@ -439,13 +439,13 @@ export default function DocumentStorage() {
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+              <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
                 Category <span className="text-rose-500">*</span>
               </label>
               <select
                 value={uploadData.category}
                 onChange={(e) => setUploadData({...uploadData, category: e.target.value})}
-                className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-bold text-slate-700"
+                className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-medium text-slate-700"
               >
                 <option value="">Select Category</option>
                 {categories.map(cat => (
@@ -456,7 +456,7 @@ export default function DocumentStorage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
                   Document Date
                 </label>
                 <div className="relative">
@@ -470,13 +470,13 @@ export default function DocumentStorage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
                   Privacy Level
                 </label>
                 <button
                   type="button"
                   onClick={() => setUploadData({...uploadData, isSensitive: !uploadData.isSensitive})}
-                  className={`w-full flex items-center justify-center gap-2 px-4 py-4 rounded-2xl font-bold transition-all ${
+                  className={`w-full flex items-center justify-center gap-2 px-4 py-4 rounded-2xl font-semibold transition-all ${
                     uploadData.isSensitive 
                     ? 'bg-rose-50 text-rose-600 border-2 border-rose-100' 
                     : 'bg-slate-50 text-slate-600 border-2 border-transparent'
@@ -491,7 +491,7 @@ export default function DocumentStorage() {
 
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">Description</label>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Description</label>
               <textarea
                 value={uploadData.description}
                 onChange={(e) => setUploadData({...uploadData, description: e.target.value})}
@@ -502,7 +502,7 @@ export default function DocumentStorage() {
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">File Attachment</label>
+              <label className="block text-sm font-medium text-slate-700 mb-2">File Attachment</label>
               <input
                 type="file"
                 id="file-upload"
@@ -522,12 +522,12 @@ export default function DocumentStorage() {
                 }`}>
                   {uploadData.file ? <CheckCircle2 size={28} /> : <FileUp size={28} />}
                 </div>
-                <p className={`text-sm font-extrabold text-center px-4 line-clamp-1 ${
+                <p className={`text-sm font-semibold text-center px-4 line-clamp-1 ${
                   uploadData.file ? 'text-indigo-700' : 'text-slate-500'
                 }`}>
                   {uploadData.file ? uploadData.file.name : "Select Document"}
                 </p>
-                {!uploadData.file && <p className="text-xs text-slate-400 mt-1 font-bold">PDF, Images or Docs (Max 10MB)</p>}
+                {!uploadData.file && <p className="text-xs text-slate-400 mt-1 font-medium">PDF, Images or Docs (Max 10MB)</p>}
               </label>
             </div>
           </div>

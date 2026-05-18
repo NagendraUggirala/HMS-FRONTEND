@@ -36,7 +36,7 @@ const Sidebar = ({ activePage, onPageChange, isOpen = false, onClose }) => {
 
   const doctorMenu = [
     { id: 'dashboard', label: 'Dashboard Overview', icon: 'fa-chart-line' },
-    { id: 'appointments', label: 'Appointments', icon: 'fa-calendar-alt' },
+    //{ id: 'appointments', label: 'Appointments', icon: 'fa-calendar-alt' },
     { id: 'appointment-tracking', label: 'Appointment Tracking', icon: 'fa-route' },
     { id: 'schedule', label: 'Schedule Management', icon: 'fa-calendar-week' },
     { id: 'patients', label: 'Patient Records', icon: 'fa-user-injured' },
@@ -46,6 +46,7 @@ const Sidebar = ({ activePage, onPageChange, isOpen = false, onClose }) => {
     { id: 'inpatient', label: 'Inpatient Visits', icon: 'fa-procedures' },
     { id: 'discharge', label: 'Discharge Summary', icon: 'fa-file-contract' },
     { id: 'messages', label: 'Messaging', icon: 'fa-comments' },
+    { id: 'reports-analytics', label: 'Reports & Analytics', icon: 'fa-chart-pie' },
     { id: 'profile', label: 'My Profile', icon: 'fa-user-md' },
     { id: 'raise-ticket', label: 'Raise Ticket', icon: 'fa-envelope-open-text' }
   ]
@@ -82,8 +83,10 @@ const Sidebar = ({ activePage, onPageChange, isOpen = false, onClose }) => {
   const receptionistMenu = [
     { id: 'dashboard', label: 'Dashboard Overview', icon: 'fa-chart-line' },
     { id: 'registration', label: 'Patient Registration', icon: 'fa-user-plus' },
-    { id: 'appointments', label: 'Appointment Scheduling', icon: 'fa-calendar-check' },
     { id: 'records', label: 'Patient Records', icon: 'fa-folder' },
+    { id: 'appointments', label: 'Appointment Scheduling', icon: 'fa-calendar-check' },
+    { id: "Doctors", label: "Doctors", icon: "fa-user-md" },
+    { id: "Departments", label: "Departments", icon: "fa-building" },
     { id: 'opd', label: 'OPD Management', icon: 'fas fa-stethoscope' },
     { id: 'ipd', label: 'IPD Management', icon: 'fas fa-procedures' },
     { id: 'documents', label: 'Document Management', icon: 'fas fa-file-upload' },
@@ -121,13 +124,17 @@ const Sidebar = ({ activePage, onPageChange, isOpen = false, onClose }) => {
   ]
 
    const pharmacyMenu = [
-    { id: "dashboard", label: "Dashboard", icon: "fas fa-tachometer-alt" },
-    { id: "inventory", label: "Inventory", icon: "fas fa-boxes" },
+    { id: "dashboard", label: "Dashboard Overview", icon: "fas fa-tachometer-alt" },
+    { id: "inventory", label: "Inventory Management", icon: "fas fa-boxes" },
     { id: "purchaseorders", label: "Purchase Orders", icon: "fas fa-shopping-cart" },
     { id: "salestracking", label: "Sales Tracking", icon: "fa-chart-line" },
     { id: "expiryalerts", label: "Expiry Alerts", icon: "fas fa-exclamation-triangle" },
     { id: "suppliermanagement", label: "Supplier Management", icon: "fas fa-truck" },
     { id: "medicinedatabase", label: "Medicine Database", icon: "fas fa-database" },
+    { id: "stock", label: "Stock", icon: "fas fa-cubes" },
+    { id: "return", label: "Return", icon: "fas fa-undo" },
+    { id: "grn", label: "GRN", icon: "fas fa-file-invoice" },
+    { id: "report", label: "Report", icon: "fas fa-chart-bar" },
     { id: "settings", label: "Settings", icon: "fas fa-cog" },
     { id: 'raise-ticket', label: 'Raise Ticket', icon: 'fa-envelope-open-text' }
   ];

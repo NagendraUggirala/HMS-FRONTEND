@@ -17,6 +17,11 @@ import LoadingSpinner from '../../../../components/common/LoadingSpinner/Loading
 import DataTable from '../../../../components/ui/Tables/DataTable'
 import Modal from '../../../../components/common/Modal/Modal'
 import { apiFetch } from '../../../../services/apiClient'
+import {
+  DEPARTMENT_LIST,
+  DOCTOR_LIST,
+  RECEPTIONIST_PATIENT_SEARCH
+} from '../../../../config/api'
 
 const AppointmentScheduling = () => {
   const [loading, setLoading] = useState(true)
@@ -70,23 +75,42 @@ const AppointmentScheduling = () => {
   const [isDocDropdownOpen, setIsDocDropdownOpen] = useState(false)
   const docDropdownRef = useRef(null)
 
-  // Centralized Doctor and Department data
-  const DOCTORS = [
-    { id: '1', name: 'Dr. Meena Rao', department: 'Cardiology' },
-    { id: '2', name: 'Dr. Sharma', department: 'Orthopedics' },
-    { id: '3', name: 'Dr. Menon', department: 'Neurology' },
-    { id: '4', name: 'Dr. Patel', department: 'Cardiology' },
-    { id: '5', name: 'Dr. Joshi', department: 'Neurology' }
-  ]
-
-  const DEPARTMENTS = [...new Set(DOCTORS.map(d => d.department))]
+  const [apiDepartments, setApiDepartments] = useState([])
+  const [apiDoctors, setApiDoctors] = useState([])
 
   useEffect(() => {
     loadPatients()
     loadAppointments()
-    loadStatistics()
     loadQuickActions()
+    loadApiDepartments()
+    loadApiDoctors()
   }, [filters])
+
+  const loadApiDepartments = async () => {
+    try {
+      const res = await apiFetch(DEPARTMENT_LIST)
+      const data = await res.json()
+      if (res.ok) {
+        const list = data.data?.departments || data.data || data
+        setApiDepartments(Array.isArray(list) ? list : [])
+      }
+    } catch (e) {
+      console.error('Error fetching departments', e)
+    }
+  }
+
+  const loadApiDoctors = async () => {
+    try {
+      const res = await apiFetch(DOCTOR_LIST)
+      const data = await res.json()
+      if (res.ok) {
+        const list = data.data?.doctors || data.data || data
+        setApiDoctors(Array.isArray(list) ? list : [])
+      }
+    } catch (e) {
+      console.error('Error fetching doctors', e)
+    }
+  }
 
   // Apply search and filters
   useEffect(() => {
@@ -131,23 +155,19 @@ const AppointmentScheduling = () => {
     }
   }
 
-  const loadStatistics = async () => {
-    try {
-      const res = await apiFetch('/api/v1/receptionist/appointments/statistics', { skipAuth: false })
-      if (res.ok) {
-        const data = await res.json()
-        console.log('Statistics Data:', data.data)
-        setStatistics(data.data || {})
-      }
-    } catch (e) {
-      console.error('Error fetching statistics', e)
-      // Fallback: Calculate statistics from appointments
-      calculateStatistics()
-    }
-  }
-
   const calculateStatistics = (data = appointments) => {
-    if (!data || data.length === 0) return
+    if (!data || data.length === 0) {
+      setStatistics({
+        total_appointments: 0,
+        checked_in: 0,
+        waiting: 0,
+        in_consultation: 0,
+        completed: 0,
+        cancelled: 0,
+        no_show: 0
+      })
+      return
+    }
 
     const stats = {
       total_appointments: data.length,
@@ -288,10 +308,10 @@ const AppointmentScheduling = () => {
   const handleSelectDept = (dept) => {
     setFormData({
       ...formData,
-      department: dept,
+      department: dept.name || dept,
       doctorId: ''
     })
-    setDeptSearchTerm(dept)
+    setDeptSearchTerm(dept.name || dept)
     setDocSearchTerm('') // Clear doctor search when department changes
     setIsDeptDropdownOpen(false)
   }
@@ -310,18 +330,18 @@ const AppointmentScheduling = () => {
     p.referralId.toLowerCase().includes(patientSearchTerm.toLowerCase())
   )
 
-  const filteredDepartments = DEPARTMENTS.filter(dept =>
-    dept.toLowerCase().includes(deptSearchTerm.toLowerCase())
+  const filteredDepartments = apiDepartments.filter(dept =>
+    (dept.name || dept).toLowerCase().includes(deptSearchTerm.toLowerCase())
   )
 
-  const filteredDoctors = DOCTORS.filter(d =>
+  const filteredDoctors = apiDoctors.filter(d =>
     d.department === formData.department &&
     d.name.toLowerCase().includes(docSearchTerm.toLowerCase())
   )
 
   const getDoctorName = (doctorIdOrName) => {
     if (!doctorIdOrName) return ''
-    const doc = DOCTORS.find(d => d.id === doctorIdOrName || d.name === doctorIdOrName)
+    const doc = apiDoctors.find(d => d.id === doctorIdOrName || d.name === doctorIdOrName)
     return doc ? doc.name : doctorIdOrName
   }
 
@@ -392,7 +412,6 @@ const AppointmentScheduling = () => {
         if (typeof toast !== 'undefined') toast.success(data.message || `Appointment ${formData.id ? 'modified' : 'scheduled'} successfully!`);
         setShowForm(false)
         await loadAppointments(true) // Silent reload
-        await loadStatistics()
 
         setFormData({
           id: null,
@@ -426,7 +445,7 @@ const AppointmentScheduling = () => {
   const handleReschedule = (appointment) => {
     setSelectedAppointment(null) // Close details modal
     setSelectedPatientProfile(null)
-    const doctorObj = DOCTORS.find(d => d.id === appointment.doctorId) || DOCTORS.find(d => d.name === appointment.doctor);
+    const doctorObj = apiDoctors.find(d => d.id === appointment.doctorId) || apiDoctors.find(d => d.name === appointment.doctor);
     setFormData({
       id: appointment.id,
       patientId: appointment.patient || '', // Use name since we switched to names
@@ -492,7 +511,6 @@ const AppointmentScheduling = () => {
         if (res.ok) {
           if (typeof toast !== 'undefined') toast.success('Appointment cancelled successfully');
           await loadAppointments(true)
-          await loadStatistics()
         } else {
           if (typeof toast !== 'undefined') toast.error('Failed to cancel appointment')
         }
@@ -512,7 +530,6 @@ const AppointmentScheduling = () => {
       if (res.ok) {
         if (typeof toast !== 'undefined') toast.success('Status updated successfully');
         await loadAppointments(true)
-        await loadStatistics()
       } else {
         if (typeof toast !== 'undefined') toast.error('Failed to update status')
       }
@@ -530,7 +547,6 @@ const AppointmentScheduling = () => {
       if (res.ok) {
         if (typeof toast !== 'undefined') toast.success('Patient checked-in successfully');
         await loadAppointments(true)
-        await loadStatistics()
       } else {
         const errorData = await res.json().catch(() => ({}));
         if (typeof toast !== 'undefined') toast.error(errorData?.message || 'Failed to check-in patient');
@@ -554,7 +570,7 @@ const AppointmentScheduling = () => {
             className="flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md hover:shadow-lg active:scale-95 font-medium"
           >
             <AddCircleOutlineIcon />
-            Appointment Schedule 
+            Appointment Schedule
           </button>
         </div>
 
@@ -900,11 +916,11 @@ const AppointmentScheduling = () => {
                   {filteredDepartments.length > 0 ? (
                     filteredDepartments.map(dept => (
                       <div
-                        key={dept}
+                        key={dept.id || dept.name || dept}
                         onClick={() => handleSelectDept(dept)}
                         className="p-3 hover:bg-blue-50 cursor-pointer border-b last:border-0 border-gray-100 transition-colors"
                       >
-                        <div className="font-medium text-gray-800">{dept}</div>
+                        <div className="font-medium text-gray-800">{dept.name || dept}</div>
                       </div>
                     ))
                   ) : (

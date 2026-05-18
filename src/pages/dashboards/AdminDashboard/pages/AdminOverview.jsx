@@ -65,6 +65,7 @@ const AdminOverview = ({ setActivePage }) => {
     total_staff: 0,
     active_staff: 0,
     staff_by_role: {},
+    staff_by_department: {},
     criticalAlerts: [],
   });
 

@@ -168,6 +168,18 @@ export const DOCTOR_SCHEDULE_WEEKLY = '/api/v1/doctor-management/schedule/weekly
 export const DOCTOR_SCHEDULE_SLOTS = '/api/v1/doctor-management/schedule/slots';
 export const DOCTOR_SCHEDULE_CREATE = '/api/v1/doctor-management/schedule/create';
 export const DOCTOR_SCHEDULE_SLOT_DETAILS = (scheduleId) => `/api/v1/doctor-management/schedule/${encodeURIComponent(scheduleId)}`;
+export const DOCTOR_STATISTICS_SUMMARY = (period = 'month') => `/api/v1/doctor-management/statistics/summary?period=${period}`;
+
+/** Doctor: reports and analytics */
+export const DOCTOR_REPORTS_PRACTICE_OVERVIEW = '/api/v1/doctor-management/reports/practice-overview';
+export const DOCTOR_REPORTS_PATIENT_ANALYTICS = '/api/v1/doctor-management/reports/patient-analytics';
+export const DOCTOR_REPORTS_APPOINTMENT_ANALYTICS = '/api/v1/doctor-management/reports/appointment-analytics';
+export const DOCTOR_REPORTS_CLINICAL_OUTCOMES = '/api/v1/doctor-management/reports/clinical-outcomes';
+export const DOCTOR_REPORTS_FINANCIAL_SUMMARY = '/api/v1/doctor-management/reports/financial-summary';
+export const DOCTOR_REPORTS_PERFORMANCE_METRICS = '/api/v1/doctor-management/reports/performance-metrics';
+export const DOCTOR_REPORTS_COMPARATIVE_ANALYSIS = '/api/v1/doctor-management/reports/comparative-analysis';
+export const DOCTOR_REPORTS_GENERATE_CUSTOM_REPORT = '/api/v1/doctor-management/reports/generate-custom-report';
+export const DOCTOR_REPORTS_EXPORT_OPTIONS = '/api/v1/doctor-management/reports/export-options';
 
 /** Receptionist: profile management */
 export const RECEPTIONIST_PROFILE = '/api/v1/receptionist/profile';
@@ -177,11 +189,27 @@ export const RECEPTIONIST_PROFILE_UPDATE = '/api/v1/receptionist/profile';
 /** Receptionist: patient registration */
 export const RECEPTIONIST_PATIENT_REGISTER = '/api/v1/receptionist/patients/register';
 export const RECEPTIONIST_PATIENT_SEARCH = '/api/v1/receptionist/patients/search';
-export const RECEPTIONIST_PATIENT_PROFILE = (patientId) => `/api/v1/receptionist/patients/${encodeURIComponent(patientId)}`;
+export const RECEPTIONIST_PATIENT_PROFILE = (patientId) => `/api/v1/receptionist/patients/${encodeURIComponent(patientId)}/profile`;
 export const RECEPTIONIST_PATIENT_UPDATE = (patientId) => `/api/v1/receptionist/patients/${encodeURIComponent(patientId)}`;
 
 /** Receptionist: dashboard overview */
 export const RECEPTIONIST_DASHBOARD_OVERVIEW = '/api/v1/receptionist/dashboard';
+
+/** Receptionist: Department management */
+export const DEPARTMENT_LIST = '/api/v1/departments';
+export const DEPARTMENT_SEARCH = '/api/v1/departments/search';
+export const DEPARTMENT_STATISTICS = '/api/v1/departments/statistics';
+export const DEPARTMENT_DETAILS = (id) => `/api/v1/departments/${encodeURIComponent(id)}`;
+export const DEPARTMENT_DOCTORS = (id) => `/api/v1/receptionist/departments/${encodeURIComponent(id)}/doctors`;
+export const DEPARTMENT_NURSES = (id) => `/api/v1/receptionist/departments/${encodeURIComponent(id)}/nurses`;
+export const DEPARTMENT_BEDS = (id) => `/api/v1/receptionist/departments/${encodeURIComponent(id)}/beds`;
+
+/** Receptionist: Doctor management */
+export const DOCTOR_LIST = '/api/v1/doctors';
+export const DOCTOR_SEARCH = '/api/v1/doctors/search';
+export const DOCTOR_DROPDOWN = '/api/v1/doctors/dropdown';
+export const DOCTOR_STATISTICS = '/api/v1/doctors/statistics';
+export const DOCTOR_DETAILS = (id) => `/api/v1/doctors/${encodeURIComponent(id)}`;
 
 /** Prescription Management - Doctor endpoints */
 export const PRESCRIPTION_MEDICINES_SEARCH = '/api/v1/simple-prescription/doctor/medicines/search';
@@ -237,3 +265,32 @@ export const LAB_EQUIPMENT_QC_BASE = `${LAB_BASE}/equipment-qc/equipment`;
 export const LAB_EQUIPMENT_DETAILS = (id) => `${LAB_EQUIPMENT_QC_BASE}/${encodeURIComponent(id)}`;
 export const LAB_EQUIPMENT_LOGS = (id) => `${LAB_EQUIPMENT_QC_BASE}/${encodeURIComponent(id)}/logs`;
 export const LAB_EQUIPMENT_STATUS = (id) => `${LAB_EQUIPMENT_QC_BASE}/${encodeURIComponent(id)}/status`;
+
+ 
+// --- NURSE ---
+export const NURSE_BASE = '/api/v1/nurse';
+// NURSE DASHBOARD APIs
+export const NURSE_DASHBOARD_OVERVIEW =
+  '/api/v1/nurse/dashboard';
+
+export const NURSE_ADD_VITALS =
+  '/api/v1/nurse/vitals';
+
+export const NURSE_GET_VITALS =
+  '/api/v1/nurse/vitals';
+
+export const NURSE_ASSIGNED_PATIENTS =
+  '/api/v1/nurse/assigned-patients';
+
+export const NURSE_MEDICATIONS =
+  '/api/v1/nurse/medications';
+
+export const NURSE_BEDS =
+  '/api/v1/nurse/beds';
+
+export const NURSE_LAB_TESTS =
+  '/api/v1/nurse/lab-tests';
+
+export const NURSE_NURSING_NOTES =
+  '/api/v1/nurse/nursing-notes';
+  

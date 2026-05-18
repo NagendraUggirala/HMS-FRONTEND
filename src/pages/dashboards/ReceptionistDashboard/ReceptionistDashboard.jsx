@@ -13,6 +13,8 @@ import IPDManagement from './pages/IPDManagement'
 import DocumentManagement from './pages/DocumentManagement'
 import DischargeSummary from './pages/DischargeSummary'
 import RaiseticketRecepetionst from './pages/RaiseticketReceptionst'
+import Doctors from './pages/Doctors'
+import Departments from './pages/Departments'
 
 const ReceptionistDashboard = () => {
   const [activePage, setActivePage] = useState('dashboard')
@@ -62,6 +64,10 @@ const ReceptionistDashboard = () => {
       return <PatientRecords />
     case 'profile':
       return <ReceptionProfile />
+    case 'doctors':
+      return <Doctors />
+    case 'departments':
+      return <Departments />
     case 'opd':
       return <OPDManagement />
     case 'ipd':

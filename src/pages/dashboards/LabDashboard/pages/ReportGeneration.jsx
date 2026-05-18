@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import html2pdf from 'html2pdf.js'
 import * as XLSX from 'xlsx'
 import { saveAs } from 'file-saver'
+import { apiFetch } from '../../../../services/apiClient'
 
 import DataTable from '../../../../components/ui/Tables/DataTable'
 import SearchBar from '../../../../components/common/SearchBar/SearchBar'
@@ -24,28 +25,34 @@ import {
     Person as PersonIcon,
     Science as ScienceIcon,
     AssignmentTurnedIn as AssignmentTurnedInIcon,
-    DeleteOutline as DeleteOutlineIcon
+    DeleteOutline as DeleteOutlineIcon,
+    Edit as EditIcon
 } from '@mui/icons-material'
 
 const ReportGeneration = () => {
     const [loading, setLoading] = useState(true)
     const [reports, setReports] = useState([])
+    const [readyTests, setReadyTests] = useState([])
+    const [loadingReadyTests, setLoadingReadyTests] = useState(false)
     const [searchTerm, setSearchTerm] = useState('')
     const [showPreviewModal, setShowPreviewModal] = useState(false)
     const [showGenerateModal, setShowGenerateModal] = useState(false)
     const [showPatientDropdown, setShowPatientDropdown] = useState(false)
     const [currentReport, setCurrentReport] = useState(null)
-    const [template, setTemplate] = useState('standard')
+    const [template, setTemplate] = useState('STANDARD')
     const [selectedReports, setSelectedReports] = useState([])
     const [showExportModal, setShowExportModal] = useState(false)
+    const [isEditing, setIsEditing] = useState(false)
+    const [editingReportId, setEditingReportId] = useState(null)
 
-const [exportData, setExportData] = useState({
-    fromDate: new Date().toISOString().split('T')[0],
-    toDate: new Date().toISOString().split('T')[0],
-    format: 'pdf'
-})
+    const [exportData, setExportData] = useState({
+        fromDate: new Date().toISOString().split('T')[0],
+        toDate: new Date().toISOString().split('T')[0],
+        format: 'pdf'
+    })
 
     const [formData, setFormData] = useState({
+        sourceTestId: '',
         patientName: '',
         patientId: '',
         age: '',
@@ -58,6 +65,7 @@ const [exportData, setExportData] = useState({
         ],
         verifiedBy: '',
         priority: 'Normal',
+        status: 'READY',
         interpretation: '',
         accessCode: `ACC-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
     })
@@ -98,112 +106,177 @@ const [exportData, setExportData] = useState({
         { name: 'C-Reactive Protein (CRP)', unit: 'mg/L', range: '<10' }
     ]
 
-    const patientOptions = [
-        { name: 'Rajesh Kumar', id: 'PAT-001', age: 45, gender: 'Male' },
-        { name: 'Priya Sharma', id: 'PAT-002', age: 32, gender: 'Female' },
-        { name: 'Suresh Patel', id: 'PAT-003', age: 58, gender: 'Male' },
-        { name: 'Anita Mehta', id: 'PAT-004', age: 29, gender: 'Female' }
-    ]
+
 
     useEffect(() => {
         loadReportData()
+    }, [searchTerm, template])
+
+    useEffect(() => {
+        loadReadyTests()
     }, [])
+
+    const loadReadyTests = async () => {
+        setLoadingReadyTests(true)
+        try {
+            console.log('[ReportGeneration] Calling ready-tests API endpoint')
+
+            const response = await apiFetch('/api/v1/lab/report-generation/ready-tests', {
+                method: 'GET'
+            })
+
+            console.log('[ReportGeneration] Ready Tests Response Status:', response.status)
+
+            const data = await response.json().catch(() => ({}))
+            console.log('[ReportGeneration] Ready Tests Response Data:', data)
+
+            if (!response.ok) {
+                const detail = data?.detail?.message || data?.detail || data?.message || `API Error: ${response.status}`
+                console.error('[ReportGeneration] Ready Tests API Error:', detail)
+                throw new Error(typeof detail === 'string' ? detail : 'Failed to fetch ready tests')
+            }
+
+            // Parse response based on backend structure
+            let testsList = []
+
+            // Primary: rows field (standard response from backend)
+            if (data.rows && Array.isArray(data.rows)) {
+                testsList = data.rows
+                console.log('[ReportGeneration] Ready tests has rows field (backend standard format)')
+            }
+            // Fallback: direct array
+            else if (Array.isArray(data)) {
+                testsList = data
+                console.log('[ReportGeneration] Ready tests is direct array')
+            }
+            // Fallback: data field
+            else if (data.data && Array.isArray(data.data)) {
+                testsList = data.data
+                console.log('[ReportGeneration] Ready tests has data field')
+            } else {
+                console.warn('[ReportGeneration] Could not find array in ready-tests response, available keys:', Object.keys(data))
+            }
+
+            console.log('[ReportGeneration] Ready tests list (raw from API):', testsList)
+
+            // Map backend fields to component format
+            const formattedTests = testsList.map((test) => ({
+                id: test.test_id || test.id || 'Unknown',
+                patientName: test.patient_name || test.patientName || 'Unknown Patient',
+                patientId: test.patient_ref || test.patient_id || test.patientId || 'Unknown ID',
+                testType: test.test_type || test.testType || 'Unknown Test',
+                sampleDate: test.registered_date || test.sample_date || test.sampleDate || new Date().toISOString().split('T')[0],
+                status: test.status || 'Pending',
+                doctorName: test.doctor_name || test.doctorName || '',
+                comments: test.comments || '',
+                priority: test.priority === 'ROUTINE' ? 'Normal' : (test.priority === 'URGENT' ? 'Urgent' : (test.priority || 'Normal')),
+                results: test.results || test.parameters || [],
+                ...test // Include all original fields
+            }))
+
+            console.log('[ReportGeneration] Formatted ready tests:', formattedTests)
+            setReadyTests(formattedTests)
+        } catch (error) {
+            console.error('[ReportGeneration] Error loading ready tests:', error)
+            setReadyTests([])
+        } finally {
+            setLoadingReadyTests(false)
+        }
+    }
 
     const loadReportData = async () => {
         setLoading(true)
-        setTimeout(() => {
-            const reportData = [
-                {
-                    id: 'REP-2024-001',
-                    testId: 'TEST-2024-001',
-                    patientName: 'Rajesh Kumar',
-                    patientId: 'PAT-001',
-                    age: 45,
-                    gender: 'Male',
-                    testType: 'CBC',
-                    sampleDate: '2024-01-14',
-                    completionDate: '2024-01-15',
-                    status: 'Ready',
-                    verifiedBy: 'Dr. Sharma',
-                    format: 'PDF',
-                    accessCode: 'ACCESS001',
-                    results: [
-                        { parameter: 'Hemoglobin', result: '14.2', unit: 'g/dL', referenceRange: '13.5-17.5', status: 'Normal' },
-                        { parameter: 'WBC Count', result: '7200', unit: 'cells/µL', referenceRange: '4,000-11,000', status: 'Normal' },
-                        { parameter: 'RBC Count', result: '5.1', unit: 'million/µL', referenceRange: '4.5-5.9', status: 'Normal' },
-                        { parameter: 'Platelets', result: '240000', unit: 'cells/µL', referenceRange: '150,000-450,000', status: 'Normal' }
-                    ],
-                    interpretation: 'Hematological parameters are within normal clinical limits. No signs of anemia or infection detected.'
-                },
-                {
-                    id: 'REP-2024-002',
-                    testId: 'TEST-2024-002',
-                    patientName: 'Priya Sharma',
-                    patientId: 'PAT-002',
-                    age: 32,
-                    gender: 'Female',
-                    testType: 'Lipid Profile',
-                    sampleDate: '2024-01-15',
-                    completionDate: '2024-01-15',
-                    status: 'Pending Review',
-                    verifiedBy: '',
-                    format: 'Draft',
-                    accessCode: 'ACCESS002',
-                    results: [
-                        { parameter: 'Total Cholesterol', result: '210', unit: 'mg/dL', referenceRange: '<200', status: 'High' },
-                        { parameter: 'LDL Cholesterol', result: '135', unit: 'mg/dL', referenceRange: '<100', status: 'High' },
-                        { parameter: 'HDL Cholesterol', result: '42', unit: 'mg/dL', referenceRange: '>40', status: 'Normal' },
-                        { parameter: 'Triglycerides', result: '160', unit: 'mg/dL', referenceRange: '<150', status: 'High' }
-                    ],
-                    interpretation: 'Borderline high cholesterol levels detected. Lifestyle modifications and dietary changes recommended. Clinical correlation with cardiovascular risk factors is advised.'
-                },
-                {
-                    id: 'REP-2024-003',
-                    testId: 'TEST-2024-003',
-                    patientName: 'Suresh Patel',
-                    patientId: 'PAT-003',
-                    age: 58,
-                    gender: 'Male',
-                    testType: 'KFT (Kidney Function)',
-                    sampleDate: '2024-01-13',
-                    completionDate: '2024-01-14',
-                    status: 'Ready',
-                    verifiedBy: 'Dr. Mehta',
-                    format: 'PDF',
-                    accessCode: 'ACCESS003',
-                    results: [
-                        { parameter: 'Creatinine', result: '0.9', unit: 'mg/dL', referenceRange: '0.7-1.3', status: 'Normal' },
-                        { parameter: 'BUN', result: '15', unit: 'mg/dL', referenceRange: '7-20', status: 'Normal' },
-                        { parameter: 'Uric Acid', result: '6.2', unit: 'mg/dL', referenceRange: '3.4-7.0', status: 'Normal' }
-                    ],
-                    interpretation: 'Renal function parameters are within the expected physiological range.'
-                },
-                {
-                    id: 'REP-2024-004',
-                    testId: 'TEST-2024-004',
-                    patientName: 'Anita Mehta',
-                    patientId: 'PAT-004',
-                    age: 29,
-                    gender: 'Female',
-                    testType: 'Liver Function',
-                    sampleDate: '2024-01-14',
-                    completionDate: '2024-01-14',
-                    status: 'Ready',
-                    verifiedBy: 'Dr. Rao',
-                    format: 'PDF',
-                    accessCode: 'ACCESS004',
-                    results: [
-                        { parameter: 'Total Bilirubin', result: '0.8', unit: 'mg/dL', referenceRange: '0.1-1.2', status: 'Normal' },
-                        { parameter: 'SGOT (AST)', result: '24', unit: 'U/L', referenceRange: '8-48', status: 'Normal' },
-                        { parameter: 'SGPT (ALT)', result: '22', unit: 'U/L', referenceRange: '7-55', status: 'Normal' },
-                        { parameter: 'Alkaline Phosphatase', result: '75', unit: 'U/L', referenceRange: '40-129', status: 'Normal' }
-                    ],
-                    interpretation: 'Liver enzymes and bilirubin levels are within normal limits. Hepatic function appears normal.'
-                }
-            ]
-            setReports(reportData)
+        try {
+            // Build query params for list_reports endpoint
+            const params = new URLSearchParams()
+            if (searchTerm.trim()) params.append('search', searchTerm.trim())
+            params.append('template', template)
+
+            const queryString = params.toString()
+            const endpoint = `/api/v1/lab/report-generation?${queryString}`
+
+            console.log('[ReportGeneration] Calling API endpoint:', endpoint)
+            console.log('[ReportGeneration] Query params:', { search: searchTerm, template })
+
+            const response = await apiFetch(endpoint, {
+                method: 'GET'
+            })
+
+            console.log('[ReportGeneration] API Response Status:', response.status)
+
+            const data = await response.json().catch(() => ({}))
+            console.log('[ReportGeneration] API Response Data:', data)
+
+            if (!response.ok) {
+                const detail = data?.detail?.message || data?.detail || data?.message || `API Error: ${response.status}`
+                console.error('[ReportGeneration] API Error Detail:', detail)
+                throw new Error(typeof detail === 'string' ? detail : 'Failed to fetch reports')
+            }
+
+            // Parse response based on backend structure (ReportGenerationListResponse)
+            let reportsList = []
+
+            // Primary: rows field (standard response from backend)
+            if (data.rows && Array.isArray(data.rows)) {
+                reportsList = data.rows
+                console.log('[ReportGeneration] Response has rows field (backend standard format)')
+            }
+            // Fallback: direct array
+            else if (Array.isArray(data)) {
+                reportsList = data
+                console.log('[ReportGeneration] Response is direct array')
+            }
+            // Fallback: data field
+            else if (data.data && Array.isArray(data.data)) {
+                reportsList = data.data
+                console.log('[ReportGeneration] Response has data field (array)')
+            }
+            // Fallback: reports field
+            else if (data.reports && Array.isArray(data.reports)) {
+                reportsList = data.reports
+                console.log('[ReportGeneration] Response has reports field')
+            } else {
+                console.warn('[ReportGeneration] Could not find array in response, available keys:', Object.keys(data))
+            }
+
+            console.log('[ReportGeneration] Reports list (raw from API):', reportsList)
+
+            // Map backend fields to component format
+            const formattedReports = reportsList.map((report) => ({
+                // Backend provides: report_id, patient_ref, patient_name, doctor_name, test_type, template, report_type, completion_date, status, verified_by
+                id: report.report_id || report.id || 'Unknown',
+                testId: report.test_type || 'Unknown Test',
+                patientName: report.patient_name || 'Unknown Patient',
+                patientId: report.patient_ref || 'Unknown ID',
+                doctorName: report.doctor_name || '',
+                reportType: report.report_type || 'Lab Report',
+                age: report.age || '',
+                gender: report.gender || '',
+                testType: report.test_type || 'Unknown Test',
+                template: report.template || template || 'STANDARD',
+                sampleDate: report.sample_date || new Date().toISOString().split('T')[0],
+                completionDate: report.completion_date || new Date().toISOString().split('T')[0],
+                status: report.status 
+                    ? (report.status.toUpperCase() === 'READY' ? 'Ready' 
+                       : report.status.toUpperCase() === 'PENDING_REVIEW' ? 'Pending Review' 
+                       : report.status.toUpperCase() === 'DRAFT' ? 'Draft' 
+                       : report.status) 
+                    : 'Ready',
+                verifiedBy: report.verified_by || '',
+                format: report.format || 'PDF',
+                accessCode: report.access_code || `ACC-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+                results: report.results || report.parameters || [],
+                interpretation: report.interpretation || ''
+            }))
+
+            console.log('[ReportGeneration] Formatted reports:', formattedReports)
+            setReports(formattedReports)
+        } catch (error) {
+            console.error('[ReportGeneration] Error loading report data:', error)
+            setReports([])
+        } finally {
             setLoading(false)
-        }, 1000)
+        }
     }
 
     const handleSearch = (term) => {
@@ -296,6 +369,7 @@ const [exportData, setExportData] = useState({
 
     const resetFormData = () => {
         setFormData({
+            sourceTestId: '',
             patientName: '',
             patientId: '',
             age: '',
@@ -308,221 +382,212 @@ const [exportData, setExportData] = useState({
             ],
             verifiedBy: '',
             priority: 'Normal',
+            status: 'READY',
             interpretation: '',
             accessCode: `ACC-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
         })
 
         // IMPORTANT FIX
         setShowPatientDropdown(false)
+        setIsEditing(false)
+        setEditingReportId(null)
     }
 
     const getToday = () => new Date().toISOString().split('T')[0]
 
-const resetExportData = () => {
-    setExportData({
-        fromDate: getToday(),
-        toDate: getToday(),
-        format: 'pdf'
-    })
-}
-    const isFormValid = formData.patientName.trim() !== '' &&
+    const resetExportData = () => {
+        setExportData({
+            fromDate: getToday(),
+            toDate: getToday(),
+            format: 'pdf'
+        })
+    }
+    const isFormValid = formData.sourceTestId.trim() !== '' &&
+        formData.patientName.trim() !== '' &&
         formData.patientId.trim() !== '' &&
         formData.age !== '' &&
         formData.testType.trim() !== '' &&
         formData.verifiedBy.trim() !== '' &&
         formData.results.every(res => res.parameter && res.result.trim() !== '')
 
-    const handleSubmitReport = () => {
-        const newReport = {
-            id: `REP-${new Date().getFullYear()}-${reports.length + 1}`,
-            ...formData,
-            completionDate: formData.reportDate,
-            status: 'Ready',
-            format: 'PDF'
-        }
-        setReports([newReport, ...reports])
-        setShowGenerateModal(false)
-        resetFormData()
-        alert('Report generated successfully!')
+    const handleEditReport = (report) => {
+        setIsEditing(true)
+        setEditingReportId(report.id)
+
+        setFormData({
+            sourceTestId: report.sourceTestId || report.id || '',
+            patientName: report.patientName || '',
+            patientId: report.patientId || '',
+            age: report.age || '',
+            gender: report.gender || 'Male',
+            testType: report.testType || '',
+            sampleDate: report.sampleDate || report.completionDate || new Date().toISOString().split('T')[0],
+            reportDate: report.reportDate || new Date().toISOString().split('T')[0],
+            results: (report.results && report.results.length > 0) ? report.results : [
+                { parameter: 'Hemoglobin', result: '', unit: 'g/dL', referenceRange: '13.5-17.5', status: 'Normal' }
+            ],
+            verifiedBy: report.verifiedBy || '',
+            priority: report.priority || 'Normal',
+            status: report.status === 'Pending Review' ? 'PENDING_REVIEW' : (report.status ? report.status.toUpperCase() : 'READY'),
+            interpretation: report.interpretation || '',
+            accessCode: report.accessCode || `ACC-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+        })
+
+        setShowGenerateModal(true)
     }
 
-    const handlePreviewReport = (report) => {
-        setCurrentReport(report)
-        setShowPreviewModal(true)
-    }
+    const handleSubmitReport = async () => {
+        if (!isFormValid) return;
 
-    const handlePrintReport = (reportId) => {
-        const report = reports.find(r => r.id === reportId)
-        if (!report) return
+        try {
+            setLoading(true)
 
-        // Create or get hidden iframe for printing
-        let printFrame = document.getElementById('print-frame')
-        if (!printFrame) {
-            printFrame = document.createElement('iframe')
-            printFrame.id = 'print-frame'
-            printFrame.style.position = 'fixed'
-            printFrame.style.right = '0'
-            printFrame.style.bottom = '0'
-            printFrame.style.width = '0'
-            printFrame.style.height = '0'
-            printFrame.style.border = 'none'
-            document.body.appendChild(printFrame)
-        }
-
-        const htmlContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Lab Report - ${report.id}</title>
-                <style>
-                    /* Hide browser headers/footers */
-                    @page { margin: 0; }
-                    body { 
-                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-                        color: #333; 
-                        margin: 0; 
-                        padding: 2cm; /* Padding to compensate for margin:0 */
-                        min-height: 100vh;
-                        display: flex;
-                        flex-direction: column;
-                    }
-                    * { box-sizing: border-box; }
-                    .report-container { flex: 1; display: flex; flex-direction: column; }
-                    .content-body { flex: 1; }
-                    
-                    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #1e40af; padding-bottom: 20px; margin-bottom: 30px; }
-                    .hospital-info h1 { margin: 0; color: #1e40af; font-size: 24px; }
-                    .hospital-info p { margin: 5px 0 0 0; color: #666; font-size: 14px; }
-                    .report-title { text-align: right; }
-                    .report-title h2 { margin: 0; color: #1e40af; font-size: 20px; text-transform: uppercase; letter-spacing: 1px; }
-                    .report-title p { margin: 5px 0 0 0; font-weight: bold; }
-                    
-                    .info-section { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; }
-                    .info-group { display: flex; margin-bottom: 5px; }
-                    .info-label { width: 120px; color: #64748b; font-size: 13px; font-weight: 600; }
-                    .info-value { font-weight: 500; font-size: 14px; }
-                    
-                    .interpretation { margin-bottom: 200px; }
-                    .interpretation h3 { font-size: 16px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 12px; color: #1e40af; }
-                    .interpretation p { font-size: 14px; line-height: 1.6; color: #4b5563; }
-                    
-                    .footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 20px; border-top: 1px solid #e2e8f0; }
-                    .signature-box { text-align: center; width: 220px; }
-                    .signature-line { border-top: 1px solid #333; margin-top: 40px; margin-bottom: 5px; }
-                    .signature-name { font-weight: 600; font-size: 14px; }
-                    .signature-title { font-size: 12px; color: #666; font-style: italic; }
-                    
-                    .qr-code { font-size: 11px; color: #64748b; }
-                    .qr-code p { margin: 2px 0; }
-                </style>
-            </head>
-            <body>
-                <div class="report-container">
-                    <div class="content-body">
-                        <div class="header">
-                            <div class="hospital-info">
-                                <h1>ADVANCED DIAGNOSTIC CENTER</h1>
-                                <p>123 Healthcare Avenue, Medical District, NY 10001</p>
-                                <p>Tel: +1 (555) 012-3456 | Web: www.advancedlab.com</p>
-                            </div>
-                            <div class="report-title">
-                                <h2>Laboratory Report</h2>
-                                <p>ID: ${report.id}</p>
-                            </div>
-                        </div>
-
-                        <div class="info-section">
-                            <div class="left-col">
-                                <div class="info-group">
-                                    <span class="info-label">Patient Name:</span>
-                                    <span class="info-value">${report.patientName}</span>
-                                </div>
-                                <div class="info-group">
-                                    <span class="info-label">Patient ID:</span>
-                                    <span class="info-value">${report.patientId}</span>
-                                </div>
-                                <div class="info-group">
-                                    <span class="info-label">Age / Gender:</span>
-                                    <span class="info-value">${report.age || '35'}Y / ${report.gender || 'Male'}</span>
-                                </div>
-                            </div>
-                            <div class="right-col">
-                                <div class="info-group">
-                                    <span class="info-label">Test Type:</span>
-                                    <span class="info-value">${report.testType}</span>
-                                </div>
-                                <div class="info-group">
-                                    <span class="info-label">Sample Date:</span>
-                                    <span class="info-value">${report.sampleDate || report.completionDate}</span>
-                                </div>
-                                <div class="info-group">
-                                    <span class="info-label">Report Date:</span>
-                                    <span class="info-value">${report.completionDate}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed;">
-                            <thead>
-                                <tr style="border-bottom: 2px solid #1e40af;">
-                                    <th style="width: 35%; padding: 12px 10px; text-align: left; background-color: #f1f5f9; font-size: 11px; text-transform: uppercase; color: #475569;">Test Parameter</th>
-                                    <th style="width: 15%; padding: 12px 10px; text-align: left; background-color: #f1f5f9; font-size: 11px; text-transform: uppercase; color: #475569;">Result</th>
-                                    <th style="width: 15%; padding: 12px 10px; text-align: left; background-color: #f1f5f9; font-size: 11px; text-transform: uppercase; color: #475569;">Unit</th>
-                                    <th style="width: 20%; padding: 12px 10px; text-align: left; background-color: #f1f5f9; font-size: 11px; text-transform: uppercase; color: #475569;">Ref. Range</th>
-                                    <th style="width: 15%; padding: 12px 10px; text-align: left; background-color: #f1f5f9; font-size: 11px; text-transform: uppercase; color: #475569;">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody style="font-size: 13px;">
-                                ${report.results && report.results.length > 0
-                ? report.results.map(res => `
-                                        <tr style="border-bottom: 1px solid #eee; page-break-inside: avoid;">
-                                            <td style="padding: 10px; text-align: left; vertical-align: top;">${res.parameter}</td>
-                                            <td style="padding: 10px; text-align: left; vertical-align: top; font-weight: bold;">${res.result || '-'}</td>
-                                            <td style="padding: 10px; text-align: left; vertical-align: top;">${res.unit}</td>
-                                            <td style="padding: 10px; text-align: left; vertical-align: top;">${res.referenceRange}</td>
-                                            <td style="padding: 10px; text-align: left; vertical-align: top; color: ${res.status === 'Normal' ? '#059669' : '#dc2626'}">${res.status}</td>
-                                        </tr>
-                                    `).join('')
-                : '<tr><td colspan="5" style="padding: 2.5rem; text-align: center; color: #64748b;">No results available for this laboratory investigation.</td></tr>'
+            // Map frontend formData to backend request fields
+            const payload = {
+                source_test_id: formData.sourceTestId || currentReport?.id || '',
+                patient_name: formData.patientName,
+                patient_ref: formData.patientId,
+                age: parseInt(formData.age, 10) || 0,
+                gender: formData.gender,
+                test_type: formData.testType,
+                sample_date: formData.sampleDate,
+                report_date: formData.reportDate,
+                results: formData.results.map(r => ({
+                    parameter: r.parameter,
+                    result: r.result,
+                    unit: r.unit,
+                    reference_range: r.referenceRange,
+                    status: r.status
+                })),
+                verified_by: formData.verifiedBy,
+                priority: formData.priority ? formData.priority.toUpperCase() : 'NORMAL',
+                interpretation: formData.interpretation,
+                template: template,
+                format: 'PDF',
+                status: formData.status || 'READY'
             }
-                            </tbody>
-                        </table>
-                    </div>
 
-                    <div style="margin-top: auto;">
-                        <div class="interpretation">
-                            <h3>Interpretation</h3>
-                            <p>${report.interpretation || 'All parameters are within normal limits for the requested test. No abnormalities detected. Clinical correlation suggested for a definitive diagnosis.'}</p>
-                        </div>
+            const endpoint = isEditing ? `/api/v1/lab/report-generation/${editingReportId}` : '/api/v1/lab/report-generation/generate';
+            const method = isEditing ? 'PUT' : 'POST';
 
-                        <div class="footer">
-                            <div class="qr-code">
-                                <p><strong>Verify Report:</strong></p>
-                                <p>Access Code: ${report.accessCode}</p>
-                                <p>Verification URL: lab.example.com/verify</p>
-                            </div>
-                            <div class="signature-box">
-                                <div class="signature-line"></div>
-                                <div class="signature-name">${report.verifiedBy || 'Dr. Arjun Sharma'}</div>
-                                <div class="signature-title">Consultant Doctor</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </body>
-            </html>
-        `
+            console.log(`[ReportGeneration] ${isEditing ? 'Updating' : 'Generating'} report with payload:`, payload)
 
-        const frameDoc = printFrame.contentWindow.document
-        frameDoc.open()
-        frameDoc.write(htmlContent)
-        frameDoc.close()
+            const response = await apiFetch(endpoint, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
 
-        // Wait for content to load then print
-        setTimeout(() => {
-            printFrame.contentWindow.focus()
-            printFrame.contentWindow.print()
-        }, 500)
+            const data = await response.json().catch(() => ({}))
+
+            if (!response.ok) {
+                const detail = data?.detail?.message || data?.detail || data?.message || `API Error: ${response.status}`
+                throw new Error(typeof detail === 'string' ? detail : `Failed to ${isEditing ? 'update' : 'generate'} report`)
+            }
+
+            alert(`Report ${isEditing ? 'updated' : 'generated'} successfully!`)
+            setShowGenerateModal(false)
+            resetFormData()
+
+            // Reload data to reflect the newly generated report
+            loadReportData()
+            loadReadyTests()
+
+        } catch (error) {
+            console.error('[ReportGeneration] Submit Error:', error)
+            alert(`Error generating report: ${error.message}`)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handlePreviewReport = async (report) => {
+        try {
+            // Optional loading state if you want a spinner for preview fetching
+            const response = await apiFetch(`/api/v1/lab/report-generation/${report.id}/preview`)
+            if (response.ok) {
+                const data = await response.json()
+                const previewData = data.data || data
+
+                setCurrentReport({
+                    ...report,
+                    ...previewData,
+                    results: previewData.results || previewData.parameters || report.results || [],
+                    interpretation: previewData.interpretation || report.interpretation || ''
+                })
+            } else {
+                console.warn('[ReportGeneration] Failed to fetch report preview, falling back to local data')
+                setCurrentReport(report)
+            }
+        } catch (error) {
+            console.error('[ReportGeneration] Error fetching preview:', error)
+            setCurrentReport(report)
+        } finally {
+            setShowPreviewModal(true)
+        }
+    }
+
+    const handlePrintReport = async (reportId) => {
+        try {
+            setLoading(true)
+            const response = await apiFetch(`/api/v1/lab/report-generation/${reportId}/print`, {
+                method: 'POST'
+            })
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}))
+                throw new Error(data.detail?.message || data.detail || data.message || 'Failed to fetch print template from server')
+            }
+
+            const data = await response.json()
+            const printData = data.data || data
+
+            // If the API returns a URL to a PDF, open it
+            if (printData.pdf_url || printData.url) {
+                window.open(printData.pdf_url || printData.url, '_blank')
+                return
+            }
+
+            // Otherwise, if it returns HTML, print it via iframe
+            const htmlContent = printData.html_content || printData.html || ''
+
+            if (!htmlContent) {
+                throw new Error('No printable content received from server')
+            }
+
+            // Create or get hidden iframe for printing
+            let printFrame = document.getElementById('print-frame')
+            if (!printFrame) {
+                printFrame = document.createElement('iframe')
+                printFrame.id = 'print-frame'
+                printFrame.style.position = 'fixed'
+                printFrame.style.right = '0'
+                printFrame.style.bottom = '0'
+                printFrame.style.width = '0'
+                printFrame.style.height = '0'
+                printFrame.style.border = 'none'
+                document.body.appendChild(printFrame)
+            }
+
+            const frameDoc = printFrame.contentWindow.document
+            frameDoc.open()
+            frameDoc.write(htmlContent)
+            frameDoc.close()
+
+            // Wait for content to load then print
+            setTimeout(() => {
+                printFrame.contentWindow.focus()
+                printFrame.contentWindow.print()
+            }, 500)
+
+        } catch (error) {
+            console.error('[ReportGeneration] Print Error:', error)
+            alert(`Unable to print report: ${error.message}`)
+        } finally {
+            setLoading(false)
+        }
     }
 
     const handleDownloadReport = (reportId, format) => {
@@ -963,10 +1028,10 @@ const resetExportData = () => {
         saveAs(blob, `Reports_${Date.now()}.xlsx`)
     }
 
-const exportToPDF = (filteredReports) => {
-    const container = document.createElement('div')
+    const exportToPDF = (filteredReports) => {
+        const container = document.createElement('div')
 
-    container.innerHTML = `
+        container.innerHTML = `
         <style>
             body {
                 font-family: 'Segoe UI', Arial, sans-serif;
@@ -1125,9 +1190,9 @@ const exportToPDF = (filteredReports) => {
                 </div>
 
                 ${(index + 1) % 2 === 0 && index !== filteredReports.length - 1
-                    ? '<div class="page-break"></div>'
-                    : ''
-                }
+                ? '<div class="page-break"></div>'
+                : ''
+            }
             `).join('')}
 
             <!-- FOOTER -->
@@ -1138,13 +1203,13 @@ const exportToPDF = (filteredReports) => {
         </div>
     `
 
-    html2pdf().from(container).set({
-        margin: 10,
-        filename: `Clinical_Export_${Date.now()}.pdf`,
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    }).save()
-}
+        html2pdf().from(container).set({
+            margin: 10,
+            filename: `Clinical_Export_${Date.now()}.pdf`,
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }).save()
+    }
 
     const handleExportSubmit = () => {
         const { fromDate, toDate, format } = exportData
@@ -1163,8 +1228,8 @@ const exportToPDF = (filteredReports) => {
         } else {
             exportToPDF(filtered)
         }
-    setShowExportModal(false)
-    resetExportData()
+        setShowExportModal(false)
+        resetExportData()
     }
 
     const filteredReports = reports.filter(report =>
@@ -1212,23 +1277,7 @@ const exportToPDF = (filteredReports) => {
                     </div>
                 </div>
 
-                {/* <div className="bg-white p-4 rounded border card-shadow">
-                    <h3 className="text-lg font-semibold mb-3">Report Templates</h3>
-                    <div className="flex flex-wrap gap-3">
-                        {['Standard', 'Comprehensive', 'Doctor Summary', 'Patient Friendly', 'Custom'].map((temp) => (
-                            <button
-                                key={temp}
-                                className={`px-4 py-2 rounded-lg border ${template === temp.toLowerCase()
-                                    ? 'bg-blue-100 border-blue-500 text-blue-700'
-                                    : 'bg-white border-gray-300 hover:bg-gray-50'
-                                    }`}
-                                onClick={() => setTemplate(temp.toLowerCase())}
-                            >
-                                {temp}
-                            </button>
-                        ))}
-                    </div>
-                </div> */}
+
 
                 <div className="bg-white p-4 rounded border card-shadow">
                     <div className="flex flex-col md:flex-row gap-4">
@@ -1276,7 +1325,7 @@ const exportToPDF = (filteredReports) => {
                             </div>
                             <div>
                                 <p className="text-gray-500 text-sm">Ready Reports</p>
-                                <p className="text-2xl font-bold text-green-600 mt-1">{reports.filter(r => r.status === 'Ready').length}</p>
+                                <p className="text-2xl font-bold text-green-600 mt-1">{reports.filter(r => r.status === 'Ready' || r.status === 'READY').length}</p>
                             </div>
                         </div>
                     </div>
@@ -1288,7 +1337,7 @@ const exportToPDF = (filteredReports) => {
                             </div>
                             <div>
                                 <p className="text-gray-500 text-sm">Pending Review</p>
-                                <p className="text-2xl font-bold text-yellow-600 mt-1">{reports.filter(r => r.status === 'Pending Review').length}</p>
+                                <p className="text-2xl font-bold text-yellow-600 mt-1">{reports.filter(r => r.status === 'Pending Review' || r.status === 'PENDING_REVIEW').length}</p>
                             </div>
                         </div>
                     </div>
@@ -1324,7 +1373,9 @@ const exportToPDF = (filteredReports) => {
                             },
                             { key: 'id', title: 'Report ID', sortable: true },
                             { key: 'patientName', title: 'Patient', sortable: true },
+                            { key: 'doctorName', title: 'Doctor', sortable: true },
                             { key: 'testType', title: 'Test Type', sortable: true },
+                            { key: 'reportType', title: 'Report Type', sortable: true },
                             { key: 'completionDate', title: 'Completion Date', sortable: true },
                             {
                                 key: 'status',
@@ -1345,6 +1396,16 @@ const exportToPDF = (filteredReports) => {
                                 title: 'Actions',
                                 render: (_, row) => (
                                     <div className="flex gap-2">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleEditReport(row)
+                                            }}
+                                            className="px-3 py-1 text-xs bg-orange-100 text-orange-800 rounded hover:bg-orange-200"
+                                            title="Edit Report"
+                                        >
+                                            <EditIcon style={{ fontSize: '0.875rem' }} />
+                                        </button>
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation()
@@ -1394,6 +1455,133 @@ const exportToPDF = (filteredReports) => {
                         data={filteredReports}
                         emptyMessage="No reports available. Generate reports from completed tests."
                     />
+                </div>
+
+                {/* Ready Tests Section */}
+                <div className="bg-white rounded border card-shadow overflow-hidden">
+                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b">
+                        <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                            <ScienceIcon className="text-green-600" />
+                            Ready for Report Generation
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-1">Tests ready to be converted into lab reports</p>
+                    </div>
+                    {loadingReadyTests ? (
+                        <div className="p-4">
+                            <LoadingSpinner />
+                        </div>
+                    ) : readyTests.length === 0 ? (
+                        <div className="p-6 text-center">
+                            <div className="text-gray-400 mb-3">
+                                <ScienceIcon style={{ fontSize: '3rem' }} />
+                            </div>
+                            <p className="text-gray-600">No tests are currently ready for report generation</p>
+                        </div>
+                    ) : (
+                        <DataTable
+                            columns={[
+                                { key: 'id', title: 'Test ID', sortable: true },
+                                { key: 'patientName', title: 'Patient', sortable: true },
+                                { key: 'doctorName', title: 'Doctor', sortable: true },
+                                { key: 'testType', title: 'Test Type', sortable: true },
+                                { key: 'sampleDate', title: 'Sample Date', sortable: true },
+                                { key: 'comments', title: 'Comments', sortable: false },
+                                {
+                                    key: 'status',
+                                    title: 'Status',
+                                    sortable: true,
+                                    render: (value) => (
+                                        <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                                            {value || 'Pending'}
+                                        </span>
+                                    )
+                                },
+                                {
+                                    key: 'actions',
+                                    title: 'Actions',
+                                    render: (_, row) => (
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={async (e) => {
+                                                    e.stopPropagation()
+                                                    setCurrentReport(row)
+
+                                                    let patientAge = row.age || '';
+                                                    let patientGender = row.gender || 'Male';
+
+                                                    // Fetch patient details to get age and gender using patientId (patient_ref)
+                                                    if (row.patientId) {
+                                                        try {
+                                                            const res = await apiFetch(`/api/v1/lab/patients?search=${encodeURIComponent(row.patientId)}`);
+                                                            if (res.ok) {
+                                                                const data = await res.json();
+                                                                const patients = data.data || data.patients || data.rows || (Array.isArray(data) ? data : []);
+                                                                const patient = patients.find(p =>
+                                                                    p.patient_ref === row.patientId ||
+                                                                    p.patient_id === row.patientId ||
+                                                                    p.id === row.patientId
+                                                                );
+                                                                if (patient) {
+                                                                    patientAge = patient.age || patientAge;
+                                                                    patientGender = patient.gender || patientGender;
+                                                                }
+                                                            }
+                                                        } catch (err) {
+                                                            console.error("Could not fetch patient details:", err);
+                                                        }
+                                                    }
+
+                                                    // Auto-fill the form with data from the selected ready test
+                                                    setFormData({
+                                                        sourceTestId: row.id || '',
+                                                        patientName: row.patientName || '',
+                                                        patientId: row.patientId || '',
+                                                        age: patientAge,
+                                                        gender: patientGender,
+                                                        testType: row.testType || '',
+                                                        sampleDate: row.sampleDate || new Date().toISOString().split('T')[0],
+                                                        reportDate: new Date().toISOString().split('T')[0],
+                                                        results: (row.results && row.results.length > 0) ? row.results.map(r => ({
+                                                            parameter: r.parameter || r.name || '',
+                                                            result: r.result || '',
+                                                            unit: r.unit || '',
+                                                            referenceRange: r.referenceRange || r.reference_range || r.range || '',
+                                                            status: r.status || 'Normal'
+                                                        })) : [
+                                                            { parameter: 'Hemoglobin', result: '', unit: 'g/dL', referenceRange: '13.5-17.5', status: 'Normal' }
+                                                        ],
+                                                        verifiedBy: '',
+                                                        priority: row.priority || 'Normal',
+                                                        interpretation: '',
+                                                        accessCode: `ACC-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+                                                    })
+
+                                                    setShowGenerateModal(true)
+                                                }}
+                                                className="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200"
+                                                title="Generate Report"
+                                            >
+                                                <DescriptionIcon style={{ fontSize: '0.875rem' }} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setCurrentReport(row)
+                                                    setShowPreviewModal(true)
+                                                }}
+                                                className="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200"
+                                                title="View Details"
+                                            >
+                                                <VisibilityIcon style={{ fontSize: '0.875rem' }} />
+                                            </button>
+                                        </div>
+                                    )
+                                }
+                            ]}
+                            data={readyTests}
+                            emptyMessage="No ready tests available"
+                        />
+                    )}
                 </div>
 
                 <div className="bg-white p-4 rounded border card-shadow">
@@ -1583,7 +1771,7 @@ const exportToPDF = (filteredReports) => {
             <Modal
                 isOpen={showGenerateModal}
                 onClose={() => { resetFormData(); setShowGenerateModal(false); }}
-                title="Generate Report"
+                title={isEditing ? "Edit Report" : "Generate Report"}
                 size="lg"
                 footer={
                     <div className="flex justify-end gap-3">
@@ -1596,7 +1784,7 @@ const exportToPDF = (filteredReports) => {
                             disabled={!isFormValid}
                             className={!isFormValid ? 'opacity-50 cursor-not-allowed' : ''}
                         >
-                            Generate Report
+                            {isEditing ? "Update Report" : "Generate Report"}
                         </Button>
                     </div>
                 }
@@ -1607,9 +1795,23 @@ const exportToPDF = (filteredReports) => {
                             <h4 className="font-bold text-gray-800 tracking-widest text-sm">Patient Identification</h4>
                         </div>
 
+                        <div className="grid grid-cols-1 gap-5 mb-5">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-600 mb-2">Source Test ID <span className="text-red-500">*</span></label>
+                                <input
+                                    type="text"
+                                    name="sourceTestId"
+                                    value={formData.sourceTestId}
+                                    onChange={handleFormChange}
+                                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-mono text-sm"
+                                    placeholder="Enter Source Test ID"
+                                />
+                            </div>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div className="relative">
-                                <label className="block text-xs font-bold text-gray-600 tracking-wider mb-2">Patient Name</label>
+                                <label className="block text-xs font-bold text-gray-600 tracking-wider mb-2">Patient Name <span className="text-red-500">*</span></label>
                                 <div className="relative">
                                     <input
                                         type="text"
@@ -1672,7 +1874,7 @@ const exportToPDF = (filteredReports) => {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-gray-600 mb-2">Patient ID</label>
+                                <label className="block text-xs font-bold text-gray-600 mb-2">Patient ID <span className="text-red-500">*</span></label>
                                 <input
                                     type="text"
                                     name="patientId"
@@ -1853,7 +2055,7 @@ const exportToPDF = (filteredReports) => {
                             <h4 className="font-bold text-gray-800 tracking-widest text-sm">Conclusion & Authentication</h4>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div className={`grid grid-cols-1 md:grid-cols-${isEditing ? '3' : '2'} gap-5`}>
                             <div>
                                 <label className="block text-xs font-bold text-gray-600 tracking-wider mb-2">Verified By</label>
                                 <input
@@ -1882,6 +2084,24 @@ const exportToPDF = (filteredReports) => {
                                     <KeyboardArrowDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" style={{ fontSize: '1.25rem' }} />
                                 </div>
                             </div>
+                            {isEditing && (
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 tracking-wider mb-2">Report Status</label>
+                                    <div className="relative">
+                                        <select
+                                            name="status"
+                                            value={formData.status}
+                                            onChange={handleFormChange}
+                                            className="w-full px-4 py-2.5 rounded-lg border focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm appearance-none cursor-pointer border-gray-300 bg-gray-50 text-gray-700"
+                                        >
+                                            <option value="READY">Ready</option>
+                                            <option value="PENDING_REVIEW">Pending Review</option>
+                                            <option value="DRAFT">Draft</option>
+                                        </select>
+                                        <KeyboardArrowDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" style={{ fontSize: '1.25rem' }} />
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div>
@@ -1916,20 +2136,20 @@ const exportToPDF = (filteredReports) => {
             <Modal
                 isOpen={showExportModal}
                 onClose={() => {
-    setShowExportModal(false)
-    resetExportData()
-}}
+                    setShowExportModal(false)
+                    resetExportData()
+                }}
                 title="Export Records"
                 size="md"
                 footer={
                     <div className="flex justify-end gap-3">
                         <Button
-    variant="outline"
-    onClick={() => {
-        setShowExportModal(false)
-        resetExportData()
-    }}
->
+                            variant="outline"
+                            onClick={() => {
+                                setShowExportModal(false)
+                                resetExportData()
+                            }}
+                        >
                             Cancel
                         </Button>
                         <Button variant="primary" onClick={handleExportSubmit} icon={<FileDownloadIcon fontSize="small" />}>
@@ -1973,8 +2193,8 @@ const exportToPDF = (filteredReports) => {
                             <div
                                 onClick={() => setExportData(prev => ({ ...prev, format: 'pdf' }))}
                                 className={`group p-4 rounded-xl border-2 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 ${exportData.format === 'pdf'
-                                        ? 'border-red-500 bg-red-50 text-red-700 shadow-md ring-4 ring-red-100'
-                                        : 'border-gray-100 bg-white hover:border-gray-200 text-gray-400'
+                                    ? 'border-red-500 bg-red-50 text-red-700 shadow-md ring-4 ring-red-100'
+                                    : 'border-gray-100 bg-white hover:border-gray-200 text-gray-400'
                                     }`}
                             >
                                 <PictureAsPdfIcon style={{ fontSize: '2rem' }} className={`mb-2 transition-transform group-active:scale-90 ${exportData.format === 'pdf' ? 'text-red-500' : 'text-gray-300'}`} />
@@ -1984,8 +2204,8 @@ const exportToPDF = (filteredReports) => {
                             <div
                                 onClick={() => setExportData(prev => ({ ...prev, format: 'excel' }))}
                                 className={`group p-4 rounded-xl border-2 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 ${exportData.format === 'excel'
-                                        ? 'border-green-600 bg-green-50 text-green-800 shadow-md ring-4 ring-green-100'
-                                        : 'border-gray-100 bg-white hover:border-gray-200 text-gray-400'
+                                    ? 'border-green-600 bg-green-50 text-green-800 shadow-md ring-4 ring-green-100'
+                                    : 'border-gray-100 bg-white hover:border-gray-200 text-gray-400'
                                     }`}
                             >
                                 <FileDownloadIcon style={{ fontSize: '2rem' }} className={`mb-2 transition-transform group-active:scale-90 ${exportData.format === 'excel' ? 'text-green-600' : 'text-gray-300'}`} />

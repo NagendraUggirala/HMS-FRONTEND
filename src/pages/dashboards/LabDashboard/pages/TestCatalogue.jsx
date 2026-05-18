@@ -6,11 +6,38 @@ import Button from '../../../../components/common/Button/Button'
 import Modal from '../../../../components/common/Modal/Modal'
 import LoadingSpinner from '../../../../components/common/LoadingSpinner/LoadingSpinner'
 import Toast from '../../../../components/common/Toast/Toast'
+import { apiFetch } from '../../../../services/apiClient'
+
+const normalizeTestRecord = (payload) => ({
+  id: payload.test_code ?? payload.code ?? payload.id ?? payload.testId ?? '',
+  name: payload.test_name ?? payload.name ?? payload.title ?? '',
+  category: payload.category ?? payload.test_category ?? payload.group ?? 'General',
+  sampleType: payload.sample_type ?? payload.sampleType ?? payload.specimen_type ?? payload.specimenType ?? 'Blood',
+  turnaroundTime: payload.turnaround_time ?? payload.turnaroundTime ?? payload.tat ?? '24 hours',
+  price: Number(payload.price ?? payload.cost ?? payload.fee ?? payload.amount ?? 0),
+  status: payload.status ?? payload.test_status ?? 'active',
+  parameters: Number(payload.parameters_count ?? payload.parametersCount ?? payload.num_parameters ?? (Array.isArray(payload.params) ? payload.params.length : payload.parameters ?? 0) ?? 0),
+  instructions: payload.instructions ?? payload.test_instructions ?? payload.preparation ?? '',
+  params: payload.params ?? payload.parameters ?? [],
+  lastSynced: payload.last_synced ?? payload.lastSynced ?? null,
+})
+
+const normalizeCategory = (payload) => ({
+  id: payload.id ?? payload.category_id ?? payload.code ?? String(payload.name ?? '').toLowerCase().replace(/\s+/g, '-') ?? '',
+  name: payload.name ?? payload.category_name ?? payload.label ?? 'General',
+  count: Number(payload.count ?? payload.test_count ?? payload.total ?? 0),
+})
 
 const TestCatalogue = () => {
   const [loading, setLoading] = useState(true)
   const [tests, setTests] = useState([])
   const [categories, setCategories] = useState([])
+  const [categoryChips, setCategoryChips] = useState([])
+  const [catalogueSummary, setCatalogueSummary] = useState({
+    active_tests: 0,
+    categories: 0,
+    total_parameters: 0
+  })
   const [searchTerm, setSearchTerm] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -35,8 +62,16 @@ const TestCatalogue = () => {
     instructions: '',
     parameters: []
   })
-  const [newCategory, setNewCategory] = useState('')
+  const [newCategory, setNewCategory] = useState({
+    name: '',
+    description: '',
+    parentCategoryId: ''
+  })
   const [activeCategory, setActiveCategory] = useState('all')
+  const [addingCategory, setAddingCategory] = useState(false)
+  const [deletingCategoryId, setDeletingCategoryId] = useState(null)
+  const [addingTest, setAddingTest] = useState(false)
+  const [bulkActionLoading, setBulkActionLoading] = useState(false)
 
   useEffect(() => {
     loadTestData()
@@ -44,138 +79,162 @@ const TestCatalogue = () => {
 
   const loadTestData = async () => {
     setLoading(true)
-    setTimeout(() => {
-      const testCategories = [
-        { id: 'hem', name: 'Hematology', count: 15 },
-        { id: 'bio', name: 'Biochemistry', count: 25 },
-        { id: 'mic', name: 'Microbiology', count: 18 },
-        { id: 'ser', name: 'Serology', count: 12 },
-        { id: 'hor', name: 'Hormones', count: 20 },
-        { id: 'imm', name: 'Immunology', count: 10 }
-      ]
 
-      const testData = [
-        {
-          id: 'CBC',
-          name: 'Complete Blood Count',
-          category: 'Hematology',
-          sampleType: 'Blood',
-          turnaroundTime: '4 hours',
-          price: 500,
-          status: 'active',
-          parameters: 18,
-          instructions: 'Fast for 8-12 hours before sample collection.',
-          params: [
-            { name: 'Hemoglobin', unit: 'g/dL', range: '13.0 - 17.0' },
-            { name: 'WBC Count', unit: 'cells/mcL', range: '4,500 - 11,000' },
-            { name: 'Platelets', unit: 'cells/mcL', range: '150,000 - 450,000' },
-            { name: 'RBC Count', unit: 'M/µL', range: '4.5 - 5.9' },
-            { name: 'Hematocrit', unit: '%', range: '40 - 54' }
-          ]
-        },
-        {
-          id: 'LFT',
-          name: 'Liver Function Test',
-          category: 'Biochemistry',
-          sampleType: 'Blood',
-          turnaroundTime: '24 hours',
-          price: 1200,
-          status: 'active',
-          parameters: 8,
-          instructions: 'Standard blood sample. No specific preparation needed.',
-          params: [
-            { name: 'ALT (SGPT)', unit: 'U/L', range: '7 - 55' },
-            { name: 'AST (SGOT)', unit: 'U/L', range: '8 - 48' },
-            { name: 'Bilirubin Total', unit: 'mg/dL', range: '0.1 - 1.2' },
-            { name: 'ALP', unit: 'U/L', range: '30 - 120' },
-            { name: 'Total Protein', unit: 'g/dL', range: '6.0 - 8.0' },
-            { name: 'Albumin', unit: 'g/dL', range: '3.5 - 5.0' }
-          ]
-        },
-        {
-          id: 'KFT',
-          name: 'Kidney Function Test',
-          category: 'Biochemistry',
-          sampleType: 'Blood',
-          turnaroundTime: '24 hours',
-          price: 800,
-          status: 'active',
-          parameters: 6,
-          instructions: 'Fasting not required. Inform about any medications.',
-          params: [
-            { name: 'Creatinine', unit: 'mg/dL', range: '0.7 - 1.3' },
-            { name: 'BUN', unit: 'mg/dL', range: '7 - 20' },
-            { name: 'Uric Acid', unit: 'mg/dL', range: '3.5 - 7.2' },
-            { name: 'Sodium', unit: 'mmol/L', range: '135 - 145' },
-            { name: 'Potassium', unit: 'mmol/L', range: '3.5 - 5.1' }
-          ]
-        }
-      ]
+    try {
+      const res = await apiFetch('/api/v1/lab/test-catalogue')
+      const payload = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(payload?.detail?.message || payload?.message || `Failed to load test catalogue (${res.status})`)
+      }
 
-      const updatedCategories = testCategories.map(cat => ({
-        ...cat,
-        count: testData.filter(test => test.category === cat.name).length
-      }))
+      const data = payload?.data ?? payload
+      const rawTests = data.rows ?? data.tests ?? data.test_catalogue ?? data.catalogue ?? data.items ?? data
+      const rawCategories = data.category_chips ?? data.categories ?? data.test_categories ?? data.categories_list ?? []
+      const rawSummary = data.summary ?? data.meta ?? null
 
-      setCategories(updatedCategories)
-      setTests(testData)
+      const normalizedTests = Array.isArray(rawTests)
+        ? rawTests.map(normalizeTestRecord)
+        : []
+
+      const normalizedCategories = Array.isArray(rawCategories)
+        ? rawCategories.map((item) => ({
+            id: item.id ?? item.category_id ?? item.code ?? String(item.category_name ?? item.name ?? item.label ?? '').toLowerCase().replace(/\s+/g, '-'),
+            name: item.category_name ?? item.name ?? item.label ?? 'General',
+            count: Number(item.test_count ?? item.count ?? item.total ?? 0)
+          }))
+        : []
+
+      const computedCategories = normalizedCategories.length > 0
+        ? normalizedCategories
+        : normalizedTests.reduce((map, test) => {
+            const key = test.category || 'General'
+            map[key] = (map[key] || 0) + 1
+            return map
+          }, {})
+
+      const finalCategories = normalizedCategories.length > 0
+        ? normalizedCategories.filter((category) => (category.name || '').toLowerCase() !== 'all tests')
+        : Object.keys(computedCategories).map((name) => ({
+            id: name.toLowerCase().replace(/\s+/g, '-'),
+            name,
+            count: computedCategories[name]
+          }))
+
+      setTests(normalizedTests)
+      setCategories(finalCategories)
+      setCategoryChips(normalizedCategories)
+      setCatalogueSummary({
+        active_tests: Number(rawSummary?.active_tests ?? rawSummary?.activeTests ?? normalizedTests.filter((test) => test.status === 'active').length),
+        categories: Number(rawSummary?.categories ?? rawSummary?.category_count ?? finalCategories.length),
+        total_parameters: Number(rawSummary?.total_parameters ?? rawSummary?.total_parameters ?? normalizedTests.reduce((sum, test) => sum + (test.parameters || 0), 0))
+      })
+    } catch (error) {
+      console.error('Failed to load test catalogue:', error)
+      setToast({ message: error.message || 'Unable to load test catalogue.', type: 'error' })
+    } finally {
       setLoading(false)
-    }, 1000)
+    }
   }
 
   const handleSearch = (term) => {
     setSearchTerm(term)
   }
 
-  const handleAddTest = () => {
+  const handleAddTest = async () => {
     if (!newTest.name || !newTest.category || !newTest.sampleType || !newTest.turnaroundTime || !newTest.price) {
       setToast({ message: 'Please fill in all required fields', type: 'error' })
       return
     }
 
-    const testCode = newTest.name
-      .split(' ')
-      .map(word => word[0])
-      .join('')
-      .toUpperCase()
-      .substring(0, 10)
+    const testCode = newTest.code ||
+      newTest.name
+        .split(' ')
+        .map(word => word[0])
+        .join('')
+        .toUpperCase()
+        .substring(0, 10)
 
-    const newTestEntry = {
-      id: testCode,
+    const payload = {
+      test_code: testCode,
+      test_name: newTest.name,
       name: newTest.name,
       category: newTest.category,
-      sampleType: newTest.sampleType,
-      turnaroundTime: newTest.turnaroundTime,
-      price: parseFloat(newTest.price),
-      status: 'active',
-      parameters: newTest.parameters.length,
-      instructions: newTest.instructions,
-      params: newTest.parameters.filter(p => p.name).map(p => ({
-        name: p.name,
-        unit: p.unit || 'N/A',
-        range: p.range || 'Not specified'
-      }))
+      category_name: newTest.category,
+      sample_type: newTest.sampleType,
+      turnaround_time: newTest.turnaroundTime,
+      price: parseFloat(newTest.price) || 0
     }
-    
-    setTests([...tests, newTestEntry])
-    setCategories(categories.map(cat => 
-      cat.name === newTest.category 
-        ? { ...cat, count: cat.count + 1 }
-        : cat
-    ))
-    
-    setShowAddModal(false)
-    setNewTest({
-      code: '',
-      name: '',
-      category: '',
-      sampleType: '',
-      turnaroundTime: '',
-      price: '',
-      instructions: '',
-      parameters: []
-    })
-    setToast({ message: `Test "${newTest.name}" added successfully!`, type: 'success' })
+
+    if (newTest.instructions?.trim()) {
+      payload.instructions = newTest.instructions.trim()
+      payload.test_instructions = newTest.instructions.trim()
+    }
+
+    const preparedParameters = newTest.parameters
+      .filter(p => p.name && p.name.trim())
+      .map(p => ({
+        name: p.name.trim(),
+        unit: p.unit?.trim() || 'N/A',
+        range: p.range?.trim() || 'Not specified'
+      }))
+
+    if (preparedParameters.length > 0) {
+      payload.parameters = preparedParameters
+    }
+
+    setAddingTest(true)
+    try {
+      const res = await apiFetch('/api/v1/lab/test-catalogue/test', {
+        method: 'POST',
+        body: payload
+      })
+      const payloadRes = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(payloadRes?.detail?.message || payloadRes?.message || `Failed to add test (${res.status})`)
+      }
+
+      const data = payloadRes?.data ?? payloadRes
+      const createdTest = normalizeTestRecord(data)
+      const testEntry = {
+        ...createdTest,
+        status: createdTest.status || 'active',
+        params: data.params ?? data.parameters ?? newTest.parameters.filter(p => p.name).map(p => ({
+          name: p.name,
+          unit: p.unit || 'N/A',
+          range: p.range || 'Not specified'
+        }))
+      }
+
+      setTests([...tests, testEntry])
+      setCategories(categories.map(cat => 
+        cat.name === newTest.category 
+          ? { ...cat, count: cat.count + 1 }
+          : cat
+      ))
+      setCatalogueSummary(prev => ({
+        ...prev,
+        active_tests: Number(prev.active_tests) + 1,
+        total_parameters: Number(prev.total_parameters) + newTest.parameters.filter(p => p.name).length
+      }))
+
+      setShowAddModal(false)
+      setNewTest({
+        code: '',
+        name: '',
+        category: '',
+        sampleType: '',
+        turnaroundTime: '',
+        price: '',
+        instructions: '',
+        parameters: []
+      })
+      setToast({ message: `Test "${newTest.name}" added successfully!`, type: 'success' })
+    } catch (error) {
+      console.error('Failed to add test:', error)
+      setToast({ message: error.message || 'Unable to add test. Please try again.', type: 'error' })
+    } finally {
+      setAddingTest(false)
+    }
   }
 
   const handleEditTest = (test) => {
@@ -235,22 +294,77 @@ const TestCatalogue = () => {
     setToast({ message: `Test "${newTest.name}" updated successfully!`, type: 'success' })
   }
 
-  const handleAddCategory = () => {
-    if (newCategory.trim()) {
-      if (categories.some(cat => cat.name.toLowerCase() === newCategory.toLowerCase())) {
-        setToast({ message: 'Category already exists!', type: 'error' })
-        return
+  const handleAddCategory = async () => {
+    const trimmedName = newCategory.name.trim()
+    if (!trimmedName) {
+      setToast({ message: 'Please enter a category name', type: 'error' })
+      return
+    }
+
+    if (categories.some(cat => cat.name.toLowerCase() === trimmedName.toLowerCase())) {
+      setToast({ message: 'Category already exists!', type: 'error' })
+      return
+    }
+
+    setAddingCategory(true)
+    try {
+      const body = {
+        category_name: trimmedName,
+        description: newCategory.description.trim() || undefined
       }
-      const categoryId = newCategory.toLowerCase().replace(/\s/g, '').substring(0, 3)
-      const newCategoryEntry = {
-        id: categoryId,
-        name: newCategory,
-        count: 0
+      if (newCategory.parentCategoryId) {
+        body.parent_category_id = Number(newCategory.parentCategoryId)
       }
-      setCategories([...categories, newCategoryEntry])
-      setNewCategory('')
+
+      const res = await apiFetch('/api/v1/lab/test-catalogue/category', {
+        method: 'POST',
+        body
+      })
+      const payload = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(payload?.detail?.message || payload?.message || `Failed to add category (${res.status})`)
+      }
+
+      await loadTestData()
+      setNewCategory({ name: '', description: '', parentCategoryId: '' })
       setShowCategoryModal(false)
-      setToast({ message: `Category "${newCategory}" added successfully!`, type: 'success' })
+      setToast({ message: `Category "${trimmedName}" added successfully!`, type: 'success' })
+    } catch (error) {
+      console.error('Failed to add category:', error)
+      setToast({ message: error.message || 'Unable to add category. Please try again.', type: 'error' })
+    } finally {
+      setAddingCategory(false)
+    }
+  }
+
+  const handleDeleteCategory = async (categoryId, categoryName) => {
+    if (!window.confirm(`Are you sure you want to delete the category "${categoryName}"?`)) {
+      return
+    }
+
+    setDeletingCategoryId(categoryId)
+    try {
+      const res = await apiFetch(`/api/v1/lab/test-catalogue/category/${categoryId}`, {
+        method: 'DELETE'
+      })
+      const payload = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(payload?.detail?.message || payload?.message || `Failed to delete category (${res.status})`)
+      }
+
+      setCategories(prev => prev.filter(cat => cat.id !== categoryId))
+      setCategoryChips(prev => prev.filter(cat => cat.id !== categoryId))
+      if (activeCategory === categoryName) {
+        setActiveCategory('all')
+      }
+
+      await loadTestData()
+      setToast({ message: `Category "${categoryName}" deleted successfully!`, type: 'success' })
+    } catch (error) {
+      console.error('Failed to delete category:', error)
+      setToast({ message: error.message || 'Unable to delete category. Please try again.', type: 'error' })
+    } finally {
+      setDeletingCategoryId(null)
     }
   }
 
@@ -580,23 +694,59 @@ const TestCatalogue = () => {
     `;
   };
 
+  const runBulkAction = async (action, successMessage, updateLocalTests) => {
+    if (selectedTests.length === 0) {
+      setToast({ message: 'Please select tests to update', type: 'warning' })
+      return
+    }
+
+    setBulkActionLoading(true)
+    try {
+      const res = await apiFetch(`/api/v1/lab/test-catalogue/bulk/${action}`, {
+        method: 'POST',
+        body: {
+          ids: selectedTests,
+          action,
+        }
+      })
+      const payload = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(payload?.detail?.message || payload?.message || `Bulk action failed (${res.status})`)
+      }
+
+      if (typeof updateLocalTests === 'function') {
+        updateLocalTests()
+      }
+
+      setToast({ message: successMessage, type: 'success' })
+      setSelectedTests([])
+    } catch (error) {
+      console.error('Bulk action failed:', error)
+      setToast({ message: error.message || 'Bulk action failed. Please try again.', type: 'error' })
+    } finally {
+      setBulkActionLoading(false)
+    }
+  }
+
   // 5. BULK STATUS UPDATE - Update status for multiple tests
   const handleBulkStatusUpdate = (newStatus) => {
     if (selectedTests.length === 0) {
       setToast({ message: 'Please select tests to update', type: 'warning' });
       return;
     }
-    const updatedTests = tests.map(test => 
-      selectedTests.includes(test.id) 
-        ? { ...test, status: newStatus }
-        : test
-    );
-    setTests(updatedTests);
-    setToast({ 
-      message: `${selectedTests.length} test(s) ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully!`, 
-      type: 'success' 
-    });
-    setSelectedTests([]);
+
+    return runBulkAction(
+      newStatus,
+      `${selectedTests.length} test(s) ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully!`,
+      () => {
+        const updatedTests = tests.map(test =>
+          selectedTests.includes(test.id)
+            ? { ...test, status: newStatus }
+            : test
+        )
+        setTests(updatedTests)
+      }
+    )
   };
 
   // 6. BULK DELETE - Delete multiple tests
@@ -606,10 +756,14 @@ const TestCatalogue = () => {
       return;
     }
     if (window.confirm(`Are you sure you want to delete ${selectedTests.length} test(s)? This action cannot be undone.`)) {
-      const remainingTests = tests.filter(test => !selectedTests.includes(test.id));
-      setTests(remainingTests);
-      setToast({ message: `${selectedTests.length} test(s) deleted successfully!`, type: 'success' });
-      setSelectedTests([]);
+      return runBulkAction(
+        'delete',
+        `${selectedTests.length} test(s) deleted successfully!`,
+        () => {
+          const remainingTests = tests.filter(test => !selectedTests.includes(test.id));
+          setTests(remainingTests)
+        }
+      )
     }
   };
 
@@ -672,12 +826,15 @@ const TestCatalogue = () => {
               All Tests ({tests.length})
             </button>
             {categories.map(category => (
-              <button key={category.id} className={`px-4 py-2 rounded-lg ${
-                  activeCategory === category.name 
-                    ? 'bg-blue-100 text-blue-700 border-blue-300' 
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              } border`}
-              onClick={() => setActiveCategory(category.name)} >
+              <button
+                key={category.id}
+                className={`px-4 py-2 rounded-lg ${
+                    activeCategory === category.name 
+                      ? 'bg-blue-100 text-blue-700 border-blue-300' 
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                } border`}
+                onClick={() => setActiveCategory(category.name)}
+              >
                 {category.name} ({category.count})
               </button>
             ))}
@@ -693,15 +850,15 @@ const TestCatalogue = () => {
             <div className="flex gap-4 text-sm">
               <div className="text-center">
                 <p className="text-gray-500">Active Tests</p>
-                <p className="text-xl font-bold text-green-600">{tests.filter(t => t.status === 'active').length}</p>
+                <p className="text-xl font-bold text-green-600">{catalogueSummary.active_tests}</p>
               </div>
               <div className="text-center">
                 <p className="text-gray-500">Categories</p>
-                <p className="text-xl font-bold text-blue-600">{categories.length}</p>
+                <p className="text-xl font-bold text-blue-600">{catalogueSummary.categories || categories.length}</p>
               </div>
               <div className="text-center">
                 <p className="text-gray-500">Total Parameters</p>
-                <p className="text-xl font-bold text-purple-600">{tests.reduce((sum, test) => sum + (test.parameters || 0), 0)}</p>
+                <p className="text-xl font-bold text-purple-600">{catalogueSummary.total_parameters}</p>
               </div>
             </div>
           </div>
@@ -709,24 +866,26 @@ const TestCatalogue = () => {
 
         {/* Selection Bar - Shows when tests are selected */}
         {selectedTests.length > 0 && (
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 flex justify-between items-center">
-            <div>
-              <i className="fas fa-check-circle text-blue-600 mr-2"></i>
-              <span className="font-semibold">{selectedTests.length} test(s) selected</span>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => handleBulkStatusUpdate('active')}>
-                <i className="fas fa-play mr-1"></i> Activate
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => handleBulkStatusUpdate('inactive')}>
-                <i className="fas fa-stop mr-1"></i> Deactivate
-              </Button>
-              <Button variant="danger" size="sm" onClick={handleBulkDelete}>
-                <i className="fas fa-trash mr-1"></i> Delete
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setSelectedTests([])}>
-                <i className="fas fa-times mr-1"></i> Clear
-              </Button>
+          <div className="bg-white p-4 rounded-lg border card-shadow mb-4">
+            <div className="flex flex-col md:flex-row justify-between gap-4 items-start md:items-center">
+              <div>
+                <p className="text-sm font-semibold text-gray-700">Bulk Actions</p>
+                <p className="text-sm text-gray-500">{selectedTests.length} test(s) selected.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => handleBulkStatusUpdate('active')} disabled={bulkActionLoading}>
+                  {bulkActionLoading ? <><i className="fas fa-spinner fa-spin mr-1"></i> Processing...</> : <><i className="fas fa-play mr-1"></i> Activate</>}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleBulkStatusUpdate('inactive')} disabled={bulkActionLoading}>
+                  <i className="fas fa-stop mr-1"></i> Deactivate
+                </Button>
+                <Button variant="danger" size="sm" onClick={handleBulkDelete} disabled={bulkActionLoading}>
+                  <i className="fas fa-trash mr-1"></i> Delete
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setSelectedTests([])} disabled={bulkActionLoading}>
+                  <i className="fas fa-times mr-1"></i> Clear
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -1004,8 +1163,14 @@ const TestCatalogue = () => {
               Cancel
             </Button>
             <Button variant="primary" onClick={handleAddTest}
-              disabled={!newTest.name || !newTest.category || !newTest.sampleType || !newTest.turnaroundTime || !newTest.price} >
-              Add Test
+              disabled={!newTest.name || !newTest.category || !newTest.sampleType || !newTest.turnaroundTime || !newTest.price || addingTest} >
+              {addingTest ? (
+                <>
+                  <i className="fas fa-spinner fa-spin mr-2"></i> Adding...
+                </>
+              ) : (
+                'Add Test'
+              )}
             </Button>
           </div>
         </div>
@@ -1271,14 +1436,44 @@ const TestCatalogue = () => {
               Category Name *
             </label>
             <input type="text" className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="e.g., Molecular Diagnostics, Genetic Testing" value={newCategory}
-              onChange={(e) => setNewCategory(e.target.value)}
+              placeholder="e.g., Molecular Diagnostics, Genetic Testing" value={newCategory.name}
+              onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
               onKeyPress={(e) => e.key === 'Enter' && handleAddCategory()}
               autoFocus
               required
             />
             <p className="text-xs text-gray-500 mt-1">
-              Category ID will be auto-generated from the name
+              Category ID will be auto-generated from the name.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Description
+            </label>
+            <textarea className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Optional description for this category"
+              value={newCategory.description}
+              onChange={(e) => setNewCategory({ ...newCategory, description: e.target.value })}
+              rows={3}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Parent Category
+            </label>
+            <select className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              value={newCategory.parentCategoryId}
+              onChange={(e) => setNewCategory({ ...newCategory, parentCategoryId: e.target.value })}
+            >
+              <option value="">None</option>
+              {categories.map(cat => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Choose an existing category to set as parent, or leave blank.
             </p>
           </div>
 
@@ -1286,8 +1481,16 @@ const TestCatalogue = () => {
             <Button variant="outline" onClick={() => setShowCategoryModal(false)}>
               Cancel
             </Button>
-            <Button variant="primary" onClick={handleAddCategory} disabled={!newCategory.trim()} >
-              <i className="fas fa-plus mr-2"></i> Add Category
+            <Button variant="primary" onClick={handleAddCategory} disabled={!newCategory.name.trim() || addingCategory} >
+              {addingCategory ? (
+                <>
+                  <i className="fas fa-spinner fa-spin mr-2"></i> Adding...
+                </>
+              ) : (
+                <>
+                  <i className="fas fa-plus mr-2"></i> Add Category
+                </>
+              )}
             </Button>
           </div>
         </div>

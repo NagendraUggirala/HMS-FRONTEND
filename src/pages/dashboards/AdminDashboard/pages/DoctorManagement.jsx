@@ -45,25 +45,24 @@ const DoctorManagement = () => {
   const [currentDoctor, setCurrentDoctor] = useState(null)
   const [showPassword, setShowPassword] = useState(false)
   const [isAddMode, setIsAddMode] = useState(true)
+  const [submitLoading, setSubmitLoading] = useState(false)
   const [departmentDropdownOpen, setDepartmentDropdownOpen] = useState(false)
   const [specializationDropdownOpen, setSpecializationDropdownOpen] = useState(false)
   const [departmentSearchTerm, setDepartmentSearchTerm] = useState('')
   const [specializationSearchTerm, setSpecializationSearchTerm] = useState('')
   const [formData, setFormData] = useState({
-    name: '',
-    specialization: '',
-    department: '',
+    first_name: '',
+    middle_name: '',
+    last_name: '',
     email: '',
-    personalEmail: '',
     phone: '',
     password: '',
-    confirmPassword: '',
-    qualification: '',
-    experience: '',
-    consultationFee: '',
-    consultationType: '',
-    availability: '9AM-5PM',
-   
+    role: 'DOCTOR',
+    emergency_contact: '',
+    shift_timing: '',
+    joining_date: '',
+    address: '',
+    department_name: ''
   })
 
   useEffect(() => {
@@ -74,25 +73,29 @@ const DoctorManagement = () => {
   const mapDoctorData = (staffItem) => {
     const firstNameOrFull = staffItem?.first_name || staffItem?.firstName || ''
     const lastNameOrFull = staffItem?.last_name || staffItem?.lastName || ''
-    const fullName = `Dr. ${firstNameOrFull}${lastNameOrFull ? ' ' + lastNameOrFull : ''}`.trim()
+    const generatedName = `Dr. ${firstNameOrFull}${lastNameOrFull ? ' ' + lastNameOrFull : ''}`.trim()
+    const fullName = staffItem?.staff_name || generatedName
     
     return {
-      id: staffItem?.id || staffItem?.staff_id || staffItem?.user_id || '',
+      id: staffItem?.staff_id || staffItem?.id || staffItem?.user_id || '',
       name: fullName || 'Unnamed Doctor',
+      first_name: staffItem?.first_name || '',
+      middle_name: staffItem?.middle_name || '',
+      last_name: staffItem?.last_name || '',
       email: staffItem?.email || '',
-      personalEmail: staffItem?.personal_email || '',
       phone: staffItem?.phone || '',
-      qualification: staffItem?.qualification || '',
-      experience: staffItem?.experience || '0',
-      fee: parseInt(staffItem?.consultation_fee || 0),
-      specialization: staffItem?.doctor_specialization || 'General Physician',
-      department: staffItem?.department || 'General',
-      consultationType: staffItem?.consultation_type || 'In-Person',
-      availability: staffItem?.availability || '9AM-5PM',
-      status: staffItem?.is_active === false ? 'Inactive' : 'Active',
+      role: staffItem?.primary_role || staffItem?.role || 'DOCTOR',
+      emergency_contact: staffItem?.emergency_contact || '',
+      shift_timing: staffItem?.shift_timing || '',
+      joining_date: staffItem?.joining_date || staffItem?.hire_date || '',
+      address: staffItem?.address || '',
+      department_name: staffItem?.department_name || staffItem?.department || 'General',
+      department: staffItem?.department_name || staffItem?.department || 'General',
+      status: staffItem?.status === 'ACTIVE' ? 'Active' : (staffItem?.is_active === false ? 'Inactive' : 'Active'),
       image: `https://i.pravatar.cc/100?img=${Math.floor(Math.random() * 70) + 1}`,
       contact: staffItem?.phone || '',
-      is_active: staffItem?.is_active !== false
+      is_active: staffItem?.is_active !== false,
+      specialization: staffItem?.specialization || staffItem?.doctor_specialization || 'General Physician'
     }
   }
 
@@ -138,24 +141,65 @@ const DoctorManagement = () => {
         doctor.id === currentDoctor.id 
           ? { 
               ...doctor,
-              name: formData.name,
-              specialization: formData.specialization,
-              department: formData.department,
-              availability: formData.availability,
-              fee: parseInt(formData.consultationFee),
-              contact: formData.phone,
+              name: `Dr. ${formData.first_name} ${formData.last_name}`.trim(),
+              first_name: formData.first_name,
+              middle_name: formData.middle_name,
+              last_name: formData.last_name,
               email: formData.email,
-              personalEmail: formData.personalEmail,
-              qualification: formData.qualification,
-              experience: formData.experience,
-              consultationType: formData.consultationType,
-              bio: formData.bio
+              phone: formData.phone,
+              contact: formData.phone,
+              emergency_contact: formData.emergency_contact,
+              shift_timing: formData.shift_timing,
+              joining_date: formData.joining_date,
+              address: formData.address,
+              department_name: formData.department_name,
+              department: formData.department_name
             }
           : doctor
       )
     )
     setIsEditModalOpen(false)
     resetForm()
+  }
+
+  // Add new doctor
+  const handleAddDoctor = async () => {
+    if (!validateForm()) return
+    setSubmitLoading(true)
+
+    try {
+      const payload = {
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        first_name: formData.first_name.trim(),
+        last_name: formData.last_name.trim(),
+        middle_name: formData.middle_name?.trim() || '',
+        role: formData.role || 'DOCTOR',
+        password: formData.password,
+        emergency_contact: formData.emergency_contact?.trim() || '',
+        shift_timing: formData.shift_timing?.trim() || '',
+        joining_date: formData.joining_date,
+        address: formData.address?.trim() || '',
+        department_name: formData.department_name?.trim() || '',
+        doctor_specialization: 'General Physician'
+      }
+      
+      const res = await apiFetch(HOSPITAL_ADMIN_STAFF, { method: 'POST', body: payload })
+      const data = await res.json().catch(() => ({}))
+      
+      if (!res.ok) {
+        window.alert(data?.message || data?.detail?.message || `Failed to create doctor (${res.status})`)
+        return
+      }
+      
+      setIsEditModalOpen(false)
+      resetForm()
+      loadDoctors()
+    } catch (error) {
+      window.alert(error?.message || 'Unable to create doctor.')
+    } finally {
+      setSubmitLoading(false)
+    }
   }
 
   // Toggle doctor status (Active/Inactive)
@@ -187,19 +231,18 @@ const DoctorManagement = () => {
     setIsAddMode(false)
     setCurrentDoctor(doctor)
     setFormData({
-      name: doctor.name,
-      specialization: doctor.specialization,
-      department: doctor.department,
-      email: doctor.email,
-      personalEmail: doctor.personalEmail || '',
-      phone: doctor.contact,
+      first_name: doctor.first_name || '',
+      middle_name: doctor.middle_name || '',
+      last_name: doctor.last_name || '',
+      email: doctor.email || '',
+      phone: doctor.phone || doctor.contact || '',
       password: '',
-      qualification: doctor.qualification,
-      experience: doctor.experience,
-      consultationFee: doctor.fee.toString(),
-      consultationType: doctor.consultationType || '',
-      availability: doctor.availability,
-      bio: doctor.bio || ''
+      role: doctor.role || 'DOCTOR',
+      emergency_contact: doctor.emergency_contact || '',
+      shift_timing: doctor.shift_timing || '',
+      joining_date: doctor.joining_date || '',
+      address: doctor.address || '',
+      department_name: doctor.department_name || doctor.department || ''
     })
     setDepartmentSearchTerm('')
     setSpecializationSearchTerm('')
@@ -214,22 +257,27 @@ const DoctorManagement = () => {
     setIsDeleteModalOpen(true)
   }
 
+  // Open add modal
+  const openModal = () => {
+    setIsAddMode(true)
+    resetForm()
+    setIsEditModalOpen(true)
+  }
+
   const resetForm = () => {
     setFormData({
-      name: '',
-      specialization: '',
-      department: '',
+      first_name: '',
+      middle_name: '',
+      last_name: '',
       email: '',
-      personalEmail: '',
       phone: '',
       password: '',
-      confirmPassword: '',
-      qualification: '',
-      experience: '',
-      consultationFee: '',
-      consultationType: '',
-      availability: '9AM-5PM',
-     
+      role: 'DOCTOR',
+      emergency_contact: '',
+      shift_timing: '',
+      joining_date: '',
+      address: '',
+      department_name: ''
     })
     setDepartmentSearchTerm('')
     setSpecializationSearchTerm('')
@@ -247,10 +295,10 @@ const DoctorManagement = () => {
 
   // Form validation
   const validateForm = () => {
-    const requiredFields = ['name', 'email', 'phone', 'qualification', 'department', 'specialization', 'experience', 'consultationFee']
+    const requiredFields = ['first_name', 'last_name', 'email', 'phone', 'department_name']
     for (let field of requiredFields) {
       if (!formData[field]) {
-        alert(`Please fill in the ${field} field`)
+        alert(`Please fill in the ${field.replace('_', ' ')} field`)
         return false
       }
     }
@@ -307,25 +355,51 @@ const DoctorManagement = () => {
   // Common form fields for both Add and Edit modals
   const renderFormFields = () => (
     <div className="space-y-6">
-      {/* Personal Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Full Name <span className="text-red-500">*</span>
+            First Name <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             required
-            value={formData.name}
-            onChange={(e) => handleInputChange('name', e.target.value)}
+            value={formData.first_name}
+            onChange={(e) => handleInputChange('first_name', e.target.value)}
             className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-            placeholder="Dr. John Doe"
+            placeholder="First Name"
           />
         </div>
-
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Official Email <span className="text-red-500">*</span>
+            Middle Name
+          </label>
+          <input
+            type="text"
+            value={formData.middle_name}
+            onChange={(e) => handleInputChange('middle_name', e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            placeholder="Middle Name"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Last Name <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            required
+            value={formData.last_name}
+            onChange={(e) => handleInputChange('last_name', e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            placeholder="Last Name"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Email <span className="text-red-500">*</span>
           </label>
           <input
             type="email"
@@ -336,20 +410,6 @@ const DoctorManagement = () => {
             placeholder="doctor@hospital.com"
           />
         </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Personal Email
-          </label>
-          <input
-            type="email"
-            value={formData.personalEmail}
-            onChange={(e) => handleInputChange('personalEmail', e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-            placeholder="personal@email.com"
-          />
-        </div>
-
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Phone Number <span className="text-red-500">*</span>
@@ -363,82 +423,89 @@ const DoctorManagement = () => {
             placeholder="+91 98765 43210"
           />
         </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Qualification <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            required
-            value={formData.qualification}
-            onChange={(e) => handleInputChange('qualification', e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-            placeholder="MBBS, MD, etc."
-          />
-        </div>
       </div>
 
-      {/* Password Setup Section - Only in Add Mode */}
       {isAddMode && (
-        <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-            <Lock className="text-blue-500" style={{fontSize: '20px'}} />
-            Login Credentials
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="password"
-                required={isAddMode}
-                value={formData.password}
-                onChange={(e) => handleInputChange('password', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                placeholder="Enter a strong password"
-              />
-              <p className="text-xs text-gray-500 mt-1">Use at least 8 characters, numbers, and symbols</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Confirm Password <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="password"
-                required={isAddMode}
-                value={formData.confirmPassword}
-                onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                placeholder="Confirm password"
-              />
-              {formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword && (
-                <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
-              )}
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Password <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="password"
+              required={isAddMode}
+              value={formData.password}
+              onChange={(e) => handleInputChange('password', e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              placeholder="Enter password"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Role
+            </label>
+            <input
+              type="text"
+              value={formData.role}
+              disabled
+              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+            />
           </div>
         </div>
       )}
 
-      {/* Professional Information */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Emergency Contact
+          </label>
+          <input
+            type="tel"
+            value={formData.emergency_contact}
+            onChange={(e) => handleInputChange('emergency_contact', e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            placeholder="Emergency Contact"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Shift Timing
+          </label>
+          <input
+            type="text"
+            value={formData.shift_timing}
+            onChange={(e) => handleInputChange('shift_timing', e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            placeholder="e.g. 9 AM - 5 PM"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Joining Date
+          </label>
+          <input
+            type="date"
+            value={formData.joining_date}
+            onChange={(e) => handleInputChange('joining_date', e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+          />
+        </div>
         <div className="relative">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Department <span className="text-red-500">*</span>
+            Department Name <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             required
-            value={departmentSearchTerm || formData.department}
+            value={departmentSearchTerm || formData.department_name}
             onChange={(e) => {
               setDepartmentSearchTerm(e.target.value)
               setDepartmentDropdownOpen(true)
-              handleInputChange('department', e.target.value)
+              handleInputChange('department_name', e.target.value)
             }}
             onFocus={() => setDepartmentDropdownOpen(true)}
             onBlur={() => setTimeout(() => setDepartmentDropdownOpen(false), 150)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
             placeholder="Type or select department"
           />
           {departmentDropdownOpen && (
@@ -451,7 +518,7 @@ const DoctorManagement = () => {
                   <div
                     key={dept}
                     onClick={() => {
-                      handleInputChange('department', dept)
+                      handleInputChange('department_name', dept)
                       setDepartmentSearchTerm('')
                       setDepartmentDropdownOpen(false)
                     }}
@@ -468,117 +535,19 @@ const DoctorManagement = () => {
             </div>
           )}
         </div>
-
-        <div className="relative">
+        <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Specialization <span className="text-red-500">*</span>
+            Address
           </label>
-          <input
-            type="text"
-            required
-            value={specializationSearchTerm || formData.specialization}
-            onChange={(e) => {
-              setSpecializationSearchTerm(e.target.value)
-              setSpecializationDropdownOpen(true)
-              handleInputChange('specialization', e.target.value)
-            }}
-            onFocus={() => setSpecializationDropdownOpen(true)}
-            onBlur={() => setTimeout(() => setSpecializationDropdownOpen(false), 150)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-            placeholder="Type or select specialization"
+          <textarea
+            rows="3"
+            value={formData.address}
+            onChange={(e) => handleInputChange('address', e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            placeholder="Full Address"
           />
-          {specializationDropdownOpen && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
-              {specializations
-                .filter(spec => 
-                  !specializationSearchTerm || spec.toLowerCase().includes(specializationSearchTerm.toLowerCase())
-                )
-                .map(spec => (
-                  <div
-                    key={spec}
-                    onClick={() => {
-                      handleInputChange('specialization', spec)
-                      setSpecializationSearchTerm('')
-                      setSpecializationDropdownOpen(false)
-                    }}
-                    className="w-full text-left px-4 py-2.5 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
-                  >
-                    {spec}
-                  </div>
-                ))}
-              {specializations.filter(spec => 
-                !specializationSearchTerm || spec.toLowerCase().includes(specializationSearchTerm.toLowerCase())
-              ).length === 0 && (
-                <div className="px-4 py-2.5 text-gray-500 text-sm">No specializations found</div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Years of Experience <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="number"
-            required
-            min="0"
-            max="50"
-            value={formData.experience}
-            onChange={(e) => handleInputChange('experience', e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-            placeholder="5"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Consultation Fee (₹) <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="number"
-            required
-            min="0"
-            value={formData.consultationFee}
-            onChange={(e) => handleInputChange('consultationFee', e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-            placeholder="500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Consultation Type
-          </label>
-          <select
-            value={formData.consultationType}
-            onChange={(e) => handleInputChange('consultationType', e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-          >
-            <option value="">Select Consultation Type</option>
-            <option value="In-Person">In-Person</option>
-            <option value="Telemedicine">Telemedicine</option>
-            <option value=" In-Person and Telemedicine">Both In-Person and Telemedicine</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Availability <span className="text-red-500">*</span>
-          </label>
-          <select
-            required
-            value={formData.availability}
-            onChange={(e) => handleInputChange('availability', e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-          >
-            {availabilityOptions.map(option => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
         </div>
       </div>
-
     </div>
   )
 
@@ -586,17 +555,23 @@ const DoctorManagement = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-        <div className=" px-4 sm:px-6 lg:px-8 py-5">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div className="flex items-center gap-3 flex-1">
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold">Doctor Management</h1>
-                <p className="text-gray-600 mt-2 text-xs sm:text-sm">Manage your medical team efficiently</p>
-              </div>
+      <div className=" px-4 sm:px-6 lg:px-8 py-5">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex items-center gap-3 flex-1">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold">Doctor Management</h1>
+              <p className="text-gray-600 mt-2 text-xs sm:text-sm">Manage your medical team efficiently</p>
             </div>
           </div>
+          <button
+            onClick={openModal}
+            className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-center gap-2 font-medium"
+          >
+            <i className="fas fa-plus-circle text-lg"></i>
+            <span>Add New Doctor</span>
+          </button>
         </div>
-      
+      </div>
 
       <div className="px-4 sm:px-6 lg:px-8 py-8">
         {/* Premium Search & Filter Bar */}
@@ -604,7 +579,7 @@ const DoctorManagement = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Search Input - Full Width on Mobile */}
             <div className="sm:col-span-2 lg:col-span-2">
-              <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2  items-center gap-2">
                 <Search className="text-blue-500" style={{fontSize: '20px'}} />
                 Search
               </label>
@@ -618,7 +593,7 @@ const DoctorManagement = () => {
             </div>
             {/* Department Filter */}
             <div className="lg:col-span-1">
-              <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2  items-center gap-2">
                 <LocalHospital className="text-green-500" style={{fontSize: '20px'}} />
                 Dept
               </label>
@@ -638,7 +613,7 @@ const DoctorManagement = () => {
             </div>
             {/* Status Filter */}
             <div>
-              <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2  items-center gap-2">
                 <FiberManualRecord className="text-orange-500" style={{fontSize: '20px'}} />
                 Status
               </label>
@@ -657,7 +632,7 @@ const DoctorManagement = () => {
             </div>
             {/* Consultation Type Filter */}
             <div>
-              <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2  items-center gap-2">
                 <LocalHospital className="text-purple-500" style={{fontSize: '20px'}} />
                 Consultation Type
               </label>
@@ -701,11 +676,14 @@ const DoctorManagement = () => {
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-center gap-4 flex-1 min-w-0">
                         <div className="relative flex-shrink-0">
-                          <img 
-                            src={doctor.image} 
-                            className="w-16 h-16 rounded-3xl border border-white/60 shadow-lg group-hover:scale-110 transition-transform duration-500 object-cover backdrop-blur-sm" 
-                            alt={doctor.name}
-                          />
+                          <div className="w-16 h-16 rounded-3xl border border-white/60 shadow-lg group-hover:scale-110 transition-transform duration-500 backdrop-blur-sm bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl uppercase">
+                            {(() => {
+                              const nameParts = doctor.name.replace(/^Dr\.\s*/i, '').trim().split(' ');
+                              return nameParts.length > 1 
+                                ? `${nameParts[0][0] || ''}${nameParts[nameParts.length - 1][0] || ''}`
+                                : (nameParts[0]?.substring(0, 2) || 'DR');
+                            })()}
+                          </div>
                           <div className={`absolute -bottom-2 -right-2 w-5 h-5 border-2 border-white/80 rounded-full animate-pulse shadow-lg backdrop-blur-sm ${
                             doctor.status === 'Active' 
                               ? 'bg-emerald-400/70' 
@@ -756,7 +734,7 @@ const DoctorManagement = () => {
           setIsEditModalOpen(false)
           resetForm()
         }} 
-        title="Edit Doctor"
+        title={isAddMode ? "Add New Doctor" : "Edit Doctor"}
         size="lg"
       >
         <div className="bg-gradient-to-b from-indigo-50/50 to-white/50 rounded-lg p-2">
@@ -775,12 +753,16 @@ const DoctorManagement = () => {
           </button>
           <button
             type="button"
-            onClick={handleEditDoctor}
-            disabled={!formData.name || !formData.email || !formData.department || !formData.specialization}
+            onClick={isAddMode ? handleAddDoctor : handleEditDoctor}
+            disabled={!formData.first_name || !formData.last_name || !formData.email || !formData.phone || !formData.department_name || submitLoading}
             className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 active:scale-95 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
           >
-            <SaveOutlined style={{fontSize: '20px'}} />
-            Update Doctor
+            {submitLoading ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <SaveOutlined style={{fontSize: '20px'}} />
+            )}
+            {submitLoading ? 'Saving...' : (isAddMode ? 'Add Doctor' : 'Update Doctor')}
           </button>
         </div>
       </Modal>
@@ -835,205 +817,126 @@ const DoctorManagement = () => {
         size="lg"
       >
         {currentDoctor && (
-          <div>
-            {/* Premium Header Section */}
-            <div className="relative bg-gradient-to-r from-blue-500/10 to-indigo-500/10 backdrop-blur-md border-b border-blue-200/50 rounded-t-3xl p-4 sm:p-6 md:p-8 mb-6 sm:mb-8">
-              {/* Status Badge - Top Right */}
-              <span className={`absolute top-3 right-3 sm:top-6 sm:right-6 inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-bold backdrop-blur-md border ${
-                currentDoctor.status === 'Active' 
-                  ? 'bg-emerald-500/20 text-emerald-700/90 border-emerald-400/50' 
-                  : 'bg-slate-500/20 text-slate-700/90 border-slate-400/50'
-              }`}>
-                {currentDoctor.status === 'Active' ? (
-                  <CheckCircle style={{fontSize: '18px'}} />
-                ) : (
-                  <Close style={{fontSize: '18px'}} />
-                )}
-                {currentDoctor.status}
-              </span>
-
-              <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-6">
-                <div className="relative">
-                  <img 
-                    src={currentDoctor.image} 
-                    className="w-20 h-20 sm:w-28 sm:h-28 rounded-2xl border-4 border-white/80 shadow-xl object-cover" 
-                    alt={currentDoctor.name}
-                  />
-                  <div className={`absolute -bottom-2 -right-2 w-5 sm:w-6 h-5 sm:h-6 border-3 border-white rounded-full animate-pulse ${
-                    currentDoctor.status === 'Active' 
-                      ? 'bg-emerald-400' 
-                      : 'bg-slate-400'
-                  }`}></div>
+          <div className="bg-white">
+            {/* Header Banner */}
+            <div className="bg-[#f4f7ff] p-6 mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-6">
+              <div className="relative">
+                <div className="w-24 h-24 rounded-2xl bg-[#4361ee] shadow-sm flex items-center justify-center text-white font-bold text-4xl uppercase">
+                  {(() => {
+                    const nameParts = currentDoctor.name.replace(/^Dr\.\s*/i, '').trim().split(' ');
+                    return nameParts.length > 1 
+                      ? `${nameParts[0][0] || ''}${nameParts[nameParts.length - 1][0] || ''}`
+                      : (nameParts[0]?.substring(0, 2) || 'DR');
+                  })()}
                 </div>
-                <div className="flex-1">
-                  <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">{currentDoctor.name}</h2>
-                  <p className="text-gray-700 text-sm font-semibold mb-2 flex items-center gap-2">
-                    <Badge className="text-blue-500/70" style={{fontSize: '20px'}} />
+                <div className={`absolute -bottom-2 -right-2 w-7 h-7 border-4 border-[#f4f7ff] rounded-full ${
+                  currentDoctor.status === 'Active' ? 'bg-[#2ec4b6]' : 'bg-slate-400'
+                }`}></div>
+              </div>
+              <div>
+                <h2 className="text-3xl font-bold text-[#4361ee] mb-2">{currentDoctor.name}</h2>
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-gray-600 text-sm font-semibold flex items-center gap-2">
+                    <Badge style={{fontSize: '16px'}} />
                     {currentDoctor.id}
                   </p>
-                  <p className="text-lg font-bold text-blue-600/90 flex items-center gap-2">
-                    <LocalHospital className="text-blue-600/70" style={{fontSize: '20px'}} />
-                    {currentDoctor.specialization}
+                  <p className="text-[#4361ee] font-bold text-sm flex items-center gap-2">
+                    <LocalHospital style={{fontSize: '16px'}} />
+                    {currentDoctor.specialization || currentDoctor.department}
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Info Grid - Premium Layout */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5 mb-6 sm:mb-8 px-4 sm:px-6 md:px-8">
+            {/* Info Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-6 mb-8">
               {/* Department */}
-              <div className="backdrop-blur-md bg-white border-2 border-blue-300/50 rounded-2xl p-5 hover:from-blue-500/25 hover:to-blue-500/15 hover:border-blue-400/75 transition-all shadow-md hover:shadow-lg">
+              <div className="bg-white border border-blue-100 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 bg-blue-500/30 rounded-lg flex items-center justify-center">
-                    <LocalHospital className="text-blue-700" style={{fontSize: '20px'}} />
+                  <div className="w-8 h-8 bg-blue-100/70 rounded-lg flex items-center justify-center">
+                    <LocalHospital className="text-blue-600" style={{fontSize: '18px'}} />
                   </div>
-                  <label className="text-xs font-bold text-blue-700/90 uppercase tracking-wide">Department</label>
+                  <label className="text-[11px] font-bold text-blue-600 uppercase tracking-widest">Department</label>
                 </div>
-                <p className="text-lg font-bold text-black-900 ml-13">{currentDoctor.department}</p>
+                <p className="text-base font-bold text-gray-900">{currentDoctor.department}</p>
               </div>
 
               {/* Experience */}
-              <div className="backdrop-blur-md bg-white border-2 border-blue-300/50 rounded-2xl p-5 hover:from-blue-500/25 hover:to-blue-500/15 hover:border-blue-400/75 transition-all shadow-md hover:shadow-lg">
+              <div className="bg-white border border-blue-100 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 bg-purple-500/30 rounded-lg flex items-center justify-center">
-                    <EmojiEvents className="text-purple-700" style={{fontSize: '20px'}} />
+                  <div className="w-8 h-8 bg-purple-100/70 rounded-lg flex items-center justify-center">
+                    <EmojiEvents className="text-purple-600" style={{fontSize: '18px'}} />
                   </div>
-                  <label className="text-xs font-bold text-purple-700/90 uppercase tracking-wide">Experience</label>
+                  <label className="text-[11px] font-bold text-purple-600 uppercase tracking-widest">Experience</label>
                 </div>
-                <p className="text-lg font-bold text-black-900 ml-13">{currentDoctor.experience} Years</p>
+                <p className="text-base font-bold text-gray-900">{currentDoctor.experience || ''} Years</p>
               </div>
 
               {/* Email */}
-              <div className="backdrop-blur-md bg-white border-2 border-blue-300/50 rounded-2xl p-5 hover:from-blue-500/25 hover:to-blue-500/15 hover:border-blue-400/75 transition-all shadow-md hover:shadow-lg">
+              <div className="bg-white border border-blue-100 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 bg-green-500/30 rounded-lg flex items-center justify-center">
-                    <MailOutline className="text-green-700" style={{fontSize: '20px'}} />
+                  <div className="w-8 h-8 bg-green-100/70 rounded-lg flex items-center justify-center">
+                    <MailOutline className="text-green-600" style={{fontSize: '18px'}} />
                   </div>
-                  <label className="text-xs font-bold text-green-700/90 uppercase tracking-wide">Email</label>
+                  <label className="text-[11px] font-bold text-green-600 uppercase tracking-widest">Email</label>
                 </div>
-                <p className="text-sm font-semibold text-black-900 break-all ml-13">{currentDoctor.email}</p>
+                <p className="text-sm font-semibold text-gray-900 truncate">{currentDoctor.email}</p>
               </div>
 
-              {/* Personal Email */}
-              {currentDoctor.personalEmail && (
-                <div className="backdrop-blur-md bg-white border-2 border-blue-300/50 rounded-2xl p-5 hover:from-blue-500/25 hover:to-blue-500/15 hover:border-blue-400/75 transition-all shadow-md hover:shadow-lg">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 bg-rose-500/30 rounded-lg flex items-center justify-center">
-                      <MarkEmailRead className="text-rose-700" style={{fontSize: '20px'}} />
-                    </div>
-                    <label className="text-xs font-bold text-rose-700/90 uppercase tracking-wide">Personal Email</label>
-                  </div>
-                  <p className="text-sm font-semibold text-black-900 break-all ml-13">{currentDoctor.personalEmail}</p>
-                </div>
-              )}
-
               {/* Contact */}
-              <div className="backdrop-blur-md bg-white border-2 border-blue-300/50 rounded-2xl p-5 hover:from-blue-500/25 hover:to-blue-500/15 hover:border-blue-400/75 transition-all shadow-md hover:shadow-lg">
+              <div className="bg-white border border-blue-100 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 bg-orange-500/30 rounded-lg flex items-center justify-center">
-                    <Phone className="text-orange-700" style={{fontSize: '20px'}} />
+                  <div className="w-8 h-8 bg-orange-100/70 rounded-lg flex items-center justify-center">
+                    <Phone className="text-orange-600" style={{fontSize: '18px'}} />
                   </div>
-                  <label className="text-xs font-bold text-orange-700/90 uppercase tracking-wide">Contact</label>
+                  <label className="text-[11px] font-bold text-orange-600 uppercase tracking-widest">Contact</label>
                 </div>
-                <p className="text-lg font-bold text-black-900 ml-13">{currentDoctor.contact}</p>
+                <p className="text-base font-bold text-gray-900">{currentDoctor.contact}</p>
               </div>
 
               {/* Availability */}
-              <div className="backdrop-blur-md bg-white border-2 border-blue-300/50 rounded-2xl p-5 hover:from-blue-500/25 hover:to-blue-500/15 hover:border-blue-400/75 transition-all shadow-md hover:shadow-lg">
+              <div className="bg-white border border-blue-100 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 bg-teal-500/30 rounded-lg flex items-center justify-center">
-                    <CalendarMonth className="text-teal-700" style={{fontSize: '20px'}} />
+                  <div className="w-8 h-8 bg-teal-100/70 rounded-lg flex items-center justify-center">
+                    <CalendarMonth className="text-teal-600" style={{fontSize: '18px'}} />
                   </div>
-                  <label className="text-xs font-bold text-teal-700/90 uppercase tracking-wide">Availability</label>
+                  <label className="text-[11px] font-bold text-teal-600 uppercase tracking-widest">Availability</label>
                 </div>
-                <p className="text-lg font-bold text-black-900 ml-13">{currentDoctor.availability}</p>
+                <p className="text-base font-bold text-gray-900">{currentDoctor.shift_timing || currentDoctor.availability || ''}</p>
               </div>
 
               {/* Consultation Fee */}
-              <div className="backdrop-blur-md bg-white border-2 border-blue-300/50 rounded-2xl p-5 hover:from-blue-500/25 hover:to-blue-500/15 hover:border-blue-400/75 transition-all shadow-md hover:shadow-lg">
+              <div className="bg-white border border-blue-100 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 bg-yellow-500/30 rounded-lg flex items-center justify-center">
-                    <CurrencyRupee className="text-yellow-700" style={{fontSize: '20px'}} />
+                  <div className="w-8 h-8 bg-yellow-100/70 rounded-lg flex items-center justify-center">
+                    <CurrencyRupee className="text-yellow-600" style={{fontSize: '18px'}} />
                   </div>
-                  <label className="text-xs font-bold text-yellow-700/90 uppercase tracking-wide">Consultation Fee</label>
+                  <label className="text-[11px] font-bold text-yellow-600 uppercase tracking-widest">Consultation Fee</label>
                 </div>
-                <p className="text-xl font-bold text-black-900 ml-13">₹{currentDoctor.fee}</p>
+                <p className="text-base font-bold text-gray-900">₹ {currentDoctor.fee || ''}</p>
               </div>
-
-              {/* Consultation Type */}
-              {currentDoctor.consultationType && (
-                <div className="backdrop-blur-md bg-white border-2 border-blue-300/50 rounded-2xl p-5 hover:from-blue-500/25 hover:to-blue-500/15 hover:border-blue-400/75 transition-all shadow-md hover:shadow-lg">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 bg-pink-500/30 rounded-lg flex items-center justify-center">
-                      <VideoCall className="text-pink-700" style={{fontSize: '20px'}} />
-                    </div>
-                    <label className="text-xs font-bold text-pink-700/90 uppercase tracking-wide">Consultation Type</label>
-                  </div>
-                  <p className="text-lg font-bold text-black-900 ml-13">{currentDoctor.consultationType}</p>
-                </div>
-              )}
 
               {/* Qualification */}
-              <div className="backdrop-blur-md bg-white border-2 border-blue-300/50 rounded-2xl p-5 hover:from-blue-500/25 hover:to-blue-500/15 hover:border-blue-400/75 transition-all shadow-md hover:shadow-lg">
+              <div className="bg-white border border-blue-100 rounded-xl p-4 shadow-sm sm:col-span-1">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 bg-indigo-500/30 rounded-lg flex items-center justify-center">
-                    <School className="text-indigo-700" style={{fontSize: '20px'}} />
+                  <div className="w-8 h-8 bg-indigo-100/70 rounded-lg flex items-center justify-center">
+                    <School className="text-indigo-600" style={{fontSize: '18px'}} />
                   </div>
-                  <label className="text-xs font-bold text-indigo-700/90 uppercase tracking-wide">Qualification</label>
+                  <label className="text-[11px] font-bold text-indigo-600 uppercase tracking-widest">Qualification</label>
                 </div>
-                <p className="text-black-900 font-semibold ml-13">{currentDoctor.qualification}</p>
+                <p className="text-base font-bold text-gray-900">{currentDoctor.qualification || ''}</p>
               </div>
-
-              {/* Password */}
-              {currentDoctor.password && (
-                <div className="backdrop-blur-md bg-white border-2 border-blue-300/50 rounded-2xl p-5 hover:from-blue-500/25 hover:to-blue-500/15 hover:border-blue-400/75 transition-all shadow-md hover:shadow-lg">
-                  <div className="flex items-center justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-red-500/30 rounded-lg flex items-center justify-center">
-                        <Lock className="text-red-700" style={{fontSize: '20px'}} />
-                      </div>
-                      <label className="text-xs font-bold text-red-700/90 uppercase tracking-wide">Password</label>
-                    </div>
-                    <button
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="p-2 rounded-lg hover:bg-red-500/10 transition-all text-red-700 cursor-pointer"
-                      title={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showPassword ? <VisibilityOff style={{fontSize: '20px'}} /> : <Visibility style={{fontSize: '20px'}} />}
-                    </button>
-                  </div>
-                  <p className="text-sm font-semibold text-black-900 font-mono tracking-widest ml-13 select-none break-all">
-                    {showPassword ? currentDoctor.password : '•'.repeat(Math.min(currentDoctor.password.length, 12))}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-2">{showPassword ? 'Password visible' : 'Masked for security'}</p>
-                </div>
-              )}
             </div>
 
-            {/* Bio Section */}
-            <div className="space-y-3 sm:space-y-5 mb-6 sm:mb-8 px-4 sm:px-6 md:px-8">
-              {currentDoctor.bio && (
-                <div className="backdrop-blur-md bg-white border-2 border-blue-300/50 rounded-2xl p-5 hover:from-blue-500/25 hover:to-blue-500/15 hover:border-blue-400/75 transition-all shadow-md hover:shadow-lg">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 bg-cyan-500/30 rounded-lg flex items-center justify-center">
-                      <MenuBook className="text-cyan-700" style={{fontSize: '20px'}} />
-                    </div>
-                    <label className="text-xs font-bold text-cyan-700/90 uppercase tracking-wide">Bio</label>
-                  </div>
-                  <p className="text-black-900 font-medium ml-13 leading-relaxed">{currentDoctor.bio}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-4 sm:pt-6 px-4 sm:px-6 md:px-8 border-t border-gray-200">
+            {/* Footer Buttons */}
+            <div className="flex justify-center sm:justify-end gap-3 px-6 pb-6 pt-2 border-t border-gray-100">
               <button
                 type="button"
                 onClick={() => {
                   setIsViewModalOpen(false)
                   setCurrentDoctor(null)
                 }}
-                className="px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base  bg-gray-200 border-2 border-white/60 rounded-xl text-gray-700 font-semibold hover:bg-gray-300 hover:border-white/80 transition-all duration-200 active:scale-95"
+                className="px-6 py-2.5 text-sm font-semibold bg-[#e2e8f0] text-slate-700 rounded-lg hover:bg-slate-300 transition-colors"
               >
                 Close
               </button>
@@ -1043,19 +946,16 @@ const DoctorManagement = () => {
                   handleToggleStatus(currentDoctor.id)
                   setCurrentDoctor({...currentDoctor, status: currentDoctor.status === 'Active' ? 'Inactive' : 'Active'})
                 }}
-                className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold rounded-xl transition-all duration-200 active:scale-95 shadow-lg hover:shadow-xl flex items-center justify-center gap-2 backdrop-blur-md border ${
-                  currentDoctor.status === 'Active' 
-                    ? 'bg-gradient-to-r from-orange-500/80 to-red-600/80 hover:from-orange-600 hover:to-red-700 text-white border-orange-400/50' 
-                    : 'bg-gradient-to-r from-green-500/80 to-emerald-600/80 hover:from-green-600 hover:to-emerald-700 text-white border-green-400/50'
+                className={`px-6 py-2.5 text-sm font-semibold rounded-lg text-white transition-colors flex items-center gap-2 shadow-sm ${
+                  currentDoctor.status === 'Active' ? 'bg-[#f46036] hover:bg-[#e05631]' : 'bg-[#2ec4b6] hover:bg-[#27a89c]'
                 }`}
               >
                 {currentDoctor.status === 'Active' ? (
-                  <Pause style={{fontSize: '20px'}} />
+                  <Pause style={{fontSize: '18px'}} />
                 ) : (
-                  <PlayArrow style={{fontSize: '20px'}} />
+                  <PlayArrow style={{fontSize: '18px'}} />
                 )}
-                <span className="hidden sm:inline">{currentDoctor.status === 'Active' ? 'Deactivate' : 'Activate'}</span>
-                <span className="sm:hidden">{currentDoctor.status === 'Active' ? 'Deactivate' : 'Activate'}</span>
+                {currentDoctor.status === 'Active' ? 'Deactivate' : 'Activate'}
               </button>
               <button
                 type="button"
@@ -1063,11 +963,10 @@ const DoctorManagement = () => {
                   setIsViewModalOpen(false)
                   openEditModal(currentDoctor)
                 }}
-                className="px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 active:scale-95 shadow-lg hover:shadow-xl backdrop-blur-md border border-blue-400/50 flex items-center justify-center gap-2"
+                className="px-6 py-2.5 text-sm font-semibold bg-[#4361ee] text-white rounded-lg hover:bg-[#3a56d4] transition-colors flex items-center gap-2 shadow-sm"
               >
-                <Edit style={{fontSize: '20px'}} />
-                <span className="hidden sm:inline">Edit Doctor</span>
-                <span className="sm:hidden">Edit</span>
+                <Edit style={{fontSize: '18px'}} />
+                Edit Doctor
               </button>
             </div>
           </div>

@@ -350,10 +350,10 @@ const DepartmentManagement = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredDepartments.map((department) => (
                 <tr key={department.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
+                  <td className="px-6 py-4">
+                    <div className="max-w-[200px] sm:max-w-[300px] lg:max-w-[400px]">
                       <div className="text-sm font-medium text-gray-900">{department.name}</div>
-                      <div className="text-sm text-gray-500 line-clamp-1">{department.description}</div>
+                      <div className="text-xs text-gray-500 truncate mt-0.5" title={department.description}>{department.description}</div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{department.code || '-'}</td>

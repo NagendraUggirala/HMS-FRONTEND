@@ -28,10 +28,11 @@ const ResultAccess = ({ initialSearch }) => {
     mobile_accesses: 0
   })
   const [securityFeatures, setSecurityFeatures] = useState([])
+  const [metaData, setMetaData] = useState(null)
   const [accessRequest, setAccessRequest] = useState({
     patientId: '',
     doctorEmail: '',
-    accessType: 'view',
+    accessType: 'VIEW_ONLY',
     expiryDate: '',
     accessCode: ''
   })
@@ -53,8 +54,32 @@ const ResultAccess = ({ initialSearch }) => {
       const response = await apiFetch(endpoint)
       if (response.ok) {
         const data = await response.json()
-        setPatients(data.patients || [])
-        setAccessLogs(data.access_logs || [])
+        
+        const mappedPatients = (data.patients || []).map(p => ({
+          id: p.patient_ref || p.id || 'N/A',
+          name: p.patient_name || p.name || 'N/A',
+          email: p.email || 'N/A',
+          phone: p.phone || 'N/A',
+          lastAccess: p.last_access || p.lastAccess || 'Never',
+          accessCount: p.access_count || p.accessCount || 0,
+          status: p.status || 'active',
+          accessCode: p.access_code || p.accessCode || '-'
+        }))
+        
+        const mappedLogs = (data.access_logs || []).map(l => ({
+          id: l.id || `LOG-${Math.random()}`,
+          patientName: l.patient_name || l.patientName || 'N/A',
+          patientId: l.patient_ref || l.patientId,
+          accessedBy: l.accessed_by || l.accessedBy || 'N/A',
+          accessTime: l.access_time || l.accessTime || new Date().toISOString().replace('T', ' ').slice(0, 19),
+          action: l.action || l.access_type || 'View Report',
+          reportType: l.report_type || l.reportType || 'All Reports',
+          ipAddress: l.ip_address || l.ipAddress || 'System',
+          device: l.device || 'System'
+        }))
+
+        setPatients(mappedPatients)
+        setAccessLogs(mappedLogs)
         setDashboardStats(data.stats || {
           active_access: 0,
           doctor_access: 0,
@@ -62,6 +87,7 @@ const ResultAccess = ({ initialSearch }) => {
           mobile_accesses: 0
         })
         setSecurityFeatures(data.security_features || [])
+        setMetaData(data.meta || null)
       } else {
         console.error('Failed to fetch data')
       }
@@ -78,13 +104,12 @@ const ResultAccess = ({ initialSearch }) => {
 
   const handleGrantAccess = (patient) => {
     setSelectedPatient(patient)
-    const newAccessCode = `ACC${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`
     setAccessRequest({
-      patientId: patient.id,
+      patientId: patient && patient.id ? patient.id : '',
       doctorEmail: '',
-      accessType: 'view',
-      expiryDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      accessCode: newAccessCode
+      accessType: 'VIEW_ONLY',
+      expiryDate: '',
+      accessCode: ''
     })
     setShowAccessModal(true)
   }
@@ -143,32 +168,47 @@ const ResultAccess = ({ initialSearch }) => {
       const response = await apiFetch('/api/v1/lab/result-access/grant', {
         method: 'POST',
         body: {
-          patientId: accessRequest.patientId,
-          doctorEmail: accessRequest.doctorEmail,
-          accessType: accessRequest.accessType,
-          expiryDate: accessRequest.expiryDate,
-          accessCode: accessRequest.accessCode
+          patient_ref: accessRequest.patientId,
+          email: accessRequest.doctorEmail,
+          access_type: accessRequest.accessType,
+          expiry_date: accessRequest.expiryDate,
+          access_code: accessRequest.accessCode
         }
       })
 
       if (response.ok) {
         const responseData = await response.json().catch(() => ({}))
-        const updatedPatients = patients.map(patient =>
-          patient.id === accessRequest.patientId
-            ? { 
-                ...patient, 
-                status: 'active',
-                accessCode: accessRequest.accessCode,
-                expiryDate: accessRequest.expiryDate,
-                accessCount: patient.accessCount + 1
-              }
-            : patient
-        )
+        const existingPatientIndex = patients.findIndex(p => p.id === accessRequest.patientId)
+        let updatedPatients = [...patients]
+        let pName = selectedPatient?.name || accessRequest.patientId
+
+        if (existingPatientIndex >= 0) {
+          pName = updatedPatients[existingPatientIndex].name || pName
+          updatedPatients[existingPatientIndex] = {
+            ...updatedPatients[existingPatientIndex],
+            status: 'active',
+            accessCode: accessRequest.accessCode,
+            expiryDate: accessRequest.expiryDate,
+            accessCount: (updatedPatients[existingPatientIndex].accessCount || 0) + 1
+          }
+        } else {
+          updatedPatients.unshift({
+            id: accessRequest.patientId,
+            name: pName,
+            email: accessRequest.doctorEmail,
+            phone: 'N/A',
+            lastAccess: 'Just now',
+            accessCount: 1,
+            status: 'active',
+            accessCode: accessRequest.accessCode,
+            expiryDate: accessRequest.expiryDate
+          })
+        }
         setPatients(updatedPatients)
         
         const newLog = {
           id: responseData.logId || `LOG-${Date.now()}`,
-          patientName: selectedPatient?.name || patients.find(p => p.id === accessRequest.patientId)?.name,
+          patientName: pName,
           patientId: accessRequest.patientId,
           accessedBy: accessRequest.doctorEmail,
           accessTime: new Date().toISOString().replace('T', ' ').slice(0, 19),
@@ -290,9 +330,23 @@ const ResultAccess = ({ initialSearch }) => {
           <div>
             <h2 className="text-2xl font-semibold text-gray-700">Secure Result Access</h2>
             <p className="text-gray-500">Manage secure online result access for patients and referring physicians</p>
+            {metaData && (
+              <div className="flex items-center gap-2 mt-2 text-xs">
+                <span className={`px-2 py-0.5 rounded-full font-medium ${metaData.live_data ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                  <i className={`fas ${metaData.live_data ? 'fa-check-circle' : 'fa-vial'} mr-1`}></i>
+                  {metaData.live_data ? 'Live Data' : 'Demo Data'}
+                </span>
+                {metaData.generated_at && (
+                  <span className="text-gray-400">
+                    <i className="far fa-clock mr-1"></i>
+                    Last updated: {new Date(metaData.generated_at).toLocaleString()}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex gap-3">
-            <Button variant="primary" icon="fas fa-shield-alt" onClick={() => setShowAccessModal(true)} > Grant Access </Button>
+            <Button variant="primary" icon="fas fa-shield-alt" onClick={() => handleGrantAccess(null)} > Grant Access </Button>
           </div>
         </div>
 
@@ -564,15 +618,16 @@ const ResultAccess = ({ initialSearch }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1"> Patient <span className="text-red-500">*</span> </label>
-            <select className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              value={accessRequest.patientId} onChange={(e) => setAccessRequest({...accessRequest, patientId: e.target.value})}
-              required >
-              <option value="">Select patient</option>
+            <label className="block text-sm font-medium text-gray-700 mb-1"> Patient ID <span className="text-red-500">*</span> </label>
+            <input type="text" list="patient-options" className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Enter Patient ID" value={accessRequest.patientId}
+              onChange={(e) => setAccessRequest({...accessRequest, patientId: e.target.value})} required
+            />
+            <datalist id="patient-options">
               {patients.map(patient => (
                 <option key={patient.id} value={patient.id}>{patient.name} ({patient.id})</option>
               ))}
-            </select>
+            </datalist>
           </div>
 
           <div>
@@ -591,9 +646,9 @@ const ResultAccess = ({ initialSearch }) => {
               <select className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={accessRequest.accessType}
                 onChange={(e) => setAccessRequest({...accessRequest, accessType: e.target.value})} >
-                <option value="view">View Only</option>
-                <option value="download">View & Download</option>
-                <option value="full">Full Access</option>
+                <option value="VIEW_ONLY">View Only</option>
+                <option value="DOWNLOAD">View & Download</option>
+                <option value="FULL_ACCESS">Full Access</option>
               </select>
             </div>
             <div>
@@ -607,15 +662,24 @@ const ResultAccess = ({ initialSearch }) => {
             </div>
           </div>
 
-          <div className="bg-gray-50 p-3 rounded-lg">
-            <p className="text-sm text-gray-600">
-              <strong>Access Code:</strong> 
-              <code className="ml-2 px-2 py-1 bg-white rounded border font-mono">{accessRequest.accessCode}</code>
-              <button className="ml-2 text-blue-600 hover:text-blue-800 transition-colors"
-                onClick={() => handleCopyAccessCode(accessRequest.accessCode)} >
-                <i className="fas fa-copy"></i>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Access Code <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-2">
+              <input type="text" className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono bg-gray-50"
+                placeholder="Enter or generate access code" value={accessRequest.accessCode}
+                onChange={(e) => setAccessRequest({...accessRequest, accessCode: e.target.value})} required
+              />
+              <button className="px-3 py-2 bg-white text-gray-600 rounded-lg border hover:bg-gray-100 transition-colors"
+                title="Generate Random Code"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setAccessRequest({...accessRequest, accessCode: `ACC${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`});
+                }} >
+                <i className="fas fa-random"></i>
               </button>
-            </p>
+            </div>
             <p className="text-xs text-gray-500 mt-1">
               Share this code with the recipient for secure access
             </p>
@@ -626,7 +690,7 @@ const ResultAccess = ({ initialSearch }) => {
               Cancel
             </Button>
             <Button variant="primary" onClick={handleGrantAccessSubmit}
-              disabled={!accessRequest.patientId || !accessRequest.doctorEmail} >
+              disabled={!accessRequest.patientId || !accessRequest.doctorEmail || !accessRequest.accessCode} >
               Grant Access
             </Button>
           </div>

@@ -10,15 +10,24 @@ import {  ResponsiveContainer,  BarChart,  Bar,  XAxis,  YAxis,  Tooltip as ReTo
 const LabOverview = () => {
   const [loading, setLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState({})
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]) // YYYY-MM-DD format
 
   useEffect(() => {
     loadDashboardData()
   }, [])
 
-  const loadDashboardData = async () => {
+  useEffect(() => {
+    loadDashboardData(selectedDate)
+  }, [selectedDate])
+
+  const loadDashboardData = async (date = selectedDate) => {
     setLoading(true)
     try {
-      const response = await apiFetch('/api/v1/lab/tech-dashboard')
+      const params = new URLSearchParams()
+      if (date) params.append('for_date', date)
+      
+      const url = `/api/v1/lab/tech-dashboard${params.toString() ? `?${params.toString()}` : ''}`
+      const response = await apiFetch(url)
       if (response.ok) {
         const data = await response.json()
         setDashboardData(data)
@@ -187,7 +196,17 @@ const LabOverview = () => {
           </h2>
           <p className="text-sm text-gray-500">Real-time overview of lab operations and performance</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <div className="flex items-center gap-2">
+            <label htmlFor="dashboard-date" className="text-sm font-medium text-gray-700">Date:</label>
+            <input
+              id="dashboard-date"
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+            />
+          </div>
           <button onClick={() => handleQuickAction('critical-results')}
             className="px-4 py-2 bg-gradient-to-r from-red-100 to-red-50 text-red-700 rounded-lg hover:from-red-200 hover:to-red-100 transition-all text-sm font-medium border border-red-200" >
             <i className="fas fa-flask mr-2"></i>Critical Results

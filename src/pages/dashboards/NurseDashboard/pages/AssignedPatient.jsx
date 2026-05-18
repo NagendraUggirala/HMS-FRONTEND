@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Modal from '../../../../components/common/Modal/Modal';
+import { apiFetch } from '../../../../services/apiClient';
+import { NURSE_ASSIGNED_PATIENTS } from '../../../../config/api';
 
 const AssignedPatients = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -12,7 +14,9 @@ const AssignedPatients = () => {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [notes, setNotes] = useState('');
   const [medications, setMedications] = useState('');
-  
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   const [newPatient, setNewPatient] = useState({
     name: '',
     gender: 'Male',
@@ -29,90 +33,65 @@ const AssignedPatients = () => {
   });
 
   // Make patients a state variable instead of constant
-  const [patients, setPatients] = useState([
-    {
-      id: 1,
-      name: 'Leanne Graham',
-      gender: 'Female',
-      room: '101',
-      condition: 'Fever',
-      treatment: 'Antibiotics',
-      status: 'Stable',
-      lastVital: new Date().toLocaleTimeString(),
-      avatar: 'https://i.pravatar.cc/60?img=11',
-      temperature: 98.2,
-      bloodPressure: '119/72',
-      pulse: 72,
-      oxygen: 99,
-      notes: 'Patient responding well to antibiotics. Temperature stable.',
-      medications: 'Amoxicillin 500mg - 1 tab every 8 hours\nParacetamol 500mg - as needed for fever'
-    },
-    {
-      id: 2,
-      name: 'Ervin Howell',
-      gender: 'Male',
-      room: '102',
-      condition: 'Diabetes',
-      treatment: 'IV Fluids',
-      status: 'Critical',
-      lastVital: new Date().toLocaleTimeString(),
-      avatar: 'https://i.pravatar.cc/60?img=12',
-      temperature: 98.1,
-      bloodPressure: '115/71',
-      pulse: 70,
-      oxygen: 96,
-      notes: 'Blood sugar levels monitoring required every 4 hours.',
-      medications: 'Insulin - 10 units before meals\nMetformin 500mg - twice daily'
-    },
-    {
-      id: 3,
-      name: 'Clementine Bauch',
-      gender: 'Female',
-      room: '103',
-      condition: 'Fracture',
-      treatment: 'Rest',
-      status: 'Improving',
-      lastVital: new Date().toLocaleTimeString(),
-      avatar: 'https://i.pravatar.cc/60?img=13',
-      temperature: 98.2,
-      bloodPressure: '110/70',
-      pulse: 62,
-      oxygen: 97,
-      notes: 'Arm cast applied. Pain manageable with medication.',
-      medications: 'Ibuprofen 400mg - every 6 hours as needed for pain'
-    },
-    {
-      id: 4,
-      name: 'Patricia Lebsack',
-      gender: 'Female',
-      room: '104',
-      condition: 'Migraine',
-      treatment: 'Physiotherapy',
-      status: 'Stable',
-      lastVital: new Date().toLocaleTimeString(),
-      avatar: 'https://i.pravatar.cc/60?img=14',
-      temperature: 98.5,
-      bloodPressure: '117/72',
-      pulse: 68,
-      oxygen: 97,
-      notes: 'Migraine symptoms improving with rest and medication.',
-      medications: 'Sumatriptan 50mg - as needed for migraine\nPropranolol 40mg - daily for prevention'
-    }
-  ]);
+  const [patients, setPatients] = useState([]);
 
   const conditions = [
-    'Fever', 'Diabetes', 'Hypertension', 'Cardiac Care', 
+    'Fever', 'Diabetes', 'Hypertension', 'Cardiac Care',
     'Fracture', 'Migraine', 'Infection', 'Post-op Recovery',
     'Pneumonia', 'Asthma', 'Arthritis', 'Other'
   ];
 
+  const fetchAssignedPatients = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await apiFetch(NURSE_ASSIGNED_PATIENTS);
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const message = payload?.detail?.message || payload?.detail || payload?.message || 'Unable to load assigned patients';
+        throw new Error(typeof message === 'string' ? message : 'Unable to load assigned patients');
+      }
+
+      const assignedPatients = payload?.data || [];
+      const transformedPatients = assignedPatients.map((patient, index) => ({
+        id: patient.id || index + 1,
+        name: patient.name || patient.patient_name || 'Unknown',
+        gender: patient.gender || 'Unknown',
+        room: patient.room_number || patient.room || 'N/A',
+        condition: patient.condition || patient.primary_diagnosis || 'N/A',
+        treatment: patient.treatment || patient.current_treatment || 'To be determined',
+        status: patient.status || 'Stable',
+        lastVital: patient.last_vital_timestamp ? new Date(patient.last_vital_timestamp).toLocaleTimeString() : new Date().toLocaleTimeString(),
+        avatar: patient.avatar || `https://i.pravatar.cc/60?img=${(index % 20) + 11}`,
+        temperature: patient.temperature || patient.vital_temperature || 98.6,
+        bloodPressure: patient.blood_pressure || `${patient.bp_systolic || patient.systolic || 120}/${patient.bp_diastolic || patient.diastolic || 80}`,
+        pulse: patient.pulse || patient.heart_rate || 72,
+        oxygen: patient.oxygen_saturation || patient.oxygen || 98,
+        notes: patient.notes || patient.nursing_notes || '',
+        medications: patient.medications || patient.current_medications || ''
+      }));
+
+      setPatients(transformedPatients);
+    } catch (err) {
+      setError(err?.message || 'Unable to load assigned patients.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAssignedPatients();
+  }, []);
+
   const filteredPatients = patients.filter(patient => {
     const matchesSearch = patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         patient.condition.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         patient.room.toLowerCase().includes(searchTerm.toLowerCase());
-    
+      patient.condition.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patient.room.toLowerCase().includes(searchTerm.toLowerCase());
+
     const matchesStatus = !statusFilter || patient.status === statusFilter;
-    
+
     return matchesSearch && matchesStatus;
   });
 
@@ -156,7 +135,7 @@ const AssignedPatients = () => {
         avatar: `https://i.pravatar.cc/60?img=${patients.length + 15}`,
         // Add vital signs
         temperature: newPatient.temperature ? parseFloat(newPatient.temperature) : 98.6,
-        bloodPressure: newPatient.bloodPressureSystolic && newPatient.bloodPressureDiastolic 
+        bloodPressure: newPatient.bloodPressureSystolic && newPatient.bloodPressureDiastolic
           ? `${newPatient.bloodPressureSystolic}/${newPatient.bloodPressureDiastolic}`
           : '120/80',
         pulse: newPatient.pulse ? parseInt(newPatient.pulse) : 72,
@@ -170,7 +149,7 @@ const AssignedPatients = () => {
 
       alert(`Patient ${newPatient.name} added successfully!`);
       setShowAddPatientModal(false);
-      
+
       // Reset form
       setNewPatient({
         name: '',
@@ -208,9 +187,9 @@ const AssignedPatients = () => {
 
   const handleSaveNotes = () => {
     if (selectedPatient) {
-      setPatients(prevPatients => 
-        prevPatients.map(patient => 
-          patient.id === selectedPatient.id 
+      setPatients(prevPatients =>
+        prevPatients.map(patient =>
+          patient.id === selectedPatient.id
             ? { ...patient, notes }
             : patient
         )
@@ -229,9 +208,9 @@ const AssignedPatients = () => {
 
   const handleSaveMedications = () => {
     if (selectedPatient) {
-      setPatients(prevPatients => 
-        prevPatients.map(patient => 
-          patient.id === selectedPatient.id 
+      setPatients(prevPatients =>
+        prevPatients.map(patient =>
+          patient.id === selectedPatient.id
             ? { ...patient, medications }
             : patient
         )
@@ -264,24 +243,24 @@ const AssignedPatients = () => {
   const handleUpdatePatient = (e) => {
     e.preventDefault();
     if (selectedPatient && newPatient.name && newPatient.room && newPatient.condition && newPatient.status) {
-      setPatients(prevPatients => 
-        prevPatients.map(patient => 
-          patient.id === selectedPatient.id 
+      setPatients(prevPatients =>
+        prevPatients.map(patient =>
+          patient.id === selectedPatient.id
             ? {
-                ...patient,
-                name: newPatient.name,
-                gender: newPatient.gender,
-                room: newPatient.room,
-                condition: newPatient.condition,
-                treatment: newPatient.treatment,
-                status: newPatient.status,
-                temperature: newPatient.temperature ? parseFloat(newPatient.temperature) : patient.temperature,
-                bloodPressure: newPatient.bloodPressureSystolic && newPatient.bloodPressureDiastolic 
-                  ? `${newPatient.bloodPressureSystolic}/${newPatient.bloodPressureDiastolic}`
-                  : patient.bloodPressure,
-                pulse: newPatient.pulse ? parseInt(newPatient.pulse) : patient.pulse,
-                oxygen: newPatient.oxygen ? parseInt(newPatient.oxygen) : patient.oxygen
-              }
+              ...patient,
+              name: newPatient.name,
+              gender: newPatient.gender,
+              room: newPatient.room,
+              condition: newPatient.condition,
+              treatment: newPatient.treatment,
+              status: newPatient.status,
+              temperature: newPatient.temperature ? parseFloat(newPatient.temperature) : patient.temperature,
+              bloodPressure: newPatient.bloodPressureSystolic && newPatient.bloodPressureDiastolic
+                ? `${newPatient.bloodPressureSystolic}/${newPatient.bloodPressureDiastolic}`
+                : patient.bloodPressure,
+              pulse: newPatient.pulse ? parseInt(newPatient.pulse) : patient.pulse,
+              oxygen: newPatient.oxygen ? parseInt(newPatient.oxygen) : patient.oxygen
+            }
             : patient
         )
       );
@@ -296,12 +275,7 @@ const AssignedPatients = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center mb-3">
         <h2 className="text-2xl font-semibold text-gray-700">Assigned Patients</h2>
-        <button 
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center transition-colors"
-          onClick={() => setShowAddPatientModal(true)}
-        >
-          <i className="fas fa-plus mr-2"></i> Add Patient
-        </button>
+
       </div>
 
       {/* Search and Filter */}
@@ -316,7 +290,7 @@ const AssignedPatients = () => {
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-          <select 
+          <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -339,21 +313,21 @@ const AssignedPatients = () => {
         <form onSubmit={handleAddPatient} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               name="name"
               value={newPatient.name}
               onChange={handleInputChange}
-              className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
-              required 
+              className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
               placeholder="Enter patient's full name"
             />
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
-              <select 
+              <select
                 name="gender"
                 value={newPatient.gender}
                 onChange={handleInputChange}
@@ -366,13 +340,13 @@ const AssignedPatients = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Room/Bed *</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 name="room"
                 value={newPatient.room}
                 onChange={handleInputChange}
-                className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
-                required 
+                className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
                 placeholder="e.g., 101"
               />
             </div>
@@ -380,7 +354,7 @@ const AssignedPatients = () => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Condition *</label>
-            <select 
+            <select
               name="condition"
               value={newPatient.condition}
               onChange={handleInputChange}
@@ -396,19 +370,19 @@ const AssignedPatients = () => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Treatment</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               name="treatment"
               value={newPatient.treatment}
               onChange={handleInputChange}
-              className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="e.g., Antibiotics, IV Fluids"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
-            <select 
+            <select
               name="status"
               value={newPatient.status}
               onChange={handleInputChange}
@@ -428,57 +402,57 @@ const AssignedPatients = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Temperature (°F)</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   step="0.1"
                   name="temperature"
                   value={newPatient.temperature}
                   onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="e.g., 98.6"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Pulse (bpm)</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   name="pulse"
                   value={newPatient.pulse}
                   onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="e.g., 72"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">BP Systolic</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   name="bloodPressureSystolic"
                   value={newPatient.bloodPressureSystolic}
                   onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="e.g., 120"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">BP Diastolic</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   name="bloodPressureDiastolic"
                   value={newPatient.bloodPressureDiastolic}
                   onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="e.g., 80"
                 />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Oxygen Saturation (%)</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   name="oxygen"
                   value={newPatient.oxygen}
                   onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="e.g., 98"
                   min="0"
                   max="100"
@@ -489,7 +463,7 @@ const AssignedPatients = () => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Doctor</label>
-            <select 
+            <select
               name="doctor"
               value={newPatient.doctor}
               onChange={handleInputChange}
@@ -502,15 +476,15 @@ const AssignedPatients = () => {
           </div>
 
           <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-200">
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition-colors"
               onClick={() => setShowAddPatientModal(false)}
             >
               Cancel
             </button>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
             >
               Add Patient
@@ -529,20 +503,20 @@ const AssignedPatients = () => {
         <form onSubmit={handleUpdatePatient} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               name="name"
               value={newPatient.name}
               onChange={handleInputChange}
-              className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
-              required 
+              className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
             />
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
-              <select 
+              <select
                 name="gender"
                 value={newPatient.gender}
                 onChange={handleInputChange}
@@ -555,20 +529,20 @@ const AssignedPatients = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Room/Bed *</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 name="room"
                 value={newPatient.room}
                 onChange={handleInputChange}
-                className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
-                required 
+                className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
               />
             </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Condition *</label>
-            <select 
+            <select
               name="condition"
               value={newPatient.condition}
               onChange={handleInputChange}
@@ -584,18 +558,18 @@ const AssignedPatients = () => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Treatment</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               name="treatment"
               value={newPatient.treatment}
               onChange={handleInputChange}
-              className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
-            <select 
+            <select
               name="status"
               value={newPatient.status}
               onChange={handleInputChange}
@@ -614,53 +588,53 @@ const AssignedPatients = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Temperature (°F)</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   step="0.1"
                   name="temperature"
                   value={newPatient.temperature}
                   onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Pulse (bpm)</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   name="pulse"
                   value={newPatient.pulse}
                   onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">BP Systolic</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   name="bloodPressureSystolic"
                   value={newPatient.bloodPressureSystolic}
                   onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">BP Diastolic</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   name="bloodPressureDiastolic"
                   value={newPatient.bloodPressureDiastolic}
                   onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Oxygen Saturation (%)</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   name="oxygen"
                   value={newPatient.oxygen}
                   onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   min="0"
                   max="100"
                 />
@@ -669,15 +643,15 @@ const AssignedPatients = () => {
           </div>
 
           <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-200">
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition-colors"
               onClick={() => setShowEditModal(false)}
             >
               Cancel
             </button>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
             >
               Update Patient
@@ -696,7 +670,7 @@ const AssignedPatients = () => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Nursing Notes</label>
-            <textarea 
+            <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows="8"
@@ -705,15 +679,15 @@ const AssignedPatients = () => {
             />
           </div>
           <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition-colors"
               onClick={() => setShowNotesModal(false)}
             >
               Cancel
             </button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
               onClick={handleSaveNotes}
             >
@@ -733,7 +707,7 @@ const AssignedPatients = () => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Current Medications</label>
-            <textarea 
+            <textarea
               value={medications}
               onChange={(e) => setMedications(e.target.value)}
               rows="8"
@@ -743,15 +717,15 @@ const AssignedPatients = () => {
             <p className="text-xs text-gray-500 mt-1">Enter one medication per line with dosage and frequency</p>
           </div>
           <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition-colors"
               onClick={() => setShowMedsModal(false)}
             >
               Cancel
             </button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
               onClick={handleSaveMedications}
             >

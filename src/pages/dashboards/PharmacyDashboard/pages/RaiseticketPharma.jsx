@@ -368,80 +368,90 @@ const SupportManagement = () => {
         </p>
       </div>
 
-      {/* ONLY 5 Priority Cards - Enhanced Design */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5 mb-8">
+      {/* ONLY 5 Priority Cards - Reduced Size */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
         {/* CRITICAL */}
-        <div className="group relative bg-gradient-to-br from-red-50 to-red-100 rounded-2xl p-5 border border-red-200 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 cursor-pointer overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-red-200 rounded-full -mr-10 -mt-10 opacity-20 group-hover:scale-150 transition-transform duration-500"></div>
+        <div className="group relative bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-3 border border-red-200 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 cursor-pointer overflow-hidden">
+          <div className="absolute top-0 right-0 w-16 h-16 bg-red-200 rounded-full -mr-8 -mt-8 opacity-20 group-hover:scale-150 transition-transform duration-500"></div>
           <div className="relative">
-            <div className="w-12 h-12 flex items-center justify-center rounded-full bg-red-600 mb-3 shadow-md">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-8 h-8 flex items-center justify-center rounded-full bg-red-600 mb-2 shadow-sm">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <p className="text-xs font-semibold text-red-700 uppercase tracking-wider">CRITICAL</p>
-            <p className="text-3xl font-bold text-red-800 mt-1">{stats.critical}</p>
-            <p className="text-xs text-red-600 mt-1">Immediate attention</p>
+            <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider">CRITICAL</p>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <p className="text-xl font-bold text-red-800">{stats.critical}</p>
+              <p className="text-[9px] text-red-600">Tickets</p>
+            </div>
           </div>
         </div>
 
         {/* URGENT */}
-        <div className="group relative bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl p-5 border border-orange-200 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 cursor-pointer overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-orange-200 rounded-full -mr-10 -mt-10 opacity-20 group-hover:scale-150 transition-transform duration-500"></div>
+        <div className="group relative bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-3 border border-orange-200 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 cursor-pointer overflow-hidden">
+          <div className="absolute top-0 right-0 w-16 h-16 bg-orange-200 rounded-full -mr-8 -mt-8 opacity-20 group-hover:scale-150 transition-transform duration-500"></div>
           <div className="relative">
-            <div className="w-12 h-12 flex items-center justify-center rounded-full bg-orange-500 mb-3 shadow-md">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-8 h-8 flex items-center justify-center rounded-full bg-orange-500 mb-2 shadow-sm">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <p className="text-xs font-semibold text-orange-700 uppercase tracking-wider">URGENT</p>
-            <p className="text-3xl font-bold text-orange-800 mt-1">{stats.urgent}</p>
-            <p className="text-xs text-orange-600 mt-1">Address soon</p>
+            <p className="text-[10px] font-bold text-orange-700 uppercase tracking-wider">URGENT</p>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <p className="text-xl font-bold text-orange-800">{stats.urgent}</p>
+              <p className="text-[9px] text-orange-600">Tickets</p>
+            </div>
           </div>
         </div>
 
         {/* HIGH */}
-        <div className="group relative bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-2xl p-5 border border-yellow-200 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 cursor-pointer overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-yellow-200 rounded-full -mr-10 -mt-10 opacity-20 group-hover:scale-150 transition-transform duration-500"></div>
+        <div className="group relative bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-3 border border-yellow-200 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 cursor-pointer overflow-hidden">
+          <div className="absolute top-0 right-0 w-16 h-16 bg-yellow-200 rounded-full -mr-8 -mt-8 opacity-20 group-hover:scale-150 transition-transform duration-500"></div>
           <div className="relative">
-            <div className="w-12 h-12 flex items-center justify-center rounded-full bg-yellow-600 mb-3 shadow-md">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-8 h-8 flex items-center justify-center rounded-full bg-yellow-600 mb-2 shadow-sm">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
-            <p className="text-xs font-semibold text-yellow-700 uppercase tracking-wider">HIGH</p>
-            <p className="text-3xl font-bold text-yellow-800 mt-1">{stats.high}</p>
-            <p className="text-xs text-yellow-600 mt-1">Needs quick action</p>
+            <p className="text-[10px] font-bold text-yellow-700 uppercase tracking-wider">HIGH</p>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <p className="text-xl font-bold text-yellow-800">{stats.high}</p>
+              <p className="text-[9px] text-yellow-600">Tickets</p>
+            </div>
           </div>
         </div>
 
         {/* NORMAL */}
-        <div className="group relative bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-5 border border-blue-200 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 cursor-pointer overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-blue-200 rounded-full -mr-10 -mt-10 opacity-20 group-hover:scale-150 transition-transform duration-500"></div>
+        <div className="group relative bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 border border-blue-200 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 cursor-pointer overflow-hidden">
+          <div className="absolute top-0 right-0 w-16 h-16 bg-blue-200 rounded-full -mr-8 -mt-8 opacity-20 group-hover:scale-150 transition-transform duration-500"></div>
           <div className="relative">
-            <div className="w-12 h-12 flex items-center justify-center rounded-full bg-blue-600 mb-3 shadow-md">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-600 mb-2 shadow-sm">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
-            <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider">NORMAL</p>
-            <p className="text-3xl font-bold text-blue-800 mt-1">{stats.normal}</p>
-            <p className="text-xs text-blue-600 mt-1">Standard priority</p>
+            <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">NORMAL</p>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <p className="text-xl font-bold text-blue-800">{stats.normal}</p>
+              <p className="text-[9px] text-blue-600">Tickets</p>
+            </div>
           </div>
         </div>
 
         {/* LOW */}
-        <div className="group relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-5 border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 cursor-pointer overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gray-200 rounded-full -mr-10 -mt-10 opacity-20 group-hover:scale-150 transition-transform duration-500"></div>
+        <div className="group relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-3 border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 cursor-pointer overflow-hidden">
+          <div className="absolute top-0 right-0 w-16 h-16 bg-gray-200 rounded-full -mr-8 -mt-8 opacity-20 group-hover:scale-150 transition-transform duration-500"></div>
           <div className="relative">
-            <div className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-500 mb-3 shadow-md">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-500 mb-2 shadow-sm">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider">LOW</p>
-            <p className="text-3xl font-bold text-gray-800 mt-1">{stats.low}</p>
-            <p className="text-xs text-gray-600 mt-1">Can wait</p>
+            <p className="text-[10px] font-bold text-gray-700 uppercase tracking-wider">LOW</p>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <p className="text-xl font-bold text-gray-800">{stats.low}</p>
+              <p className="text-[9px] text-gray-600">Tickets</p>
+            </div>
           </div>
         </div>
       </div>
