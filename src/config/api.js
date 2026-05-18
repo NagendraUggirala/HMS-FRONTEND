@@ -183,8 +183,6 @@ export const RECEPTIONIST_PATIENT_UPDATE = (patientId) => `/api/v1/receptionist/
 /** Receptionist: dashboard overview */
 export const RECEPTIONIST_DASHBOARD_OVERVIEW = '/api/v1/receptionist/dashboard';
 
-<<<<<<< Updated upstream
-=======
 /** Receptionist: Department management */
 export const DEPARTMENT_LIST = '/api/v1/departments';
 export const DEPARTMENT_SEARCH = '/api/v1/departments/search';
@@ -200,7 +198,6 @@ export const DOCTOR_SEARCH = '/api/v1/doctors/search';
 export const DOCTOR_DROPDOWN = '/api/v1/doctors/dropdown';
 export const DOCTOR_STATISTICS = '/api/v1/doctors/statistics';
 export const DOCTOR_DETAILS = (id) => `/api/v1/doctors/${encodeURIComponent(id)}`;
->>>>>>> Stashed changes
 
 /** Prescription Management - Doctor endpoints */
 export const PRESCRIPTION_MEDICINES_SEARCH = '/api/v1/simple-prescription/doctor/medicines/search';
