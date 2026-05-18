@@ -78,7 +78,8 @@ const EMPTY_FORM = {
   shift_timing: SHIFT_OPTIONS[0],
   joining_date: '',
   address: '',
-  doctor_specialization: ''
+  doctor_specialization: '',
+  department_name: '',
 }
 
 const getStaffItems = (data) => {
@@ -122,7 +123,8 @@ const mapStaff = (item) => {
     emergency_contact: item?.emergency_contact ?? item?.emergencyContact ?? '',
     doctor_specialization: item?.doctor_specialization ?? item?.doctorSpecialization ?? '',
     status: item?.is_active === false ? 'Inactive' : 'Active',
-    is_active: item?.is_active !== false
+    is_active: item?.is_active !== false,
+    department_name: item?.department_name ?? item?.department ?? ''
   }
 }
 
@@ -193,7 +195,7 @@ const StaffManagement = () => {
 
   const validateForm = () => {
     const errors = {}
-    const required = ['email', 'phone', 'first_name', 'last_name', 'role', 'password', 'emergency_contact', 'shift_timing', 'joining_date', 'address']
+    const required = ['email', 'phone', 'first_name', 'last_name', 'role', 'password', 'emergency_contact', 'shift_timing', 'joining_date', 'address', 'department_name']
     required.forEach((field) => {
       if (!String(formData[field] || '').trim()) {
         errors[field] = 'This field is required.'
@@ -221,6 +223,7 @@ const StaffManagement = () => {
         shift_timing: formData.shift_timing.trim(),
         joining_date: formData.joining_date,
         address: formData.address.trim(),
+        department_name: formData.department_name.trim(),
         doctor_specialization: formData.role === 'DOCTOR'
           ? formData.doctor_specialization.trim()
           : ''
@@ -307,7 +310,8 @@ const StaffManagement = () => {
         joining_date: detail?.hire_date || '-',
         address: detail?.address || '-',
         emergency_contact: detail?.emergency_contact || '-',
-        doctor_specialization: detail?.doctor_specialization || '-'
+        doctor_specialization: detail?.doctor_specialization || '-',
+        department_name: detail?.department_name || staffItem.department_name || '-'
       })
     } catch (error) {
       window.alert(error?.message || 'Unable to load staff details.')
@@ -680,6 +684,7 @@ const StaffDetailsModal = ({ isOpen, details, onClose }) => (
         <div><span className="font-medium text-gray-700">Active:</span> <span className="text-gray-900">{details?.active || '-'}</span></div>
         <div><span className="font-medium text-gray-700">Shift:</span> <span className="text-gray-900">{details?.shift_timing || '-'}</span></div>
         <div><span className="font-medium text-gray-700">Joining Date:</span> <span className="text-gray-900">{details?.joining_date || '-'}</span></div>
+        <div><span className="font-medium text-gray-700">Department:</span> <span className="text-gray-900">{details?.department_name || '-'}</span></div>
       </div>
 
       <div className="text-sm">
@@ -706,6 +711,10 @@ const StaffDetailsModal = ({ isOpen, details, onClose }) => (
 )
 
 const StaffForm = ({ formData, onInputChange, onCancel, onSubmit, submitText, submitIcon, fieldErrors, submitLoading }) => {
+  const standardDepartments = ['Cardiology', 'Orthopedics', 'Neurology', 'Pediatrics', 'ENT', 'Dermatology', 'Ophthalmology', 'Dentistry', 'Psychiatry', 'General Medicine']
+  const isInitialManual = formData.department_name && !standardDepartments.includes(formData.department_name)
+  const [showManualInput, setShowManualInput] = useState(isInitialManual)
+
   const formFields = [
     { type: 'text', name: 'first_name', label: 'First Name *', placeholder: 'Enter first name', icon: 'fas fa-user' },
     { type: 'text', name: 'last_name', label: 'Last Name *', placeholder: 'Enter last name', icon: 'fas fa-user' },
@@ -787,6 +796,56 @@ const StaffForm = ({ formData, onInputChange, onCancel, onSubmit, submitText, su
             />
           </div>
           {fieldErrors.joining_date && <p className="text-sm text-red-600 mt-1">{fieldErrors.joining_date}</p>}
+        </div>
+
+        <div className="relative">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Department Name *</label>
+          <div className="relative">
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 z-10">
+              <i className="fas fa-hospital"></i>
+            </div>
+            <select
+              required
+              value={showManualInput ? 'OTHER' : (formData.department_name || '')}
+              onChange={(e) => {
+                const val = e.target.value
+                if (val === 'OTHER') {
+                  setShowManualInput(true)
+                  onInputChange('department_name', '')
+                } else {
+                  setShowManualInput(false)
+                  onInputChange('department_name', val)
+                }
+              }}
+              className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white"
+            >
+              <option value="">Select Department</option>
+              {standardDepartments.map(dept => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
+              <option value="OTHER">Other (Manual Entry)</option>
+            </select>
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
+              <i className="fas fa-chevron-down"></i>
+            </div>
+          </div>
+          
+          {showManualInput && (
+            <div className="mt-3 relative">
+              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                <i className="fas fa-edit"></i>
+              </div>
+              <input
+                type="text"
+                required
+                value={formData.department_name}
+                onChange={(e) => onInputChange('department_name', e.target.value)}
+                className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Type department name..."
+              />
+            </div>
+          )}
+          {fieldErrors.department_name && <p className="text-sm text-red-600 mt-1">{fieldErrors.department_name}</p>}
         </div>
       </div>
 
