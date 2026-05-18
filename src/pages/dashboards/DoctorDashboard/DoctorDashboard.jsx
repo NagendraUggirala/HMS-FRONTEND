@@ -15,7 +15,6 @@ import ScheduleManagement from './pages/ScheduleManagement'
 import AppointmentTracking from './pages/AppointmentTracking'
 import ReportsAndAnalytics from './pages/ReportsAndAnalytics'
 import TreatmentPlans from './pages/TreatmentPlans'
-import ReportsAndAnalytics from './pages/ReportsAndAnalytics'
 
 const DoctorDashboard = () => {
   const [activePage, setActivePage] = useState('dashboard')
