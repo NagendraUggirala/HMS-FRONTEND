@@ -1,17 +1,59 @@
 import { useEffect, useRef, useState } from 'react';
 import Chart from 'chart.js/auto';
 import { apiFetch } from '../../../../services/apiClient';
-import { NURSE_ADD_VITALS, NURSE_GET_VITALS, NURSE_ASSIGNED_PATIENTS } from '../../../../config/api';
+import { NURSE_ADD_VITALS, NURSE_GET_VITALS, NURSE_ASSIGNED_PATIENTS, NURSE_UPDATE_VITALS } from '../../../../config/api';
 import Modal from '../../../../components/common/Modal/Modal';
 
 const VitalsMonitoring = () => {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
 
-  const [selectedAdmission, setSelectedAdmission] = useState('');
+  const [selectedAdmission, setSelectedAdmission] = useState('ADM-2026-DB2AB787');
   const [patientsList, setPatientsList] = useState([]);
   const [vitals, setVitals] = useState([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
+
+  const normalizeVitalsItem = (item, admissionNumber) => {
+    let vitalSigns = item.vital_signs || item.vitalSigns || item.vitals || {};
+    if (typeof vitalSigns === 'string') {
+      try {
+        vitalSigns = JSON.parse(vitalSigns);
+      } catch {
+        vitalSigns = {};
+      }
+    }
+
+    const bpRaw = vitalSigns.blood_pressure || vitalSigns.bp || vitalSigns.bloodPressure || '';
+    let bp_systolic = vitalSigns.blood_pressure_systolic ?? vitalSigns.bp_systolic ?? vitalSigns.bloodPressureSystolic ?? null;
+    let bp_diastolic = vitalSigns.blood_pressure_diastolic ?? vitalSigns.bp_diastolic ?? vitalSigns.bloodPressureDiastolic ?? null;
+    if ((!bp_systolic || !bp_diastolic) && typeof bpRaw === 'string' && bpRaw.includes('/')) {
+      const [sys, dia] = bpRaw.split('/').map(part => parseInt(part, 10));
+      if (!bp_systolic) bp_systolic = Number.isFinite(sys) ? sys : bp_systolic;
+      if (!bp_diastolic) bp_diastolic = Number.isFinite(dia) ? dia : bp_diastolic;
+    }
+
+    const patientName = item.patient_name || item.patient || item.name || vitalSigns.patient_name || vitalSigns.patient || '';
+
+    return {
+      id: item.id || item.record_id || vitalSigns.record_id || vitalSigns.id || null,
+      record_id: item.record_id || vitalSigns.record_id || item.id || null,
+      patient_id: item.patient_id || item.patientId || vitalSigns.patient_id || null,
+      admission_number: item.admission_number || item.admissionNumber || vitalSigns.admission_number || admissionNumber,
+      patient_name: patientName,
+      temperature: vitalSigns.temperature_f ?? vitalSigns.temperature ?? vitalSigns.temp ?? vitalSigns.body_temperature ?? null,
+      pulse: vitalSigns.pulse_rate ?? vitalSigns.pulse ?? vitalSigns.heart_rate ?? vitalSigns.heartRate ?? null,
+      bp_systolic,
+      bp_diastolic,
+      bp_raw: bpRaw || null,
+      oxygen_saturation: vitalSigns.oxygen_saturation ?? vitalSigns.oxygen ?? vitalSigns.spO2 ?? vitalSigns.o2 ?? null,
+      respiratory_rate: vitalSigns.respiratory_rate ?? vitalSigns.respiratoryRate ?? vitalSigns.resp_rate ?? null,
+      height: vitalSigns.height ?? vitalSigns.body_height ?? vitalSigns.height_cm ?? null,
+      weight: vitalSigns.weight ?? vitalSigns.body_weight ?? vitalSigns.weight_kg ?? null,
+      notes: vitalSigns.notes ?? vitalSigns.comment ?? vitalSigns.comments ?? null,
+      created_at: vitalSigns.recorded_at || vitalSigns.recordedAt || item.created_at || item.createdAt || null,
+      time: new Date(vitalSigns.recorded_at || vitalSigns.recordedAt || item.created_at || item.createdAt || Date.now()).toLocaleTimeString()
+    };
+  };
 
   const fetchPatients = async () => {
     try {
@@ -42,7 +84,29 @@ const VitalsMonitoring = () => {
       const response = await apiFetch(`${NURSE_GET_VITALS}?admission_number=${admissionNumber}`);
       if (response && response.ok) {
         const data = await response.json();
-        setVitals(Array.isArray(data?.data) ? data.data : []);
+        const rawList = Array.isArray(data?.data) ? data.data : [];
+        const patientById = new Map(
+          patientsList.map(patient => [
+            patient.id || patient.patient_id || patient.patientId || patient.admission_number || patient.admissionNumber || '',
+            patient
+          ])
+        );
+        const vitalsList = rawList
+          .map(item => normalizeVitalsItem(item, admissionNumber))
+          .filter(v => v && (v.temperature !== null || v.pulse !== null || v.bp_systolic !== null || v.bp_diastolic !== null || v.oxygen_saturation !== null || v.respiratory_rate !== null));
+
+        const enrichedVitals = vitalsList.map(vital => {
+          if (!vital.patient_name) {
+            const patient = patientById.get(vital.patient_id) || patientById.get(vital.admission_number);
+            return {
+              ...vital,
+              patient_name: patient?.patient_name || patient?.name || patient?.patient || patient?.full_name || ''
+            };
+          }
+          return vital;
+        });
+
+        setVitals(enrichedVitals);
       } else {
         setVitals([]);
       }
@@ -130,7 +194,7 @@ const VitalsMonitoring = () => {
   };
 
   const [formData, setFormData] = useState({
-    admission_number: '',
+    admission_number: 'ADM-2026-DB2AB787',
     temperature: '',
     pulse: '',
     bp_systolic: '',
@@ -144,6 +208,8 @@ const VitalsMonitoring = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [showAddVitalsModal, setShowAddVitalsModal] = useState(false);
+  const [editingRecordId, setEditingRecordId] = useState(null);
+  const isEditing = Boolean(editingRecordId);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -151,6 +217,41 @@ const VitalsMonitoring = () => {
       ...prev,
       [name]: value
     }));
+  };
+
+  const handleEditVitals = (vital) => {
+    setEditingRecordId(vital.record_id || vital.id || null);
+    setFormData({
+      admission_number: vital.admission_number || vital.admissionNumber || selectedAdmission || '',
+      temperature: vital.temperature ?? vital.temp ?? '',
+      pulse: vital.pulse ?? vital.heart_rate ?? '',
+      bp_systolic: vital.bp_systolic ?? vital.bpSystolic ?? '',
+      bp_diastolic: vital.bp_diastolic ?? vital.bpDiastolic ?? '',
+      oxygen_saturation: vital.oxygen_saturation ?? vital.oxygen ?? '',
+      respiratory_rate: vital.respiratory_rate ?? vital.respiratoryRate ?? '',
+      weight: vital.weight ?? '',
+      height: vital.height ?? '',
+      notes: vital.notes ?? ''
+    });
+    setMessage({ type: '', text: '' });
+    setShowAddVitalsModal(true);
+  };
+
+  const resetVitalsForm = () => {
+    setEditingRecordId(null);
+    setFormData(prev => ({
+      ...prev,
+      temperature: '',
+      pulse: '',
+      bp_systolic: '',
+      bp_diastolic: '',
+      oxygen_saturation: '',
+      respiratory_rate: '',
+      weight: '',
+      height: '',
+      notes: ''
+    }));
+    setMessage({ type: '', text: '' });
   };
 
   const handleVitalsSubmit = async (e) => {
@@ -172,30 +273,31 @@ const VitalsMonitoring = () => {
         notes: formData.notes || ''
       };
 
-      const response = await apiFetch(NURSE_ADD_VITALS, {
-        method: 'POST',
+      const endpoint = isEditing ? NURSE_UPDATE_VITALS(editingRecordId) : NURSE_ADD_VITALS;
+      const method = isEditing ? 'PATCH' : 'POST';
+      const response = await apiFetch(endpoint, {
+        method,
         body: payloadData
       });
 
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(payload?.detail || payload?.message || 'Failed to record vitals');
+        throw new Error(payload?.detail || payload?.message || `Failed to ${isEditing ? 'update' : 'record'} vitals`);
       }
 
-      setMessage({ type: 'success', text: 'Vitals recorded successfully' });
-      setFormData({
-        admission_number: formData.admission_number,
-        temperature: '',
-        pulse: '',
-        bp_systolic: '',
-        bp_diastolic: '',
-        oxygen_saturation: '',
-        respiratory_rate: '',
-        weight: '',
-        height: '',
-        notes: ''
-      });
-      // Refresh vitals list after submission
+      setMessage({ type: 'success', text: isEditing ? 'Vitals updated successfully' : 'Vitals recorded successfully' });
+      if (isEditing) {
+        setVitals(prev => prev.map(v => {
+          const keyMatch = v.record_id === editingRecordId || v.id === editingRecordId;
+          return keyMatch ? {
+            ...v,
+            ...payloadData,
+            time: new Date().toLocaleTimeString()
+          } : v;
+        }));
+      }
+      resetVitalsForm();
+      setFormData(prev => ({ ...prev, admission_number: formData.admission_number }));
       fetchData();
       setShowAddVitalsModal(false);
     } catch (error) {
@@ -214,31 +316,32 @@ const VitalsMonitoring = () => {
           <h2 className="text-2xl font-semibold text-gray-700">Vitals Monitoring</h2>
           <div className="flex items-center gap-3 w-full md:w-auto">
             <div className="relative flex-1 md:w-64">
-              <select
+              <input
+                list="admissionsList"
+                type="text"
+                placeholder="Enter Admission No..."
                 value={selectedAdmission}
                 onChange={(e) => {
                   const val = e.target.value;
                   setSelectedAdmission(val);
-                  const patient = patientsList.find(p => (p.admission_number || p.admissionNumber || p.id?.toString()) === val);
-                  if (patient) {
-                    setFormData(prev => ({ ...prev, admission_number: val }));
-                  }
+                  setFormData(prev => ({ ...prev, admission_number: val }));
                 }}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm appearance-none pr-8"
-              >
-                <option value="">Select Patient</option>
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm pr-8"
+              />
+              <datalist id="admissionsList">
                 {patientsList.map(patient => (
                   <option key={patient.id} value={patient.admission_number || patient.admissionNumber || patient.id}>
-                    {patient.name || patient.patient_name} ({patient.admission_number || patient.admissionNumber || patient.id})
+                    {patient.name || patient.patient_name}
                   </option>
                 ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                <i className="fas fa-chevron-down text-xs"></i>
-              </div>
+              </datalist>
             </div>
             <button
-              onClick={() => setShowAddVitalsModal(true)}
+              onClick={() => {
+                resetVitalsForm();
+                setEditingRecordId(null);
+                setShowAddVitalsModal(true);
+              }}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm font-medium shadow-sm whitespace-nowrap"
             >
               <i className="fas fa-plus"></i>
@@ -272,29 +375,29 @@ const VitalsMonitoring = () => {
                   <tr key={vital.id || index} className="border-t hover:bg-gray-50 fade-in">
                     {/* Patient Name - Truncated on mobile */}
                     <td className="px-3 py-2 text-left max-w-[100px]">
-                      <div className="truncate" title={vital.patient_name || vital.name || 'Unknown Patient'}>
-                        {vital.patient_name || vital.name || 'Unknown Patient'}
+                      <div className="truncate" title={vital.patient_name || vital.admission_number || 'Unknown Patient'}>
+                        {vital.patient_name || vital.admission_number || 'Unknown Patient'}
                       </div>
                     </td>
 
                     {/* Temperature */}
                     <td className="px-3 py-2 text-center text-red-600 font-semibold whitespace-nowrap">
-                      {vital.temperature || vital.temp || 'N/A'}°F
+                      {(vital.temperature ?? vital.temp) != null ? `${vital.temperature ?? vital.temp}°F` : 'N/A'}
                     </td>
 
                     {/* Blood Pressure */}
                     <td className="px-3 py-2 text-center whitespace-nowrap">
-                      {vital.bp_systolic || vital.bpSystolic || '--'}/{vital.bp_diastolic || vital.bpDiastolic || '--'}
+                      {vital.bp_systolic || vital.bp_diastolic ? `${vital.bp_systolic || '--'}/${vital.bp_diastolic || '--'}` : (vital.bp_raw || '--')}
                     </td>
 
                     {/* Pulse */}
                     <td className="px-3 py-2 text-center whitespace-nowrap">
-                      {vital.pulse || vital.heart_rate || '--'} bpm
+                      {(vital.pulse ?? vital.heart_rate) != null ? `${vital.pulse ?? vital.heart_rate} bpm` : '-- bpm'}
                     </td>
 
                     {/* Oxygen */}
                     <td className="px-3 py-2 text-center whitespace-nowrap">
-                      {vital.oxygen_saturation || vital.oxygen || '--'}%
+                      {(vital.oxygen_saturation ?? vital.oxygen) != null ? `${vital.oxygen_saturation ?? vital.oxygen}%` : '--%'}
                     </td>
 
                     {/* Time - Compact on mobile */}
@@ -320,6 +423,7 @@ const VitalsMonitoring = () => {
                         <button
                           className="text-blue-500 hover:text-blue-700 p-1 transition-colors"
                           title="Edit Vitals"
+                          onClick={() => handleEditVitals(vital)}
                         >
                           <i className="fas fa-edit text-sm"></i>
                         </button>
@@ -368,8 +472,12 @@ const VitalsMonitoring = () => {
       {/* Add Vitals Modal */}
       <Modal
         isOpen={showAddVitalsModal}
-        onClose={() => setShowAddVitalsModal(false)}
-        title="Add Vitals Reading"
+        onClose={() => {
+          setShowAddVitalsModal(false);
+          setEditingRecordId(null);
+          setMessage({ type: '', text: '' });
+        }}
+        title={isEditing ? 'Edit Vitals Reading' : 'Add Vitals Reading'}
         size="md"
       >
         {message.text && (
@@ -522,7 +630,7 @@ const VitalsMonitoring = () => {
             ) : (
               <i className="fas fa-save mr-1"></i>
             )}
-            {loading ? 'Saving...' : 'Save Vitals'}
+            {loading ? 'Saving...' : isEditing ? 'Update Vitals' : 'Save Vitals'}
           </button>
         </form>
       </Modal>

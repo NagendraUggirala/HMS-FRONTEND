@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../../../../components/common/Modal/Modal';
 import { apiFetch } from '../../../../services/apiClient';
-import { NURSE_LAB_TESTS, NURSE_ASSIGNED_PATIENTS } from '../../../../config/api';
+import { NURSE_LAB_TESTS, NURSE_ASSIGNED_PATIENTS, NURSE_UPDATE_LAB_TEST } from '../../../../config/api';
 
 const LabTestsUpload = () => {
   const [labs, setLabs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [patients, setPatients] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingRecordId, setEditingRecordId] = useState(null);
   const [formData, setFormData] = useState({
     patient: '',
     testType: '',
@@ -25,15 +27,25 @@ const LabTestsUpload = () => {
         console.log('Raw Lab Tests data:', data);
         const rawLabs = Array.isArray(data?.data) ? data.data : [];
         
-        const mappedLabs = rawLabs.map(lab => ({
-          id: lab.id,
-          patient: lab.patient_name || lab.patient || lab.patient_id || 'N/A',
-          testType: lab.test_name || lab.test_type || lab.lab_test_name || lab.testType || lab.test || lab.name || 'N/A',
-          doctor: lab.doctor_name || lab.doctor || lab.requested_by || 'N/A',
-          orderedDate: lab.ordered_at ? new Date(lab.ordered_at).toLocaleDateString() : (lab.created_at ? new Date(lab.created_at).toLocaleDateString() : (lab.orderedDate || 'N/A')),
-          status: (lab.status || 'pending').toLowerCase(),
-          result: lab.result || lab.conclusion || lab.remarks || null
-        }));
+        const mappedLabs = rawLabs.flatMap(record => {
+          // If the record has lab_orders, map each order to a row
+          const orders = Array.isArray(record.lab_orders) && record.lab_orders.length > 0 
+            ? record.lab_orders 
+            : [record]; // fallback if it's a flat structure
+            
+          return orders.map((order, idx) => ({
+            ...record,
+            id: record.id,
+            patient: record.patient_name || record.patient || record.patient_id || 'N/A',
+            testType: order.test_type || order.test_name || record.test_type || 'N/A',
+            doctor: order.requesting_doctor || record.doctor_name || record.doctor_id || 'N/A',
+            orderedDate: order.requested_at ? new Date(order.requested_at).toLocaleDateString() : (record.created_at ? new Date(record.created_at).toLocaleDateString() : 'N/A'),
+            status: (record.status || 'pending').toLowerCase(),
+            result: record.result || null,
+            reason: order.reason_for_test || record.reason || '',
+            priority: order.priority || record.priority || 'Routine'
+          }));
+        });
         
         setLabs(mappedLabs);
       }
@@ -81,13 +93,13 @@ const LabTestsUpload = () => {
         requesting_doctor: formData.doctor
       };
 
-      const response = await apiFetch(NURSE_LAB_TESTS, {
-        method: 'POST',
+      const response = await apiFetch(isEditing ? NURSE_UPDATE_LAB_TEST(editingRecordId) : NURSE_LAB_TESTS, {
+        method: isEditing ? 'PATCH' : 'POST',
         body: payload
       });
 
       if (response && response.ok) {
-        alert('Lab test request saved successfully');
+        alert(`Lab test request ${isEditing ? 'updated' : 'saved'} successfully`);
         fetchLabTests(); // Refresh the list
         setFormData({
           patient: '',
@@ -96,6 +108,8 @@ const LabTestsUpload = () => {
           priority: 'Routine',
           doctor: 'Dr. Meena Rao'
         });
+        setIsEditing(false);
+        setEditingRecordId(null);
         setIsModalOpen(false);
       } else {
         const errorData = await response.json().catch(() => ({}));
@@ -107,6 +121,32 @@ const LabTestsUpload = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEditClick = (lab) => {
+    setIsEditing(true);
+    setEditingRecordId(lab.id);
+    setFormData({
+      patient: lab.admission_number || lab.patient_id || lab.patient || '',
+      testType: lab.testType || lab.test_type || '',
+      reason: lab.reason || '',
+      priority: lab.priority || 'Routine',
+      doctor: lab.doctor || lab.requesting_doctor || 'Dr. Meena Rao'
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleAddNewClick = () => {
+    setIsEditing(false);
+    setEditingRecordId(null);
+    setFormData({
+      patient: '',
+      testType: '',
+      reason: '',
+      priority: 'Routine',
+      doctor: 'Dr. Meena Rao'
+    });
+    setIsModalOpen(true);
   };
 
   const handleFileUpload = (patientId, testType) => {
@@ -171,41 +211,37 @@ const LabTestsUpload = () => {
             >
               <i className={`fas fa-sync-alt ${loading ? 'animate-spin' : ''}`}></i>
             </button>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm font-medium transition-all shadow-sm"
+            <button 
+              onClick={handleAddNewClick}
+              className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg hover:bg-blue-700 flex items-center shadow-sm text-sm"
             >
-              <i className="fas fa-plus"></i>
-              <span>New Test</span>
+              <i className="fas fa-plus mr-1.5 sm:mr-2"></i>
+              <span className="hidden sm:inline">Request Test</span>
+              <span className="sm:hidden">New</span>
             </button>
           </div>
         </div>
 
-        {/* Request New Lab Test Modal */}
-        <Modal
-          isOpen={isModalOpen}
+        {/* Modal for new/edit request */}
+        <Modal 
+          isOpen={isModalOpen} 
           onClose={() => setIsModalOpen(false)}
-          title="Request New Lab Test"
+          title={isEditing ? "Edit Lab Request" : "Request Lab Test"}
           size="md"
         >
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 gap-3 sm:gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Patient</label>
-                <select
+                <input
+                  type="text"
                   name="patient"
                   value={formData.patient}
                   onChange={handleInputChange}
                   className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
+                  placeholder="Enter Patient ID or Name"
                   required
-                >
-                  <option value="">Select Patient</option>
-                  {patients.map(p => (
-                    <option key={p.admission_number} value={p.admission_number}>
-                      {p.patient_name} ({p.admission_number})
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               <div>
@@ -301,9 +337,13 @@ const LabTestsUpload = () => {
           ) : labs.length > 0 ? (
             labs.map((lab) => (
               <div key={lab.id} className="bg-white border rounded-xl p-3 sm:p-4 card-shadow fade-in w-full">
-                {/* Header with Test Type and Status */}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-3">
-                  <h3 className="font-semibold text-blue-700 text-base sm:text-lg leading-snug">{lab.testType}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-blue-700 text-base sm:text-lg leading-snug">{lab.testType}</h3>
+                    <button onClick={() => handleEditClick(lab)} className="text-gray-400 hover:text-blue-600 transition-colors" title="Edit Request">
+                      <i className="fas fa-edit"></i>
+                    </button>
+                  </div>
                   <span className={`px-2.5 py-1.5 rounded-full text-[11px] sm:text-xs font-medium w-fit self-start sm:self-auto ${getStatusClass(lab.status)}`}>
                     {getStatusText(lab.status)}
                   </span>
@@ -408,8 +448,8 @@ const LabTestsUpload = () => {
                     </td>
                     <td className="px-3 py-2 sm:px-4 sm:py-2">
                       <div className="flex gap-2">
-                        <button className="p-2 rounded hover:bg-blue-50 text-blue-600" aria-label="View">
-                          <i className="fas fa-eye text-sm"></i>
+                        <button onClick={() => handleEditClick(lab)} className="p-2 rounded hover:bg-blue-50 text-blue-600" aria-label="Edit">
+                          <i className="fas fa-edit text-sm"></i>
                         </button>
                         <button className="p-2 rounded hover:bg-green-50 text-green-600" aria-label="Download">
                           <i className="fas fa-download text-sm"></i>

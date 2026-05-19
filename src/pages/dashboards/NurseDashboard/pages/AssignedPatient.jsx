@@ -46,7 +46,7 @@ const AssignedPatients = () => {
     setError(null);
 
     try {
-      const response = await apiFetch(NURSE_ASSIGNED_PATIENTS);
+      const response = await apiFetch('/api/v1/nurse/assigned-patients?include_inactive=true');
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
@@ -57,20 +57,24 @@ const AssignedPatients = () => {
       const assignedPatients = payload?.data || [];
       const transformedPatients = assignedPatients.map((patient, index) => ({
         id: patient.id || index + 1,
-        name: patient.name || patient.patient_name || 'Unknown',
-        gender: patient.gender || 'Unknown',
-        room: patient.room_number || patient.room || 'N/A',
-        condition: patient.condition || patient.primary_diagnosis || 'N/A',
-        treatment: patient.treatment || patient.current_treatment || 'To be determined',
-        status: patient.status || 'Stable',
+        patient_id: patient.patient_id,
+        name: patient.patient_name || patient.name || 'Unknown',
+        gender: patient.gender || 'Not Specified',
+        room: patient.room_number || patient.ward || 'N/A',
+        bed: patient.bed_number || 'N/A',
+        condition: patient.provisional_diagnosis || patient.condition || 'N/A',
+        treatment: patient.chief_complaint || patient.treatment || 'To be determined',
+        status: patient.is_active ? 'Admitted' : 'Discharged',
         lastVital: patient.last_vital_timestamp ? new Date(patient.last_vital_timestamp).toLocaleTimeString() : new Date().toLocaleTimeString(),
         avatar: patient.avatar || `https://i.pravatar.cc/60?img=${(index % 20) + 11}`,
         temperature: patient.temperature || patient.vital_temperature || 98.6,
-        bloodPressure: patient.blood_pressure || `${patient.bp_systolic || patient.systolic || 120}/${patient.bp_diastolic || patient.diastolic || 80}`,
+        bloodPressure: patient.blood_pressure || '120/80',
         pulse: patient.pulse || patient.heart_rate || 72,
         oxygen: patient.oxygen_saturation || patient.oxygen || 98,
-        notes: patient.notes || patient.nursing_notes || '',
-        medications: patient.medications || patient.current_medications || ''
+        notes: patient.admission_notes || patient.notes || patient.nursing_notes || '',
+        medications: patient.medications || patient.current_medications || '',
+        doctor: patient.doctor_name || 'Not Assigned',
+        department: patient.department_name || 'Not Assigned'
       }));
 
       setPatients(transformedPatients);
@@ -757,13 +761,16 @@ const AssignedPatients = () => {
                     </span>
                   </div>
                 </div>
-                <p className="text-xs text-gray-500 truncate">{patient.gender} | Bed {patient.room}</p>
+                <p className="text-xs text-gray-500 truncate">{patient.gender} | Ward {patient.room} - Bed {patient.bed}</p>
               </div>
             </div>
 
             <div className="text-sm text-gray-600 space-y-2 mb-3">
               <div>
-                <span className="font-medium">Doctor:</span> Dr. Meena Rao
+                <span className="font-medium">Doctor:</span> {patient.doctor}
+              </div>
+              <div>
+                <span className="font-medium">Department:</span> {patient.department}
               </div>
               <div>
                 <span className="font-medium">Condition:</span> {patient.condition}

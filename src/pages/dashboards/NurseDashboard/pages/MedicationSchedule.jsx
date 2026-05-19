@@ -2,13 +2,15 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../../../../components/common/Modal/Modal';
 import { apiFetch } from '../../../../services/apiClient';
-import { NURSE_MEDICATIONS, NURSE_ASSIGNED_PATIENTS } from '../../../../config/api';
+import { NURSE_MEDICATIONS, NURSE_UPDATE_MEDICATION, NURSE_ASSIGNED_PATIENTS } from '../../../../config/api';
 
 const MedicationSchedule = () => {
   const [selectedAdmission, setSelectedAdmission] = useState('');
   const [medications, setMedications] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [patientsList, setPatientsList] = useState([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingRecordId, setEditingRecordId] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [formData, setFormData] = useState({
@@ -18,7 +20,10 @@ const MedicationSchedule = () => {
     scheduled_time: '',
     instructions: '',
     frequency: 'Once daily',
-    start_date: ''
+    start_date: '',
+    end_date: '',
+    route: 'Oral',
+    duration_days: ''
   });
 
   const fetchPatients = async () => {
@@ -40,6 +45,40 @@ const MedicationSchedule = () => {
     }
   };
 
+  const normalizeMedicationRecord = (item, idx, recordAdmission = '', recordPatient = {}) => {
+    const admission = item.admission_number || item.admissionNumber || item.admissionId || item.admission || recordAdmission || '';
+    const patientName = item.patient_name || item.patientName || item.name || item.full_name || recordPatient.name || recordPatient.patient_name || recordPatient.full_name || '';
+    
+    // Try to extract the real record ID from the backend response
+    let recordId = null;
+    const isSynthetic = (idStr) => typeof idStr === 'string' && (idStr.startsWith('ADM-') || idStr.startsWith('med-'));
+    
+    if (item.id && !isSynthetic(item.id)) recordId = item.id;
+    else if (item.record_id && !isSynthetic(item.record_id)) recordId = item.record_id;
+    else if (item._id && !isSynthetic(item._id)) recordId = item._id;
+    else if (item.medication_id && !isSynthetic(item.medication_id)) recordId = item.medication_id;
+    else if (item.prescription_id && !isSynthetic(item.prescription_id)) recordId = item.prescription_id;
+    else if (item.uuid && !isSynthetic(item.uuid)) recordId = item.uuid;
+
+    return {
+      ...item,
+      id: recordId || `${admission || 'med'}-${idx}`,
+      record_id: recordId,
+      _original: item, // Preserve original for debugging
+      patient_name: patientName || 'Patient',
+      admission_number: admission || 'Not available',
+      medication_name: item.medication_name || item.medicine_name || item.medicine || item.medication || item.name || 'N/A',
+      scheduled_time: item.scheduled_time || item.time || item.schedule || 'N/A',
+      dose: item.dose || item.dosage || item.quantity || 'N/A',
+      instructions: item.instructions || item.notes || item.description || '',
+      frequency: item.frequency || item.dosage_frequency || item.schedule_frequency || 'Once daily',
+      route: item.route || item.administration_route || item.method || 'Oral',
+      duration_days: item.duration_days || item.duration || item.days || '',
+      end_date: item.end_date || item.expiry_date || item.endDate || '',
+      status: item.status || item.medication_status || 'Pending'
+    };
+  };
+
   const fetchMedications = async (admissionNumber) => {
     if (!admissionNumber) return;
     try {
@@ -48,25 +87,27 @@ const MedicationSchedule = () => {
         const data = await response.json();
         const rawData = Array.isArray(data?.data) ? data.data : [];
         
-        // Flatten the prescriptions array from each record
-        const flattenedMeds = rawData.flatMap(record => {
-          // Find the patient name from our existing patientsList
-          const patient = patientsList.find(p => p.id === record.patient_id || p.admission_number === admissionNumber);
-          const pName = patient ? (patient.name || patient.patient_name) : 'Unknown Patient';
-          
-          const prescriptions = Array.isArray(record.prescriptions) ? record.prescriptions : [];
-          return prescriptions.map((presc, idx) => ({
-            ...presc,
-            id: presc.id || `${record.id || 'rec'}-${idx}`,
-            patient_name: pName,
-            // Ensure fields exist for the table
-            medication_name: presc.medication_name || presc.medicine_name || presc.medicine || presc.medication || presc.name || 'N/A',
-            scheduled_time: presc.scheduled_time || presc.time || presc.schedule || 'N/A',
-            dose: presc.dose || presc.dosage || 'N/A'
-          }));
+        // Log first record to inspect actual structure
+        if (rawData.length > 0) {
+          console.log('[MedicationSchedule] First API response record:', JSON.stringify(rawData[0], null, 2));
+        }
+
+        const medicationsList = rawData.flatMap((record, recordIndex) => {
+          if (Array.isArray(record.prescriptions) && record.prescriptions.length > 0) {
+            const recordAdmission = record.admission_number || record.admissionNumber || record.admissionId || record.admission || admissionNumber;
+            const recordPatient = record.patient || {};
+            return record.prescriptions.map((presc, idx) => {
+              // Inject parent record ID so PATCH works
+              const enrichedPresc = { ...presc, record_id: presc.record_id || presc.id || record.id };
+              return normalizeMedicationRecord(enrichedPresc, idx, recordAdmission, recordPatient);
+            });
+          }
+
+          const recordAdmission = record.admission_number || record.admissionNumber || record.admissionId || record.admission || admissionNumber;
+          return [normalizeMedicationRecord(record, recordIndex, recordAdmission, record.patient || {})];
         });
 
-        setMedications(flattenedMeds);
+        setMedications(medicationsList);
       } else {
         setMedications([]);
       }
@@ -132,29 +173,60 @@ const MedicationSchedule = () => {
     setMessage({ type: '', text: '' });
     
     try {
-      const payloadData = {
-        admission_number: formData.admission_number,
-        medication_name: formData.medication_name,
-        dose: formData.dose,
-        scheduled_time: formData.scheduled_time,
-        frequency: formData.frequency,
-        instructions: formData.instructions,
-        start_date: formData.start_date
-      };
+      if (isEditing && editingRecordId) {
+        console.log('[MedicationSchedule] Attempting PATCH with recordId:', editingRecordId);
+        console.log('[MedicationSchedule] PATCH endpoint:', NURSE_UPDATE_MEDICATION(editingRecordId));
+      }
 
-      const response = await apiFetch(NURSE_MEDICATIONS, {
-        method: 'POST',
+      // Build payload with only non-empty fields for PATCH (exclude_unset behavior)
+      const payloadData = {};
+      
+      if (formData.admission_number) payloadData.admission_number = formData.admission_number;
+      if (formData.medication_name) payloadData.medication_name = formData.medication_name;
+      if (formData.dose) payloadData.dose = formData.dose;
+      if (formData.scheduled_time) payloadData.scheduled_time = formData.scheduled_time;
+      if (formData.frequency) payloadData.frequency = formData.frequency;
+      if (formData.instructions) payloadData.instructions = formData.instructions;
+      if (formData.start_date) payloadData.start_date = formData.start_date;
+      if (formData.end_date) payloadData.end_date = formData.end_date;
+      if (formData.route) payloadData.route = formData.route;
+      if (formData.duration_days) payloadData.duration_days = formData.duration_days;
+
+      console.log('[MedicationSchedule] Payload:', JSON.stringify(payloadData, null, 2));
+
+      const endpoint = isEditing && editingRecordId ? NURSE_UPDATE_MEDICATION(editingRecordId) : NURSE_MEDICATIONS;
+      const method = isEditing && editingRecordId ? 'PATCH' : 'POST';
+
+      if (isEditing && editingRecordId) {
+        console.log('[MedicationSchedule] PATCH Request Details:', {
+          method: 'PATCH',
+          endpoint,
+          recordId: editingRecordId,
+          payload: payloadData
+        });
+      }
+
+      const response = await apiFetch(endpoint, {
+        method,
         body: payloadData
       });
 
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(payload?.detail || payload?.message || 'Failed to add medication');
+        // Enhanced error logging for PATCH failures
+        if (isEditing) {
+          console.error('[MedicationSchedule] PATCH Failed:', {
+            status: response.status,
+            statusText: response.statusText,
+            recordId: editingRecordId,
+            error: payload
+          });
+        }
+        throw new Error(payload?.detail || payload?.message || `Failed to ${isEditing ? 'update' : 'add'} medication`);
       }
 
-      setMessage({ type: 'success', text: 'Medication added successfully' });
+      setMessage({ type: 'success', text: payload?.message || (isEditing ? 'Medication updated successfully' : 'Medication added successfully') });
       
-      // Reset form and close modal
       setFormData({
         admission_number: formData.admission_number,
         medication_name: '',
@@ -162,15 +234,19 @@ const MedicationSchedule = () => {
         scheduled_time: '',
         instructions: '',
         frequency: 'Once daily',
-        start_date: ''
+        start_date: '',
+        end_date: '',
+        route: 'Oral',
+        duration_days: ''
       });
       setIsModalOpen(false);
+      setIsEditing(false);
+      setEditingRecordId('');
       
-      // Refresh medications list after submission
       fetchData();
     } catch (error) {
       console.error(error);
-      setMessage({ type: 'error', text: error.message || 'Failed to add medication' });
+      setMessage({ type: 'error', text: error.message || `Failed to ${isEditing ? 'update' : 'add'} medication` });
     } finally {
       setLoading(false);
     }
@@ -184,9 +260,14 @@ const MedicationSchedule = () => {
       scheduled_time: '',
       instructions: '',
       frequency: 'Once daily',
-      start_date: ''
+      start_date: '',
+      end_date: '',
+      route: 'Oral',
+      duration_days: ''
     });
     setIsModalOpen(false);
+    setIsEditing(false);
+    setEditingRecordId('');
   };
 
   const getStatusClass = (status) => {
@@ -207,32 +288,29 @@ const MedicationSchedule = () => {
           <h2 className="text-2xl font-semibold text-gray-700">Medication Schedule</h2>
           <div className="flex items-center gap-3 w-full md:w-auto">
             <div className="relative flex-1 md:w-64">
-              <select
+              <input
+                type="text"
                 value={selectedAdmission}
                 onChange={(e) => {
                   const val = e.target.value;
                   setSelectedAdmission(val);
                   setFormData(prev => ({ ...prev, admission_number: val }));
                 }}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm appearance-none pr-8"
-              >
-                <option value="">Select Patient</option>
-                {patientsList.map(patient => (
-                  <option key={patient.id} value={patient.admission_number || patient.admissionNumber || patient.id}>
-                    {patient.name || patient.patient_name} ({patient.admission_number || patient.admissionNumber || patient.id})
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                <i className="fas fa-chevron-down text-xs"></i>
-              </div>
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm"
+                placeholder="Enter Admission Number"
+              />
             </div>
             <button
-              onClick={() => setIsModalOpen(true)}
+              onClick={() => {
+                setIsEditing(false);
+                setEditingRecordId('');
+                setFormData(prev => ({ ...prev, admission_number: selectedAdmission }));
+                setIsModalOpen(true);
+              }}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm font-medium shadow-sm whitespace-nowrap"
             >
               <i className="fas fa-plus"></i>
-              <span>Add Medication</span>
+              <span>{isEditing ? 'Edit Medication' : 'Add Medication'}</span>
             </button>
           </div>
         </div>
@@ -241,7 +319,7 @@ const MedicationSchedule = () => {
         <Modal
           isOpen={isModalOpen}
           onClose={handleCancel}
-          title="Add New Medication"
+          title={isEditing ? 'Edit Medication' : 'Add New Medication'}
           size="lg"
         >
           {message.text && (
@@ -330,6 +408,46 @@ const MedicationSchedule = () => {
                   required 
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Route</label>
+                <select
+                  name="route"
+                  value={formData.route}
+                  onChange={handleInputChange}
+                  className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option>Oral</option>
+                  <option>Injection</option>
+                  <option>Topical</option>
+                  <option>IV</option>
+                  <option>Inhalation</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Duration (days)</label>
+                <input 
+                  type="number" 
+                  min="1"
+                  name="duration_days"
+                  value={formData.duration_days}
+                  onChange={handleInputChange}
+                  className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                  placeholder="e.g., 5" 
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                <input 
+                  type="date" 
+                  name="end_date"
+                  value={formData.end_date}
+                  onChange={handleInputChange}
+                  className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                />
+              </div>
             </div>
             
             <div>
@@ -361,9 +479,9 @@ const MedicationSchedule = () => {
                 {loading ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                 ) : (
-                  <i className="fas fa-plus mr-2"></i>
+                  <i className={`fas ${isEditing ? 'fa-save' : 'fa-plus'} mr-2`}></i>
                 )}
-                {loading ? 'Adding...' : 'Add Medication'}
+                {loading ? (isEditing ? 'Updating...' : 'Adding...') : (isEditing ? 'Update Medication' : 'Add Medication')}
               </button>
             </div>
           </form>
@@ -419,11 +537,14 @@ const MedicationSchedule = () => {
                   medications.map((med) => (
                     <tr key={med.id} className="hover:bg-gray-50/80 transition-colors">
                       <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-3 text-xs font-bold">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">
                             {med.patient_name?.charAt(0) || 'P'}
                           </div>
-                          <span className="text-sm font-medium text-gray-900">{med.patient_name}</span>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{med.patient_name}</div>
+                            <div className="text-xs text-gray-500">{med.admission_number || 'Admission not set'}</div>
+                          </div>
                         </div>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
@@ -432,10 +553,17 @@ const MedicationSchedule = () => {
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
                         {med.dose}
+                        <div className="text-xs text-gray-500 mt-1">{med.route}</div>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">{med.scheduled_time}</div>
                         <div className="text-xs text-gray-500">{med.frequency}</div>
+                        {med.duration_days ? (
+                          <div className="text-xs text-gray-500">{`Duration: ${med.duration_days} day${med.duration_days > 1 ? 's' : ''}`}</div>
+                        ) : null}
+                        {med.end_date ? (
+                          <div className="text-xs text-gray-500">{`Until: ${med.end_date}`}</div>
+                        ) : null}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusClass(med.status)}`}>
@@ -444,6 +572,32 @@ const MedicationSchedule = () => {
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-center text-sm font-medium">
                         <div className="flex justify-center items-center gap-2">
+                          <button
+                            className="bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white p-2 rounded-lg transition-all duration-200 shadow-sm"
+                            onClick={() => {
+                              const recordId = med.record_id || med._id || med.id || med.medication_id || med.prescription_id || med.uuid || '';
+                              console.log('[MedicationSchedule] Edit button clicked - med object:', med);
+                              console.log('[MedicationSchedule] Selected recordId for PATCH:', recordId);
+                              setIsEditing(true);
+                              setEditingRecordId(recordId);
+                              setFormData({
+                                admission_number: med.admission_number || selectedAdmission,
+                                medication_name: med.medication_name || '',
+                                dose: med.dose || '',
+                                scheduled_time: med.scheduled_time || '',
+                                instructions: med.instructions || '',
+                                frequency: med.frequency || 'Once daily',
+                                start_date: med.start_date || '',
+                                end_date: med.end_date || '',
+                                route: med.route || 'Oral',
+                                duration_days: med.duration_days || ''
+                              });
+                              setIsModalOpen(true);
+                            }}
+                            title="Edit Medication"
+                          >
+                            <i className="fas fa-pen"></i>
+                          </button>
                           <button 
                             className="bg-green-50 text-green-600 hover:bg-green-600 hover:text-white p-2 rounded-lg transition-all duration-200 shadow-sm"
                             onClick={() => handleMedAction('give', med.id)}

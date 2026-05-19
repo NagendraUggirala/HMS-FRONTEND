@@ -251,25 +251,28 @@ export const PHARMACY_SETTINGS_BASE = '/api/v1/pharmacy/settings';
 
 // --- NURSE ---
 export const NURSE_BASE = '/api/v1/nurse';
-export const NURSE_DASHBOARD_OVERVIEW = `${NURSE_BASE}/dashboard`;
-export const NURSE_ADD_VITALS = `${NURSE_BASE}/vitals`;
-export const NURSE_GET_VITALS = `${NURSE_BASE}/vitals`;
-export const NURSE_ASSIGNED_PATIENTS = `${NURSE_BASE}/assigned-patients`;
-export const NURSE_MEDICATIONS = `${NURSE_BASE}/medications`;
-export const NURSE_BEDS = `${NURSE_BASE}/beds`;
-export const NURSE_LAB_TESTS = `${NURSE_BASE}/lab-tests`;
-export const NURSE_NURSING_NOTES = `${NURSE_BASE}/nursing-notes`;
+// NURSE DASHBOARD APIs
+export const NURSE_DASHBOARD_OVERVIEW =
+  '/api/v1/nurse/dashboard';
 
-// --- LAB MANAGEMENT ---
-export const LAB_BASE = '/api/v1/lab';
-export const LAB_TECH_DASHBOARD = `${LAB_BASE}/tech-dashboard`;
-export const LAB_REPORT_GENERATION = `${LAB_BASE}/report-generation`;
-export const LAB_EQUIPMENT = `${LAB_BASE}/equipment-tracking`;
-export const LAB_SAMPLES = `${LAB_BASE}/samples`;
-export const LAB_RESULT_ACCESS = `${LAB_BASE}/result-access`;
-export const LAB_RESULT_ACCESS_GRANT = `${LAB_RESULT_ACCESS}/grant`;
-export const LAB_EQUIPMENT_QC_BASE = `${LAB_BASE}/equipment-qc/equipment`;
-export const LAB_EQUIPMENT_DETAILS = (id) => `${LAB_EQUIPMENT_QC_BASE}/${encodeURIComponent(id)}`;
-export const LAB_EQUIPMENT_LOGS = (id) => `${LAB_EQUIPMENT_QC_BASE}/${encodeURIComponent(id)}/logs`;
-export const LAB_EQUIPMENT_STATUS = (id) => `${LAB_EQUIPMENT_QC_BASE}/${encodeURIComponent(id)}/status`;
-  
+export const NURSE_ADD_VITALS = '/api/v1/nurse/vitals';
+export const NURSE_GET_VITALS = '/api/v1/nurse/vitals';
+export const NURSE_UPDATE_VITALS = (recordId) => `/api/v1/nurse/vitals/${encodeURIComponent(recordId)}`;
+export const NURSE_ASSIGNED_PATIENTS = '/api/v1/nurse/assigned-patients';
+
+export const NURSE_MEDICATIONS =
+  '/api/v1/nurse/medications';
+export const NURSE_UPDATE_MEDICATION = (recordId) => `/api/v1/nurse/medications/${encodeURIComponent(recordId)}`;
+
+export const NURSE_BEDS =
+  '/api/v1/nurse/beds';
+export const NURSE_UPDATE_BED = (bedId) => `/api/v1/nurse/beds/${encodeURIComponent(bedId)}`;
+
+export const NURSE_LAB_TESTS =
+  '/api/v1/nurse/lab-tests';
+export const NURSE_UPDATE_LAB_TEST = (recordId) => `/api/v1/nurse/lab-tests/${encodeURIComponent(recordId)}`;
+export const NURSE_NURSING_NOTES =
+  '/api/v1/nurse/nursing-notes';
+
+export const NURSE_DISCHARGE_SUPPORT = '/api/v1/nurse/discharge-support';
+export const NURSE_DISCHARGE_SUMMARY = '/api/v1/nurse/discharge-summary';
