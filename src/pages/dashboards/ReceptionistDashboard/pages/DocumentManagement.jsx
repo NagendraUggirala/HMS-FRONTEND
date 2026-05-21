@@ -26,7 +26,7 @@ import {
 import LoadingSpinner from '../../../../components/common/LoadingSpinner/LoadingSpinner';
 import Modal from '../../../../components/common/Modal/Modal';
 import { apiFetch } from '../../../../services/apiClient';
-import { RECEPTIONIST_PATIENT_SEARCH } from '../../../../config/api';
+import { RECEPTIONIST_PATIENT_SEARCH, RECEPTIONIST_PATIENT_DOCUMENTS, RECEPTIONIST_PATIENT_DOCUMENTS_UPLOAD } from '../../../../config/api';
 
 const DocumentManagement = () => {
   const [loading, setLoading] = useState(true);
@@ -35,7 +35,9 @@ const DocumentManagement = () => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showPatientModal, setShowPatientModal] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
-  const [documentCategory, setDocumentCategory] = useState('');
+  const [documentType, setDocumentType] = useState('');
+  const [category, setCategory] = useState('');
+  const [uploadedBy, setUploadedBy] = useState('Receptionist');
   const [searchTerm, setSearchTerm] = useState('');
   const [documentToView, setDocumentToView] = useState(null);
   const [showViewAllModal, setShowViewAllModal] = useState(false);
@@ -65,15 +67,27 @@ const DocumentManagement = () => {
       const json = await response.json();
       if (json.success) {
         const rawPatients = json.data?.patients || json.data || [];
-        const mappedPatients = rawPatients.map(p => ({
-          ...p,
-          id: p.patient_id || p.id || p._id,
-          name: p.name || p.patient_name || 'Unknown',
-          age: p.age || 'N/A',
-          gender: p.gender || 'N/A',
-          phone: p.phone || 'N/A',
-          lastVisit: p.last_visit || p.lastVisit || 'N/A',
-          documents: p.documents || []
+        
+        const mappedPatients = await Promise.all(rawPatients.map(async (p) => {
+          const pid = p.patient_id || p.id || p._id;
+          let docs = p.documents || [];
+          try {
+             const docRes = await apiFetch(RECEPTIONIST_PATIENT_DOCUMENTS(pid));
+             const docJson = await docRes.json().catch(() => ({}));
+             if (docJson.success) docs = docJson.data || [];
+          } catch (e) {
+             console.error("Failed to fetch docs for", pid);
+          }
+          return {
+            ...p,
+            id: pid,
+            name: p.name || p.patient_name || 'Unknown',
+            age: p.age || 'N/A',
+            gender: p.gender || 'N/A',
+            phone: p.phone || 'N/A',
+            lastVisit: p.last_visit || p.lastVisit || 'N/A',
+            documents: docs
+          };
         }));
         setPatients(mappedPatients);
       }
@@ -114,15 +128,26 @@ const DocumentManagement = () => {
       const json = await response.json();
       if (json.success) {
         const rawPatients = json.data?.patients || json.data || [];
-        const mappedPatients = rawPatients.map(p => ({
-          ...p,
-          id: p.patient_id || p.id || p._id,
-          name: p.name || p.patient_name || 'Unknown',
-          age: p.age || 'N/A',
-          gender: p.gender || 'N/A',
-          phone: p.phone || 'N/A',
-          lastVisit: p.last_visit || p.lastVisit || 'N/A',
-          documents: p.documents || []
+        const mappedPatients = await Promise.all(rawPatients.map(async (p) => {
+          const pid = p.patient_id || p.id || p._id;
+          let docs = p.documents || [];
+          try {
+             const docRes = await apiFetch(RECEPTIONIST_PATIENT_DOCUMENTS(pid));
+             const docJson = await docRes.json().catch(() => ({}));
+             if (docJson.success) docs = docJson.data || [];
+          } catch (e) {
+             console.error("Failed to fetch docs for", pid);
+          }
+          return {
+            ...p,
+            id: pid,
+            name: p.name || p.patient_name || 'Unknown',
+            age: p.age || 'N/A',
+            gender: p.gender || 'N/A',
+            phone: p.phone || 'N/A',
+            lastVisit: p.last_visit || p.lastVisit || 'N/A',
+            documents: docs
+          };
         }));
         setPatients(mappedPatients);
       }
@@ -150,49 +175,63 @@ const DocumentManagement = () => {
     setUploadedFiles(uploadedFiles.filter(file => file.id !== id));
   };
 
-  const handleUpload = () => {
-    if (!selectedPatient || uploadedFiles.length === 0 || !documentCategory) {
-      alert('Please select patient, category, and add files to upload');
+  const fetchPatientDocuments = async (patientId) => {
+    try {
+      const response = await apiFetch(RECEPTIONIST_PATIENT_DOCUMENTS(patientId));
+      const json = await response.json();
+      if (json.success) {
+        const docs = json.data || [];
+        setPatients(prev => prev.map(p => p.id === patientId ? { ...p, documents: docs } : p));
+        if (selectedPatient && selectedPatient.id === patientId) {
+          setSelectedPatient(prev => ({ ...prev, documents: docs }));
+        }
+      }
+    } catch(err) {
+      console.error("Error fetching patient documents:", err);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedPatient || uploadedFiles.length === 0 || !documentType || !category || !uploadedBy) {
+      alert('Please select patient, document type, category, uploader, and add files to upload');
       return;
     }
 
     const patientIndex = patients.findIndex(p => p.id === selectedPatient.id);
     if (patientIndex === -1) return;
+    
+    try {
+      const formData = new FormData();
+      formData.append('patient_id', selectedPatient.id);
+      formData.append('document_type', documentType);
+      formData.append('category', category);
+      formData.append('uploaded_by', uploadedBy);
+      uploadedFiles.forEach(f => {
+        formData.append('files', f.file);
+      });
 
-    const newDocuments = uploadedFiles.map(file => ({
-      id: `DOC-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name: file.name,
-      type: documentCategory,
-      category: 'Uploaded',
-      size: file.size,
-      uploadedDate: new Date().toISOString().split('T')[0],
-      fileType: file.type.toLowerCase().includes('pdf') 
-  ? 'pdf'
-  : file.type.toLowerCase().includes('image') 
-  ? 'image'
-  : file.type.toLowerCase().includes('word') || file.name.endsWith('.doc') || file.name.endsWith('.docx')
-  ? 'doc'
-  : 'file',
-      file: file.file
-    }));
+      const response = await apiFetch(RECEPTIONIST_PATIENT_DOCUMENTS_UPLOAD, {
+        method: 'POST',
+        body: formData
+      });
+      
+      const result = await response.json().catch(() => ({}));
 
-    const updatedPatients = [...patients];
-    updatedPatients[patientIndex].documents = [
-      ...updatedPatients[patientIndex].documents,
-      ...newDocuments
-    ];
+      if (!response.ok || (result && result.success === false)) {
+        throw new Error(result.message || 'Failed to upload documents');
+      }
 
-    setPatients(updatedPatients);
+      await fetchPatientDocuments(selectedPatient.id);
 
-    // Update selectedPatient if it's the one we just uploaded to
-    if (selectedPatient && selectedPatient.id === updatedPatients[patientIndex].id) {
-      setSelectedPatient(updatedPatients[patientIndex]);
+      setShowUploadModal(false);
+      setUploadedFiles([]);
+      setDocumentType('');
+      setCategory('');
+      alert('Documents uploaded successfully!');
+    } catch (err) {
+      console.error("Upload Error:", err);
+      alert("Error: " + err.message);
     }
-
-    setShowUploadModal(false);
-    setUploadedFiles([]);
-    setDocumentCategory('');
-    alert('Documents uploaded successfully!');
   };
 
   const handleDownload = (doc) => {
@@ -210,15 +249,12 @@ const DocumentManagement = () => {
   };
 
   const documentCategories = [
-    'ID Proof',
-    'Insurance Documents',
-    'Previous Medical Reports',
-    'Lab Reports',
-    'Prescription',
-    'X-Ray',
-    'Scan Reports',
-    'Discharge Summary',
-    'Other Medical Documents'
+    { value: 'MEDICAL_REPORT', label: 'Medical Report' },
+    { value: 'LAB_RESULT', label: 'Lab Result' },
+    { value: 'PRESCRIPTION', label: 'Prescription' },
+    { value: 'INSURANCE_CARD', label: 'Insurance Card' },
+    { value: 'ID_PROOF', label: 'ID Proof' },
+    { value: 'DISCHARGE_SUMMARY', label: 'Discharge Summary' }
   ];
 
   const getFileIcon = (fileType) => {
@@ -256,13 +292,13 @@ const DocumentManagement = () => {
     const getDocumentsByType = (documents, type) => {
       if (type === 'all') return documents;
       if (type === 'medical') return documents.filter(d =>
-        ['Previous Medical Reports', 'Prescription', 'Discharge Summary'].includes(d.type)
+        ['Previous Medical Reports', 'Prescription', 'Discharge Summary', 'MEDICAL_REPORT', 'PRESCRIPTION', 'DISCHARGE_SUMMARY'].includes(d.type || d.document_type)
       );
       if (type === 'reports') return documents.filter(d =>
-        ['Lab Report', 'X-Ray', 'Scan Report', 'Test Report'].includes(d.type)
+        ['Lab Report', 'X-Ray', 'Scan Report', 'Test Report', 'LAB_RESULT'].includes(d.type || d.document_type)
       );
       if (type === 'other') return documents.filter(d =>
-        ['ID Proof', 'Insurance'].includes(d.type)
+        ['ID Proof', 'Insurance', 'ID_PROOF', 'INSURANCE_CARD'].includes(d.type || d.document_type)
       );
       return documents;
     };
@@ -355,7 +391,7 @@ const DocumentManagement = () => {
                     <p className="font-medium text-sm truncate">{doc.name}</p>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${getCategoryColor(doc.category)}`}>
-                        {doc.type}
+                        {doc.type || doc.document_type || doc.category || 'Document'}
                       </span>
                       <span className="text-xs text-gray-500">{doc.size}</span>
                     </div>
@@ -470,7 +506,7 @@ const DocumentManagement = () => {
               <p className="text-gray-500 text-sm">Lab Reports</p>
               <p className="text-xl font-bold text-purple-600 mt-1">
                 {patients.reduce((sum, patient) =>
-                  sum + patient.documents.filter(d => d.type.includes('Report')).length, 0
+                  sum + patient.documents.filter(d => (d.type || d.document_type || '').includes('Report') || (d.type || d.document_type || '') === 'LAB_RESULT').length, 0
                 )}
               </p>
             </div>
@@ -486,7 +522,7 @@ const DocumentManagement = () => {
               <p className="text-gray-500 text-sm">ID Proofs</p>
               <p className="text-xl font-bold text-yellow-600 mt-1">
                 {patients.reduce((sum, patient) =>
-                  sum + patient.documents.filter(d => d.type === 'ID Proof').length, 0
+                  sum + patient.documents.filter(d => (d.type || d.document_type || '') === 'ID Proof' || (d.type || d.document_type || '') === 'ID_PROOF').length, 0
                 )}
               </p>
             </div>
@@ -518,7 +554,8 @@ const DocumentManagement = () => {
           onClose={() => {
             setShowUploadModal(false);
             setUploadedFiles([]);
-            setDocumentCategory('');
+            setDocumentType('');
+            setCategory('');
           }}
           title={`Upload Documents to ${selectedPatient.name}`}
           size="lg"
@@ -528,7 +565,8 @@ const DocumentManagement = () => {
                 onClick={() => {
                   setShowUploadModal(false);
                   setUploadedFiles([]);
-                  setDocumentCategory('');
+                  setDocumentType('');
+                  setCategory('');
                 }}
                 className="px-5 py-2.5 border rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
               >
@@ -536,7 +574,7 @@ const DocumentManagement = () => {
               </button>
               <button
                 onClick={handleUpload}
-                disabled={!documentCategory || uploadedFiles.length === 0}
+                disabled={!documentType || !category || !uploadedBy || uploadedFiles.length === 0}
                 className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
               >
                 <UploadIcon className="mr-2" />
@@ -564,24 +602,56 @@ const DocumentManagement = () => {
               </div>
             </div>
 
-            {/* Document Category */}
+            {/* Document Type */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Document Category *
+                Document Type *
               </label>
               <select
-                value={documentCategory}
-                onChange={(e) => setDocumentCategory(e.target.value)}
+                value={documentType}
+                onChange={(e) => setDocumentType(e.target.value)}
                 className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
               >
                 <option value="">Select document type</option>
-                {documentCategories.map(category => (
-                  <option key={category} value={category}>{category}</option>
+                {documentCategories.map(cat => (
+                  <option key={cat.value} value={cat.value}>{cat.label}</option>
                 ))}
               </select>
+            </div>
+
+            {/* Document Category / Title */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Category (Title) *
+              </label>
+              <input
+                type="text"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="e.g. Blood Test Results, Aadhar Card"
+                className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
               <p className="text-xs text-gray-500 mt-1">
-                Select the appropriate category for proper organization
+                Stored as document title / UI category
+              </p>
+            </div>
+            
+            {/* Uploaded By */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Uploaded By *
+              </label>
+              <input
+                type="text"
+                value={uploadedBy}
+                onChange={(e) => setUploadedBy(e.target.value)}
+                className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Display name of uploader 
               </p>
             </div>
 
