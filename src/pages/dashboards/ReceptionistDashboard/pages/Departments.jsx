@@ -50,6 +50,7 @@ const Departments = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedDeptId, setSelectedDeptId] = useState('all');
     const [showModal, setShowModal] = useState(false);
     const [formData, setFormData] = useState({});
     const [modalLoading, setModalLoading] = useState(false);
@@ -59,17 +60,28 @@ const Departments = () => {
         fetchInitialData();
     }, []);
 
-    // Optimized Search Logic: Using client-side filtering for instant feedback
-    const filteredDepartments = useMemo(() => {
-        if (!searchTerm) return departments;
+    // Filter and search active departments (KPI statistics are derived from this dataset)
+    const searchFilteredDepartments = useMemo(() => {
+        // Filter only Active departments
+        const activeDepts = departments.filter(dept => 
+            dept.status?.toLowerCase() === 'active'
+        );
+
+        if (!searchTerm) return activeDepts;
         const lowSearch = searchTerm.toLowerCase().trim();
-        return departments.filter(dept =>
+        return activeDepts.filter(dept =>
             dept.name?.toLowerCase().includes(lowSearch) ||
             dept.head?.toLowerCase().includes(lowSearch) ||
             dept.code?.toLowerCase().includes(lowSearch) ||
             dept.id?.toString().toLowerCase().includes(lowSearch)
         );
     }, [departments, searchTerm]);
+
+    // Final departments shown in the table (filtered by search and selected department dropdown)
+    const filteredDepartments = useMemo(() => {
+        if (selectedDeptId === 'all') return searchFilteredDepartments;
+        return searchFilteredDepartments.filter(dept => dept.id?.toString() === selectedDeptId.toString());
+    }, [searchFilteredDepartments, selectedDeptId]);
 
     const fetchInitialData = async () => {
         setLoading(true);
@@ -152,15 +164,37 @@ const Departments = () => {
     };
 
 
-    // Dynamic Statistics derived from API response
-    const stats = {
-        total: statsData.totalDepartments || 0,
-        active: statsData.activeDepartments || 0,
-        totalBeds: statsData.totalBeds || 0,
-        availableBeds: statsData.availableBeds || 0,
-        totalStaff: (statsData.doctorCount || 0) + (statsData.nurseCount || 0),
-        emergencyUnits: statsData.emergencyReady || 0
-    };
+    // Dynamic Statistics derived from active/filtered table data
+    const stats = useMemo(() => {
+        let totalBeds = 0;
+        let availableBeds = 0;
+        let totalDoctors = 0;
+        let totalNurses = 0;
+        let emergencyUnits = 0;
+
+        filteredDepartments.forEach(dept => {
+            totalBeds += Number(dept.bedCapacity || 0);
+            availableBeds += Number(dept.availableBeds || 0);
+            totalDoctors += Number(dept.doctorCount || 0);
+            totalNurses += Number(dept.nurseCount || 0);
+            if (dept.emergencyAvailable || dept.emergencyReady || dept.isEmergencyReady) {
+                emergencyUnits++;
+            }
+        });
+
+        const activeCount = filteredDepartments.filter(dept => 
+            dept.status?.toLowerCase() === 'active'
+        ).length;
+
+        return {
+            total: filteredDepartments.length,
+            active: activeCount,
+            totalBeds,
+            availableBeds,
+            totalStaff: totalDoctors + totalNurses,
+            emergencyUnits
+        };
+    }, [filteredDepartments]);
 
 
 
@@ -245,8 +279,8 @@ const Departments = () => {
                 ))}
             </div>
 
-            {/* Search Bar */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-8">
+            {/* Search Bar & Department Filter */}
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
                 <div className="relative w-full max-w-2xl">
                     <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 !w-5 !h-5 text-slate-300" />
                     <input
@@ -256,6 +290,25 @@ const Departments = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-12 pr-6 py-3.5 bg-slate-50/50 border border-slate-100 focus:border-slate-300 rounded-2xl text-sm transition-all outline-none font-medium placeholder:text-slate-300"
                     />
+                </div>
+                
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                    <span className="text-xs font-semibold text-slate-400 whitespace-nowrap"></span>
+                    <select
+                        value={selectedDeptId}
+                        onChange={(e) => setSelectedDeptId(e.target.value)}
+                        className="w-full md:w-56 px-4 py-3 bg-slate-50 border border-slate-100 focus:border-slate-300 rounded-2xl text-xs font-bold text-slate-700 transition-all outline-none cursor-pointer"
+                    >
+                        <option value="all">All Departments</option>
+                        {departments
+                            .filter(dept => dept.status?.toLowerCase() === 'active')
+                            .map(dept => (
+                                <option key={dept.id} value={dept.id}>
+                                    {dept.name}
+                                </option>
+                            ))
+                        }
+                    </select>
                 </div>
             </div>
 

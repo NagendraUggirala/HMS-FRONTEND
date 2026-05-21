@@ -37,6 +37,8 @@ const Doctors = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedDeptFilter, setSelectedDeptFilter] = useState('all');
+    const [selectedDocFilter, setSelectedDocFilter] = useState('all');
     const [showModal, setShowModal] = useState(false);
     const [formData, setFormData] = useState({});
     const [modalLoading, setModalLoading] = useState(false);
@@ -46,17 +48,49 @@ const Doctors = () => {
         fetchInitialData();
     }, []);
 
-    // Optimized Search Logic: Using client-side filtering for instant feedback
+    // Filter active doctors
+    const activeDoctors = useMemo(() => {
+        return doctors.filter(doc => doc.status?.toLowerCase() === 'active');
+    }, [doctors]);
+
+    // Get list of unique departments from active doctors
+    const departments = useMemo(() => {
+        const depts = activeDoctors.map(doc => doc.department).filter(Boolean);
+        return [...new Set(depts)].sort();
+    }, [activeDoctors]);
+
+    // Get list of doctors for dropdown option (filtered by department if one is selected)
+    const uniqueDoctorsForFilter = useMemo(() => {
+        let docs = activeDoctors;
+        if (selectedDeptFilter && selectedDeptFilter !== 'all') {
+            docs = docs.filter(doc => doc.department?.toLowerCase() === selectedDeptFilter.toLowerCase());
+        }
+        return [...docs].sort((a, b) => a.name.localeCompare(b.name));
+    }, [activeDoctors, selectedDeptFilter]);
+
+    // Final doctors shown in the table (filtered by search, department, and doctor)
     const filteredDoctors = useMemo(() => {
-        if (!searchTerm) return doctors;
+        let docs = activeDoctors;
+
+        // Filter by Department if selected
+        if (selectedDeptFilter && selectedDeptFilter !== 'all') {
+            docs = docs.filter(doc => doc.department?.toLowerCase() === selectedDeptFilter.toLowerCase());
+        }
+
+        // Filter by Doctor if selected
+        if (selectedDocFilter && selectedDocFilter !== 'all') {
+            docs = docs.filter(doc => doc.id?.toString() === selectedDocFilter.toString());
+        }
+
+        if (!searchTerm) return docs;
         const lowSearch = searchTerm.toLowerCase().trim();
-        return doctors.filter(doc =>
+        return docs.filter(doc =>
             doc.name?.toLowerCase().includes(lowSearch) ||
             doc.specialization?.toLowerCase().includes(lowSearch) ||
             doc.id?.toString().toLowerCase().includes(lowSearch) ||
             doc.department?.toLowerCase().includes(lowSearch)
         );
-    }, [doctors, searchTerm]);
+    }, [activeDoctors, searchTerm, selectedDeptFilter, selectedDocFilter]);
 
     const fetchInitialData = async () => {
         setLoading(true);
@@ -124,13 +158,31 @@ const Doctors = () => {
     };
 
 
-    // Dynamic Statistics derived from API response
-    const stats = {
-        total: statsData.totalDoctors || statsData.total || 0,
-        available: statsData.availableDoctors || statsData.available || 0,
-        busy: statsData.busyDoctors || statsData.busy || 0,
-        onLeave: statsData.onLeaveDoctors || statsData.onLeave || 0
-    };
+    // Dynamic Statistics calculated from the filtered doctors shown in the table
+    const stats = useMemo(() => {
+        let total = filteredDoctors.length;
+        let available = 0;
+        let busy = 0;
+        let onLeave = 0;
+
+        filteredDoctors.forEach(doc => {
+            const avail = doc.availability?.toLowerCase();
+            if (avail === 'available') {
+                available++;
+            } else if (avail === 'busy') {
+                busy++;
+            } else if (avail === 'on leave' || avail === 'onleave') {
+                onLeave++;
+            }
+        });
+
+        return {
+            total,
+            available,
+            busy,
+            onLeave
+        };
+    }, [filteredDoctors]);
 
 
     const getStatusBadge = (status) => {
@@ -192,8 +244,8 @@ const Doctors = () => {
             </div>
 
             {/* Filters & Search */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-8 flex flex-col md:flex-row gap-4 items-center">
-                <div className="relative flex-1 max-w-2xl">
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="relative flex-1 w-full max-w-xl">
                     <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 !w-5 !h-5 text-slate-300" />
                     <input
                         type="text"
@@ -202,6 +254,39 @@ const Doctors = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-12 pr-6 py-3.5 bg-slate-50/50 border border-slate-100 focus:border-slate-300 rounded-2xl text-sm transition-all outline-none font-medium placeholder:text-slate-300"
                     />
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                    {/* Department Filter */}
+                    <select
+                        value={selectedDeptFilter}
+                        onChange={(e) => {
+                            setSelectedDeptFilter(e.target.value);
+                            setSelectedDocFilter('all'); // Reset doctor filter if department changes
+                        }}
+                        className="w-full md:w-48 px-4 py-3 bg-slate-50 border border-slate-100 focus:border-slate-300 rounded-2xl text-xs font-bold text-slate-700 transition-all outline-none cursor-pointer"
+                    >
+                        <option value="all">All Departments</option>
+                        {departments.map(dept => (
+                            <option key={dept} value={dept}>
+                                {dept}
+                            </option>
+                        ))}
+                    </select>
+
+                    {/* Doctor Filter */}
+                    <select
+                        value={selectedDocFilter}
+                        onChange={(e) => setSelectedDocFilter(e.target.value)}
+                        className="w-full md:w-48 px-4 py-3 bg-slate-50 border border-slate-100 focus:border-slate-300 rounded-2xl text-xs font-bold text-slate-700 transition-all outline-none cursor-pointer"
+                    >
+                        <option value="all">All Doctors</option>
+                        {uniqueDoctorsForFilter.map(doc => (
+                            <option key={doc.id} value={doc.id}>
+                                {doc.name}
+                            </option>
+                        ))}
+                    </select>
                 </div>
             </div>
 

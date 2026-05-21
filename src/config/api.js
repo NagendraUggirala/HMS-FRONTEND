@@ -171,7 +171,6 @@ export const DOCTOR_SCHEDULE_SLOT_DETAILS = (scheduleId) => `/api/v1/doctor-mana
 
 /** Receptionist: profile management */
 export const RECEPTIONIST_PROFILE = '/api/v1/receptionist/profile';
-
 /** Receptionist: profile update */
 export const RECEPTIONIST_PROFILE_UPDATE = '/api/v1/receptionist/profile';
 /** Receptionist: patient registration */
@@ -179,6 +178,8 @@ export const RECEPTIONIST_PATIENT_REGISTER = '/api/v1/receptionist/patients/regi
 export const RECEPTIONIST_PATIENT_SEARCH = '/api/v1/receptionist/patients/search';
 export const RECEPTIONIST_PATIENT_PROFILE = (patientId) => `/api/v1/receptionist/patients/${encodeURIComponent(patientId)}/profile`;
 export const RECEPTIONIST_PATIENT_UPDATE = (patientId) => `/api/v1/receptionist/patients/${encodeURIComponent(patientId)}`;
+export const RECEPTIONIST_PATIENT_DOCUMENTS_UPLOAD = '/api/v1/receptionist/patient-documents/upload';
+export const RECEPTIONIST_PATIENT_DOCUMENTS = (patientRef) => `/api/v1/receptionist/patients/${encodeURIComponent(patientRef)}/documents`;
 
 /** Receptionist: dashboard overview */
 export const RECEPTIONIST_DASHBOARD_OVERVIEW = '/api/v1/receptionist/dashboard';

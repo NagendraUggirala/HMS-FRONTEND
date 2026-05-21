@@ -26,31 +26,35 @@ const ReceptionProfile = () => {
   const [error, setError] = useState(null)
   const [successMessage, setSuccessMessage] = useState('')
   const [profile, setProfile] = useState({
-    receptionist_id: "",
-    employee_id: "",
-    name: "",
+    user_id: "",
+    first_name: "",
+    last_name: "",
+    full_name: "",
     email: "",
     phone: "",
+    staff_id: "",
+    avatar_url: null,
+    status: "",
+    is_active: true,
     mobile_number: "",
-    designation: "",
-    work_area: "",
-    address: "",
-    shift_type: "DAY",
-    shift_time: "",
-    employment_type: "FULL_TIME",
-    experience_years: 0,
+    joining_date: "",
     blood_group: "",
     gender: "",
-    join_date: "",
+    shift_timing: "Morning (7AM-3PM)",
+    address: "",
     profile_photo: null,
+    role: "RECEPTIONIST",
+    note: "",
+    // Keep internal UI state if needed
     profile_photo_url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS9B-uq-hoK_JiRml8oo37F6A0ro-ondfH0cQ&s",
+    experience_years: 0,
+    work_area: "",
     permissions: {
       can_schedule_appointments: false,
       can_modify_appointments: false,
       can_register_patients: false,
       can_collect_payments: false
-    },
-    is_active: true
+    }
   })
 
   // Fetch profile data from API
@@ -60,35 +64,40 @@ const ReceptionProfile = () => {
       setError(null)
       try {
         const response = await apiFetch(RECEPTIONIST_PROFILE)
-        const data = await response.json()
+        const result = await response.json()
 
         if (!response.ok) {
-          throw new Error(data?.message || data?.detail?.message || 'Failed to fetch profile')
+          throw new Error(result?.message || result?.detail?.message || 'Failed to fetch profile')
         }
 
-        // Map API response to profile state
-        const apiProfile = data?.data || data
-        setProfile({
-          receptionist_id: apiProfile?.receptionist_id || "",
-          employee_id: apiProfile?.employee_id || "",
-          name: apiProfile?.full_name || apiProfile?.name || "",
-          email: apiProfile?.email || "",
-          phone: apiProfile?.phone || apiProfile?.mobile_number || "",
-          mobile_number: apiProfile?.mobile_number || apiProfile?.phone || "",
-          designation: apiProfile?.designation || "",
-          work_area: apiProfile?.work_area || "",
-          address: apiProfile?.address || "",
-          shift_type: apiProfile?.shift_type || "DAY",
-          shift_time: apiProfile?.shift_timing || apiProfile?.shift_time || apiProfile?.shift || "",
-          employment_type: apiProfile?.employment_type || "FULL_TIME",
-          experience_years: apiProfile?.experience_years || 0,
-          blood_group: apiProfile?.blood_group || "",
-          gender: apiProfile?.gender || "",
-          join_date: apiProfile?.joining_date || apiProfile?.join_date || apiProfile?.date_of_joining || "",
-          profile_photo_url: apiProfile?.profile_photo || "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS9B-uq-hoK_JiRml8oo37F6A0ro-ondfH0cQ&s",
-          permissions: apiProfile?.permissions || {},
-          is_active: apiProfile?.is_active !== false
-        })
+        // Map API response to profile state using the provided schema
+        const apiData = result?.data || result
+        setProfile(prev => ({
+          ...prev,
+          user_id: apiData?.user_id || prev.user_id,
+          first_name: apiData?.first_name || prev.first_name,
+          last_name: apiData?.last_name || prev.last_name,
+          full_name: apiData?.full_name || apiData?.name || prev.full_name,
+          email: apiData?.email || prev.email,
+          phone: apiData?.phone || apiData?.mobile_number || prev.phone,
+          staff_id: apiData?.staff_id || apiData?.receptionist_id || apiData?.employee_id || prev.staff_id,
+          avatar_url: apiData?.avatar_url || apiData?.profile_photo || prev.avatar_url,
+          status: apiData?.status || prev.status,
+          is_active: apiData?.is_active !== undefined ? apiData.is_active : prev.is_active,
+          mobile_number: apiData?.mobile_number || apiData?.phone || prev.mobile_number,
+          joining_date: apiData?.joining_date || apiData?.join_date || apiData?.date_of_joining || prev.joining_date,
+          blood_group: apiData?.blood_group || prev.blood_group,
+          gender: apiData?.gender || prev.gender,
+          shift_timing: apiData?.shift_timing || apiData?.shift_time || prev.shift_timing,
+          address: apiData?.address || prev.address,
+          role: apiData?.role || apiData?.designation || prev.role,
+          note: apiData?.note || prev.note,
+          work_area: apiData?.work_area || prev.work_area,
+          experience_years: apiData?.experience_years || 0,
+          shift_type: apiData?.shift_type || apiData?.shift || prev.shift_type,
+          permissions: apiData?.permissions || apiData?.access_permissions || prev.permissions,
+          profile_photo_url: apiData?.avatar_url || apiData?.profile_photo || prev.profile_photo_url
+        }))
       } catch (err) {
         setError(err?.message || 'Unable to load profile')
         console.error('Profile fetch error:', err)
@@ -106,16 +115,22 @@ const ReceptionProfile = () => {
 
     try {
       const payload = new FormData()
-      payload.append('full_name', profile.name)
+      payload.append('first_name', profile.first_name)
+      payload.append('last_name', profile.last_name)
+      payload.append('full_name', profile.full_name)
       payload.append('phone', profile.phone)
       payload.append('mobile_number', profile.mobile_number)
-      payload.append('work_area', profile.work_area)
+      payload.append('email', profile.email)
       payload.append('address', profile.address)
-      payload.append('experience_years', profile.experience_years)
-      payload.append('blood_group', profile.blood_group)
-      payload.append('gender', profile.gender)
-      payload.append('shift_timing', profile.shift_time)
-      payload.append('joining_date', profile.join_date)
+      payload.append('blood_group', profile.blood_group || '')
+      payload.append('gender', profile.gender || '')
+      payload.append('shift_timing', profile.shift_timing)
+      payload.append('joining_date', profile.joining_date)
+      payload.append('note', profile.note)
+      payload.append('work_area', profile.work_area || '')
+      payload.append('experience_years', profile.experience_years.toString())
+      payload.append('shift_type', profile.shift_type || 'DAY')
+
       if (profile.profile_photo) {
         payload.append('profile_photo', profile.profile_photo)
       }
@@ -133,6 +148,15 @@ const ReceptionProfile = () => {
 
       setSuccessMessage('Profile updated successfully!')
       setIsEditing(false)
+      // Update local state with potentially updated data from server
+      if (data.data) {
+          const updated = data.data;
+          setProfile(prev => ({
+              ...prev,
+              ...updated,
+              avatar_url: updated.avatar_url || updated.profile_photo || prev.avatar_url
+          }));
+      }
       setTimeout(() => setSuccessMessage(''), 3000)
     } catch (err) {
       setError(err?.message || 'Unable to save profile')
@@ -146,10 +170,6 @@ const ReceptionProfile = () => {
 
       <h1 className="text-2xl font-semibold text-gray-700">My Profile</h1>
       <p className="text-gray-600 mt-2">Manage your professional information</p>
-
-
-
-
       {/* Error Message */}
       {error && (
         <div className="mx-4 sm:mx-6 lg:mx-8 mt-6 p-4 rounded-xl bg-white border border-red-600 text-gray-800 flex items-center justify-between shadow-sm">
@@ -187,9 +207,9 @@ const ReceptionProfile = () => {
                       alt="Receptionist"
                     />
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-800 mb-1">{profile.name || 'N/A'}</h3>
-                  <p className="text-blue-600 font-semibold mb-3">{profile.designation || 'Receptionist'}</p>
-                  <div className="text-md text-gray-500 mb-4 font-mono bg-gray-50 px-3 py-2 rounded-lg w-full">{profile.receptionist_id || 'ID: N/A'}</div>
+                  <h3 className="text-2xl font-bold text-gray-800 mb-1">{profile.full_name || 'N/A'}</h3>
+                  <p className="text-blue-600 font-semibold mb-3">{profile.role || 'Receptionist'}</p>
+                  <div className="text-md text-gray-500 mb-4 font-mono bg-gray-50 px-3 py-2 rounded-lg w-full">{profile.staff_id || 'ID: N/A'}</div>
                   <div>
                     <span className={`text-xs font-bold px-4 py-2 rounded-full inline-block ${profile.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
                       }`}>
@@ -210,8 +230,8 @@ const ReceptionProfile = () => {
                 <div className="border-t border-gray-100 pt-4 flex items-start">
                   <Badge className="text-blue-600 w-5 mt-1 mr-4 flex-shrink-0" />
                   <div className="flex-1">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Employee ID</p>
-                    <p className="text-sm text-gray-700 font-medium mt-1">{profile.employee_id || 'N/A'}</p>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Staff ID</p>
+                    <p className="text-sm text-gray-700 font-medium mt-1">{profile.staff_id || 'N/A'}</p>
                   </div>
                 </div>
                 <div className="border-t border-gray-100 pt-4 flex items-start">
@@ -310,13 +330,37 @@ const ReceptionProfile = () => {
                       <p className="text-xs text-gray-500 text-center">Click camera icon to change photo</p>
                     </div>
 
+                    {/* First and Last Name */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="group">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wide">First Name</label>
+                        <input
+                          type="text"
+                          value={profile.first_name}
+                          onChange={(e) => setProfile({ ...profile, first_name: e.target.value })}
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-gray-50 focus:bg-white"
+                          placeholder="Enter first name"
+                        />
+                      </div>
+                      <div className="group">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wide">Last Name</label>
+                        <input
+                          type="text"
+                          value={profile.last_name}
+                          onChange={(e) => setProfile({ ...profile, last_name: e.target.value })}
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-gray-50 focus:bg-white"
+                          placeholder="Enter last name"
+                        />
+                      </div>
+                    </div>
+
                     {/* Full Name */}
                     <div className="group">
                       <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wide">Full Name</label>
                       <input
                         type="text"
-                        value={profile.name}
-                        onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                        value={profile.full_name}
+                        onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
                         className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-gray-50 focus:bg-white"
                         placeholder="Enter your full name"
                       />
@@ -415,22 +459,37 @@ const ReceptionProfile = () => {
                       <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wide">Date of Joining</label>
                       <input
                         type="date"
-                        value={profile.join_date}
-                        onChange={(e) => setProfile({ ...profile, join_date: e.target.value })}
+                        value={profile.joining_date}
+                        onChange={(e) => setProfile({ ...profile, joining_date: e.target.value })}
                         className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-gray-50 focus:bg-white"
                       />
                     </div>
 
-                    {/* Shift Time */}
-                    <div className="group">
-                      <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wide">Shift Time</label>
-                      <input
-                        type="text"
-                        value={profile.shift_time}
-                        onChange={(e) => setProfile({ ...profile, shift_time: e.target.value })}
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-gray-50 focus:bg-white"
-                        placeholder="e.g., 09:00 AM - 05:00 PM"
-                      />
+                    {/* Shift Timing and Type */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="group">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wide">Shift Timing</label>
+                        <input
+                          type="text"
+                          value={profile.shift_timing}
+                          onChange={(e) => setProfile({ ...profile, shift_timing: e.target.value })}
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-gray-50 focus:bg-white"
+                          placeholder="e.g., Morning (7AM-3PM)"
+                        />
+                      </div>
+                      <div className="group">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wide">Shift Type</label>
+                        <select
+                          value={profile.shift_type}
+                          onChange={(e) => setProfile({ ...profile, shift_type: e.target.value })}
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-gray-50 focus:bg-white"
+                        >
+                          <option value="DAY">Day Shift</option>
+                          <option value="NIGHT">Night Shift</option>
+                          <option value="EVENING">Evening Shift</option>
+                          <option value="ROTATIONAL">Rotational Shift</option>
+                        </select>
+                      </div>
                     </div>
 
                     {/* Address */}
@@ -442,6 +501,18 @@ const ReceptionProfile = () => {
                         className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-gray-50 focus:bg-white"
                         placeholder="Enter your address"
                         rows="3"
+                      />
+                    </div>
+
+                    {/* Note */}
+                    <div className="group">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wide">Note</label>
+                      <textarea
+                        value={profile.note}
+                        onChange={(e) => setProfile({ ...profile, note: e.target.value })}
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-gray-50 focus:bg-white"
+                        placeholder="Enter any additional notes"
+                        rows="2"
                       />
                     </div>
 
@@ -465,20 +536,20 @@ const ReceptionProfile = () => {
                     <div className="space-y-6">
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                         <div className="bg-gradient-to-br from-blue-50 to-white p-4 rounded-xl border border-blue-100">
-                          <p className="text-xs text-gray-500 uppercase font-semibold tracking-wide">Employee ID</p>
-                          <p className="text-lg font-bold text-gray-800 mt-2 font-mono">{profile.employee_id || 'N/A'}</p>
+                          <p className="text-xs text-gray-500 uppercase font-semibold tracking-wide">Staff ID</p>
+                          <p className="text-lg font-bold text-gray-800 mt-2 font-mono">{profile.staff_id || 'N/A'}</p>
                         </div>
                         <div className="bg-gradient-to-br from-blue-50 to-white p-4 rounded-xl border border-blue-100">
                           <p className="text-xs text-gray-500 uppercase font-semibold tracking-wide">Experience</p>
                           <p className="text-lg font-bold text-gray-800 mt-2">{profile.experience_years} <span className="text-sm">yrs</span></p>
                         </div>
                         <div className="bg-gradient-to-br from-blue-50 to-white p-4 rounded-xl border border-blue-100">
-                          <p className="text-xs text-gray-500 uppercase font-semibold tracking-wide">Staff ID</p>
-                          <p className="text-sm font-bold text-gray-800 mt-2">{profile.receptionist_id || 'ID: N/A'}</p>
+                          <p className="text-xs text-gray-500 uppercase font-semibold tracking-wide">User ID</p>
+                          <p className="text-sm font-bold text-gray-800 mt-2">{profile.user_id || 'N/A'}</p>
                         </div>
                         <div className="bg-gradient-to-br from-blue-50 to-white p-4 rounded-xl border border-blue-100">
-                          <p className="text-xs text-gray-500 uppercase font-semibold tracking-wide">Type</p>
-                          <p className="text-sm font-bold text-gray-800 mt-2">{profile.employment_type?.replace('_', ' ') || 'N/A'}</p>
+                          <p className="text-xs text-gray-500 uppercase font-semibold tracking-wide">Role</p>
+                          <p className="text-sm font-bold text-gray-800 mt-2">{profile.role || 'N/A'}</p>
                         </div>
                       </div>
 
@@ -500,17 +571,21 @@ const ReceptionProfile = () => {
                           </div>
                           <div className="bg-gradient-to-br from-blue-50 to-white p-4 rounded-xl border border-blue-200">
                             <p className="text-xs text-gray-500 uppercase font-semibold tracking-wide">Date of Joining</p>
-                            <p className="text-lg font-bold text-gray-800 mt-2">{profile.join_date ? new Date(profile.join_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}</p>
+                            <p className="text-lg font-bold text-gray-800 mt-2">{profile.joining_date ? new Date(profile.joining_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}</p>
                           </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
+                          <div className="bg-gradient-to-br from-blue-50 to-white p-4 rounded-xl border border-blue-200">
+                            <p className="text-xs text-gray-500 uppercase font-semibold tracking-wide">Work Area</p>
+                            <p className="text-lg font-bold text-gray-800 mt-2">{profile.work_area || 'N/A'}</p>
+                          </div>
                           <div className="bg-gradient-to-br from-blue-50 to-white p-4 rounded-xl border border-blue-200">
                             <p className="text-xs text-gray-500 uppercase font-semibold tracking-wide">Shift Type</p>
                             <p className="text-lg font-bold text-gray-800 mt-2">{profile.shift_type || 'N/A'}</p>
                           </div>
                           <div className="bg-gradient-to-br from-blue-50 to-white p-4 rounded-xl border border-blue-200">
                             <p className="text-xs text-gray-500 uppercase font-semibold tracking-wide">Shift Timing</p>
-                            <p className="text-lg font-bold text-gray-800 mt-2">{profile.shift_time || 'N/A'}</p>
+                            <p className="text-lg font-bold text-gray-800 mt-2">{profile.shift_timing || 'N/A'}</p>
                           </div>
                         </div>
                       </div>
@@ -523,6 +598,17 @@ const ReceptionProfile = () => {
                         </h4>
                         <div className="bg-gradient-to-br from-blue-50 to-white p-4 rounded-xl border border-blue-200">
                           <p className="text-gray-700">{profile.address || 'No address added'}</p>
+                        </div>
+                      </div>
+
+                      {/* Note Section */}
+                      <div className="border-t border-gray-200 pt-6">
+                        <h4 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                          <Assignment className="text-blue-600" />
+                          Note
+                        </h4>
+                        <div className="bg-gradient-to-br from-blue-50 to-white p-4 rounded-xl border border-blue-200">
+                          <p className="text-gray-700">{profile.note || 'No notes added'}</p>
                         </div>
                       </div>
 
