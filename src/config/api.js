@@ -4,7 +4,6 @@ export const API_BASE_URL = import.meta.env.DEV
   : (import.meta.env.VITE_API_BASE_URL || 'https://hms-backend-t9m3.onrender.com').replace(/\/$/, '');
 
 export const PUBLIC_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://hms-backend-t9m3.onrender.com';
-
 /** When using ngrok, skip browser warning so API returns JSON instead of HTML interstitial. Empty object when not ngrok = no impact. */
 export const API_HEADERS = (API_BASE_URL && API_BASE_URL.includes('ngrok')) ? { 'ngrok-skip-browser-warning': 'true' } : {};
 
@@ -206,11 +205,19 @@ export const DOCTOR_SEARCH = '/api/v1/doctors/search';
 export const DOCTOR_DROPDOWN = '/api/v1/doctors/dropdown';
 export const DOCTOR_STATISTICS = '/api/v1/doctors/statistics';
 export const DOCTOR_DETAILS = (id) => `/api/v1/doctors/${encodeURIComponent(id)}`;
-
+/** Receptionist: Doctor management */
+export const RECEPTIONIST_DOCTORS = '/api/v1/receptionist/doctors';
+export const RECEPTIONIST_DOCTORS_SEARCH = '/api/v1/receptionist/doctors/search';
+export const RECEPTIONIST_DOCTORS_DROPDOWN = '/api/v1/receptionist/doctors/dropdown';
+export const RECEPTIONIST_DOCTORS_STATISTICS = '/api/v1/receptionist/doctors/statistics';
+export const RECEPTIONIST_DOCTOR_DETAILS = (id) => `/api/v1/receptionist/doctors/${encodeURIComponent(id)}`;
 /** Prescription Management - Doctor endpoints */
 export const PRESCRIPTION_MEDICINES_SEARCH = '/api/v1/simple-prescription/doctor/medicines/search';
 export const PRESCRIPTION_CREATE = '/api/v1/simple-prescription/doctor/prescriptions/create';
 export const PRESCRIPTION_DOCTOR_LIST = '/api/v1/simple-prescription/doctor/prescriptions';
+/** Prescription Management - Pharmacist endpoints */
+export const PRESCRIPTION_PHARMACIST_LIST = '/api/v1/simple-prescription/pharmacist/prescriptions';
+export const PRESCRIPTION_DISPENSE = (prescriptionId) => `/api/v1/simple-prescription/pharmacist/prescriptions/${encodeURIComponent(prescriptionId)}/dispense`;
 /** Prescription Management - Pharmacist endpoints */
 export const PRESCRIPTION_PHARMACIST_LIST = '/api/v1/simple-prescription/pharmacist/prescriptions';
 export const PRESCRIPTION_DISPENSE = (prescriptionId) => `/api/v1/simple-prescription/pharmacist/prescriptions/${encodeURIComponent(prescriptionId)}/dispense`;
@@ -222,7 +229,6 @@ export const PRESCRIPTION_DETAILS = (prescriptionId) => `/api/v1/simple-prescrip
 export const PRESCRIPTION_PDF_DOWNLOAD = (prescriptionId) => `/api/v1/simple-prescription/prescriptions/${encodeURIComponent(prescriptionId)}/pdf`;
 /** Receptionist: patient management */
 export const RECEPTIONIST_PATIENTS = '/api/v1/receptionist/patients';
-
 // --- PHARMACY REPORTS ---
 export const PHARMACY_REPORTS_BASE = '/api/v1/pharmacy/reports';
 export const PHARMACY_REPORTS_SALES_SUMMARY = `${PHARMACY_REPORTS_BASE}/sales-summary`;
@@ -248,6 +254,19 @@ export const PHARMACY_SETTINGS_BASE = '/api/v1/pharmacy/settings';
 export const NURSE_BASE = '/api/v1/nurse';
 // NURSE DASHBOARD APIs
 export const NURSE_DASHBOARD_OVERVIEW = '/api/v1/nurse/dashboard';
+export const NURSE_ADD_VITALS = '/api/v1/nurse/vitals';
+
+export const NURSE_GET_VITALS = '/api/v1/nurse/vitals';
+
+export const NURSE_ASSIGNED_PATIENTS = '/api/v1/nurse/assigned-patients';
+
+export const NURSE_MEDICATIONS = '/api/v1/nurse/medications';
+
+export const NURSE_BEDS = '/api/v1/nurse/beds';
+
+export const NURSE_LAB_TESTS = '/api/v1/nurse/lab-tests';
+
+export const NURSE_NURSING_NOTES = '/api/v1/nurse/nursing-notes';
 export const NURSE_ADD_VITALS = '/api/v1/nurse/vitals';
 export const NURSE_GET_VITALS = '/api/v1/nurse/vitals';
 export const NURSE_UPDATE_VITALS = (recordId) => `/api/v1/nurse/vitals/${encodeURIComponent(recordId)}`;

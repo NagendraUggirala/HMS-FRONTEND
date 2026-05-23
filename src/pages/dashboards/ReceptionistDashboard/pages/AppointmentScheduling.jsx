@@ -101,6 +101,19 @@ const AppointmentScheduling = () => {
 
   const loadApiDoctors = async () => {
     try {
+      let res = await apiFetch('/api/v1/receptionist/doctors')
+      if (!res.ok) {
+        res = await apiFetch(DOCTOR_LIST)
+      }
+      const data = await res.json()
+      if (res.ok) {
+        const list = data.data?.doctors || data.data || data || []
+        const mappedList = (Array.isArray(list) ? list : []).map(item => ({
+          id: item.id || item.doctor_id || '',
+          name: item.name || `Dr. ${item.first_name || ''} ${item.last_name || ''}`.trim() || 'Dr. Unknown',
+          department: item.department || item.department_name || 'General Medicine'
+        }))
+        setApiDoctors(mappedList)
       const res = await apiFetch(DOCTOR_LIST)
       const data = await res.json()
       if (res.ok) {
@@ -375,6 +388,7 @@ const AppointmentScheduling = () => {
         const updatePayload = {
           appointment_date: formData.date,
           appointment_time: formData.time.includes('AM') || formData.time.includes('PM') ? convertTo24Hour(formData.time) : formData.time,
+          doctor_id: formData.doctorId || undefined,
           doctor_name: getDoctorName(formData.doctorId) || formData.doctorId,
           department_name: formData.department,
           chief_complaint: formData.reason,
@@ -387,17 +401,26 @@ const AppointmentScheduling = () => {
         })
       } else {
         // Schedule new appointment
+        const patientName = formData.patientId || patientSearchTerm
+
+        // Map appointment types safely for backend (normalizes values, e.g. FOLLOW-UP -> FOLLOW_UP)
+        const getBackendAppointmentType = (type) => {
+          if (!type) return 'CONSULTATION';
+          const t = type.toUpperCase().replace('-', '_').trim();
+          if (t === 'REGULAR' || t === 'NEW' || t === 'NEW_PATIENT') return 'CONSULTATION';
+          return t;
+        }
+
         const createPayload = {
           patient_ref: formData.referralId || undefined,
-          patient_name: formData.patientId !== 'New Patient' ? formData.patientId : undefined,
+          patient_name: patientName || undefined,
+          doctor_id: formData.doctorId || undefined,
           doctor_name: getDoctorName(formData.doctorId) || formData.doctorId,
           department_name: formData.department,
           appointment_date: formData.date,
           appointment_time: formData.time.includes('AM') || formData.time.includes('PM') ? convertTo24Hour(formData.time) : formData.time,
           chief_complaint: formData.reason,
-          appointment_type: formData.type.toUpperCase() === 'NEW PATIENT' ? 'CONSULTATION' :
-            formData.type.toUpperCase() === 'REGULAR' ? 'CONSULTATION' :
-              formData.type.toUpperCase() || 'CONSULTATION'
+          appointment_type: getBackendAppointmentType(formData.type)
         }
 
         res = await apiFetch('/api/v1/receptionist/appointments/schedule', {
@@ -429,7 +452,8 @@ const AppointmentScheduling = () => {
         setDocSearchTerm('')
         setSelectedPatientProfile(null)
       } else {
-        if (typeof toast !== 'undefined') toast.error(data.message || 'Error saving appointment');
+        const errorMsg = data.message || data.detail || data.error || 'Error saving appointment';
+        if (typeof toast !== 'undefined') toast.error(errorMsg);
       }
     } catch (err) {
       if (typeof toast !== 'undefined') toast.error('An error occurred while saving');
@@ -871,11 +895,11 @@ const AppointmentScheduling = () => {
                 type="text"
                 name="referralId"
                 value={formData.referralId}
-                readOnly={formData.patientId !== 'New Patient'}
+                readOnly={formData.patientId && patients.some(p => p.name === formData.patientId)}
                 onChange={(e) => setFormData({ ...formData, referralId: e.target.value })}
-                className={`w-full p-2 border rounded outline-none transition-all ${formData.patientId !== 'New Patient' ? 'bg-gray-50 text-gray-500' : 'bg-white'}`}
+                className={`w-full p-2 border rounded outline-none transition-all ${(formData.patientId && patients.some(p => p.name === formData.patientId)) ? 'bg-gray-50 text-gray-500' : 'bg-white'}`}
                 placeholder="ID Example: PAT-DAVE-211"
-                required
+                required={formData.patientId && patients.some(p => p.name === formData.patientId)}
               />
               {selectedPatientProfile && (
                 <div className="mt-2 text-xs text-blue-800 bg-blue-50 p-2 rounded border border-blue-100 flex flex-col gap-1">
@@ -1125,12 +1149,10 @@ const AppointmentScheduling = () => {
               </div>
             </div>
 
-
           </div>
         )}
       </Modal>
     </>
   )
 }
-
 export default AppointmentScheduling

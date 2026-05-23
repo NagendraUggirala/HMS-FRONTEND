@@ -23,8 +23,11 @@ import {
 } from '@mui/icons-material';
 import Modal from '../../../../components/common/Modal/Modal';
 import { apiFetch } from '../../../../services/apiClient';
-import { DOCTOR_LIST, DOCTOR_STATISTICS, DOCTOR_DETAILS} from '../../../../config/api';
+import {
+    DOCTOR_LIST, DOCTOR_STATISTICS, DOCTOR_DETAILS, DOCTOR_SEARCH, DOCTOR_DROPDOWN, RECEPTIONIST_DOCTORS, RECEPTIONIST_DOCTORS_SEARCH, RECEPTIONIST_DOCTORS_DROPDOWN, RECEPTIONIST_DOCTORS_STATISTICS, RECEPTIONIST_DOCTOR_DETAILS
+} from '../../../../config/api';
 
+import { DOCTOR_LIST, DOCTOR_STATISTICS, DOCTOR_DETAILS} from '../../../../config/api';
 
 const Doctors = () => {
     const [doctors, setDoctors] = useState([]);
@@ -42,12 +45,16 @@ const Doctors = () => {
     const [showModal, setShowModal] = useState(false);
     const [formData, setFormData] = useState({});
     const [modalLoading, setModalLoading] = useState(false);
+    const [dropdownDoctors, setDropdownDoctors] = useState([]);
 
     // Fetch initial data
     useEffect(() => {
         fetchInitialData();
     }, []);
 
+    // Filter doctors retrieved from the API to only show active ones
+    const activeDoctors = useMemo(() => {
+        return doctors.filter(doc => doc.status === 'Active');
     // Filter active doctors
     const activeDoctors = useMemo(() => {
         return doctors.filter(doc => doc.status?.toLowerCase() === 'active');
@@ -92,11 +99,31 @@ const Doctors = () => {
         );
     }, [activeDoctors, searchTerm, selectedDeptFilter, selectedDocFilter]);
 
+    const mapDoctorData = (d) => {
+        const item = d || {};
+        return {
+            id: item.id || item.doctor_id || `D-${Math.floor(100 + Math.random() * 900)}`,
+            name: item.name || `Dr. ${item.first_name || item.firstName || ''} ${item.last_name || item.lastName || ''}`.trim() || 'Dr. Unknown',
+            department: item.department || item.department_name || 'General Medicine',
+            specialization: item.specialization || item.doctor_specialization || item.speciality || 'General Physician',
+            qualification: item.qualification || 'MBBS',
+            experience: item.experience || 10,
+            experienceUnit: item.experienceUnit || item.experience_unit || 'Years',
+            consultationFee: item.consultationFee || item.consulting_fee || item.fee || 300,
+            email: item.email || 'doctor@health.com',
+            phone: item.phone || item.contact || '+91 9999999999',
+            status: item.status ? (item.status.charAt(0).toUpperCase() + item.status.slice(1).toLowerCase()) : 'Active',
+            availability: item.availability || item.duty_status || item.dutyStatus || 'Available'
+        };
+    };
+
     const fetchInitialData = async () => {
         setLoading(true);
         try {
             await Promise.all([
                 fetchDoctors(false),
+                fetchStatistics(),
+                fetchDropdownData(selectedDeptFilter)
                 fetchStatistics()
             ]);
         } catch (err) {
@@ -109,6 +136,17 @@ const Doctors = () => {
     const fetchDoctors = async (showLoading = true) => {
         if (showLoading) setLoading(true);
         try {
+            // Attempt to fetch from receptionist-specific doctors endpoint first
+            let res = await apiFetch(RECEPTIONIST_DOCTORS);
+            if (!res.ok) {
+                // Fallback to general doctors endpoint
+                res = await apiFetch(DOCTOR_LIST);
+            }
+            const data = await res.json();
+            if (res.ok) {
+                const list = data.data?.doctors || data.data || data || [];
+                const mappedList = (Array.isArray(list) ? list : []).map(mapDoctorData);
+                setDoctors(mappedList);
             const res = await apiFetch(DOCTOR_LIST);
             const data = await res.json();
             if (res.ok) {
@@ -125,6 +163,66 @@ const Doctors = () => {
         }
     };
 
+    const searchDoctors = async (keyword) => {
+        setLoading(true);
+        try {
+            const queryParam = `?keyword=${encodeURIComponent(keyword)}`;
+            let res = await apiFetch(`${RECEPTIONIST_DOCTORS_SEARCH}${queryParam}`);
+            if (!res.ok) {
+                res = await apiFetch(`${DOCTOR_SEARCH}${queryParam}`);
+            }
+            const data = await res.json();
+            if (res.ok) {
+                const list = data.data?.doctors || data.data || data || [];
+                const mappedList = (Array.isArray(list) ? list : []).map(mapDoctorData);
+                setDoctors(mappedList);
+                setError(null);
+            }
+        } catch (err) {
+            console.error('Error searching doctors:', err);
+            setError('Failed to search clinical staff records.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchDropdownData = async (dept = 'all') => {
+        try {
+            const queryParam = dept && dept !== 'all' ? `?department=${encodeURIComponent(dept)}` : '';
+            let res = await apiFetch(`${RECEPTIONIST_DOCTORS_DROPDOWN}${queryParam}`);
+            if (!res.ok) {
+                res = await apiFetch(`${DOCTOR_DROPDOWN}${queryParam}`);
+            }
+            const data = await res.json();
+            if (res.ok) {
+                const list = data.data?.doctors || data.data || data || [];
+                const mappedList = (Array.isArray(list) ? list : []).map(d => ({
+                    id: d.id || d.doctor_id || d.value || '',
+                    name: d.name || d.label || `Dr. ${d.first_name || d.firstName || ''} ${d.last_name || d.lastName || ''}`.trim() || 'Dr. Unknown',
+                    department: d.department || d.department_name || ''
+                }));
+                setDropdownDoctors(mappedList);
+            }
+        } catch (err) {
+            console.error('Error fetching doctor dropdown:', err);
+        }
+    };
+
+    const fetchStatistics = async () => {
+        try {
+            let res = await apiFetch(RECEPTIONIST_DOCTORS_STATISTICS);
+            if (!res.ok) {
+                res = await apiFetch(DOCTOR_STATISTICS);
+            }
+            const data = await res.json();
+            if (res.ok) {
+                const stats = data.data || data || {};
+                setStatsData({
+                    total: stats.total || stats.total_doctors || 0,
+                    available: stats.available || stats.available_doctors || 0,
+                    busy: stats.busy || stats.busy_doctors || stats.in_consultation || 0,
+                    onLeave: stats.onLeave || stats.on_leave || stats.unavailable || 0
+                });
     const fetchStatistics = async () => {
         try {
             const res = await apiFetch(DOCTOR_STATISTICS);
@@ -141,6 +239,31 @@ const Doctors = () => {
         setModalLoading(true);
         setShowModal(true);
         try {
+            let res = await apiFetch(RECEPTIONIST_DOCTOR_DETAILS(doctorId));
+            if (!res.ok) {
+                res = await apiFetch(DOCTOR_DETAILS(doctorId));
+            }
+            const data = await res.json();
+            if (res.ok) {
+                const d = data.data?.doctor || data.data || data || {};
+                const mappedDoc = {
+                    id: d.id || d.doctor_id || doctorId,
+                    name: d.name || `Dr. ${d.first_name || d.firstName || ''} ${d.last_name || d.lastName || ''}`.trim() || 'Dr. Unknown',
+                    department: d.department || d.department_name || 'General Medicine',
+                    specialization: d.specialization || d.doctor_specialization || d.speciality || 'General Physician',
+                    qualification: d.qualification || 'MBBS',
+                    experience: d.experience || 10,
+                    experienceUnit: d.experienceUnit || d.experience_unit || 'Years',
+                    consultationFee: d.consultationFee || d.consulting_fee || d.fee || 300,
+                    email: d.email || 'doctor@health.com',
+                    phone: d.phone || d.contact || '+91 9999999999',
+                    status: d.status ? (d.status.charAt(0).toUpperCase() + d.status.slice(1).toLowerCase()) : 'Active',
+                    availability: d.availability || d.duty_status || d.dutyStatus || 'Available',
+                    gender: d.gender ? (d.gender.charAt(0).toUpperCase() + d.gender.slice(1).toLowerCase()) : 'Male',
+                    licenseNumber: d.licenseNumber || d.license_number || d.registration_number || 'REG-999999',
+                    emergencyContact: d.emergencyContact || d.emergency_contact || d.phone || d.contact || '+91 9999999999'
+                };
+                setFormData(mappedDoc);
             const res = await apiFetch(DOCTOR_DETAILS(doctorId));
             const data = await res.json();
             if (res.ok) {
@@ -157,6 +280,24 @@ const Doctors = () => {
         fetchDoctorDetails(doc.id);
     };
 
+    // Debounced search fetching
+    useEffect(() => {
+        if (!searchTerm) {
+            fetchDoctors(false);
+            return;
+        }
+
+        const delayDebounce = setTimeout(() => {
+            searchDoctors(searchTerm);
+        }, 500);
+
+        return () => clearTimeout(delayDebounce);
+    }, [searchTerm]);
+
+    // Dropdown fetching on department filter change
+    useEffect(() => {
+        fetchDropdownData(selectedDeptFilter);
+    }, [selectedDeptFilter]);
 
     // Dynamic Statistics calculated from the filtered doctors shown in the table
     const stats = useMemo(() => {
@@ -184,6 +325,26 @@ const Doctors = () => {
         };
     }, [filteredDoctors]);
 
+    const displayStats = useMemo(() => {
+        const isFiltering = searchTerm || (selectedDeptFilter && selectedDeptFilter !== 'all') || (selectedDocFilter && selectedDocFilter !== 'all');
+        if (isFiltering) {
+            return stats;
+        }
+        return {
+            total: statsData.total || stats.total,
+            available: statsData.available || stats.available,
+            busy: statsData.busy || stats.busy,
+            onLeave: statsData.onLeave || stats.onLeave
+        };
+    }, [stats, statsData, searchTerm, selectedDeptFilter, selectedDocFilter]);
+
+    const doctorFilterOptions = useMemo(() => {
+        if (Array.isArray(dropdownDoctors) && dropdownDoctors.length > 0) {
+            const activeIds = new Set(activeDoctors.map(doc => doc.id?.toString()));
+            return dropdownDoctors.filter(doc => activeIds.has(doc.id?.toString()));
+        }
+        return uniqueDoctorsForFilter;
+    }, [dropdownDoctors, uniqueDoctorsForFilter, activeDoctors]);
 
     const getStatusBadge = (status) => {
 
@@ -219,6 +380,10 @@ const Doctors = () => {
             {/* Stats Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 {[
+                    { label: 'Total Doctors', val: displayStats.total, icon: WorkIcon, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                    { label: 'Available ', val: displayStats.available, icon: CheckCircleIcon, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                    { label: 'In Consultation', val: displayStats.busy, icon: AccessTimeIcon, color: 'text-amber-600', bg: 'bg-amber-50' },
+                    { label: 'On Leave', val: displayStats.onLeave, icon: CancelIcon, color: 'text-rose-600', bg: 'bg-rose-50' }
                     { label: 'Total Doctors', val: stats.total, icon: WorkIcon, color: 'text-indigo-600', bg: 'bg-indigo-50' },
                     { label: 'Available ', val: stats.available, icon: CheckCircleIcon, color: 'text-emerald-600', bg: 'bg-emerald-50' },
                     { label: 'In Consultation', val: stats.busy, icon: AccessTimeIcon, color: 'text-amber-600', bg: 'bg-amber-50' },
@@ -281,6 +446,7 @@ const Doctors = () => {
                         className="w-full md:w-48 px-4 py-3 bg-slate-50 border border-slate-100 focus:border-slate-300 rounded-2xl text-xs font-bold text-slate-700 transition-all outline-none cursor-pointer"
                     >
                         <option value="all">All Doctors</option>
+                        {doctorFilterOptions.map(doc => (
                         {uniqueDoctorsForFilter.map(doc => (
                             <option key={doc.id} value={doc.id}>
                                 {doc.name}
@@ -523,7 +689,6 @@ const Doctors = () => {
                     </div>
                 )}
             </Modal>
-
 
             {/* Decorative background elements */}
             <div className="fixed top-20 right-0 w-96 h-96 bg-indigo-200/10 blur-3xl -z-10 pointer-events-none rounded-full" />
