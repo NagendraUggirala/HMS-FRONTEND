@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import LoadingSpinner from '../../../../components/common/LoadingSpinner/LoadingSpinner'
 import DataTable from '../../../../components/ui/Tables/DataTable'
+import { apiFetch } from '../../../../services/apiClient'
 import {  ResponsiveContainer,  BarChart,  Bar,  XAxis,  YAxis,  Tooltip as ReTooltip,  Legend,  LineChart,
   Line,  CartesianGrid,  AreaChart,  Area,  PieChart,  Pie,  Cell,  RadarChart,  Radar,  PolarGrid,
   PolarAngleAxis,  PolarRadiusAxis,  ComposedChart,  Scatter} from 'recharts'
@@ -9,89 +10,35 @@ import {  ResponsiveContainer,  BarChart,  Bar,  XAxis,  YAxis,  Tooltip as ReTo
 const LabOverview = () => {
   const [loading, setLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState({})
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]) // YYYY-MM-DD format
 
   useEffect(() => {
     loadDashboardData()
   }, [])
 
-  const loadDashboardData = async () => {
+  useEffect(() => {
+    loadDashboardData(selectedDate)
+  }, [selectedDate])
+
+  const loadDashboardData = async (date = selectedDate) => {
     setLoading(true)
-    setTimeout(() => {
-      setDashboardData({
-        stats: {
-          totalTests: 156,
-          pendingTests: 24,
-          completedTests: 132,
-          criticalResults: 3,
-          equipmentOperational: 15,
-          equipmentMaintenance: 2,
-          qcPassed: 45,
-          qcFailed: 1,
-          turnaroundTime: 45,
-          samplesCollected: 78
-        },
-        pendingTests: [
-          { id: 'TEST-2024-015', patient: 'Rajesh Kumar', test: 'CBC', received: '10:30 AM', priority: 'urgent', status: 'Sample Processing' },
-          { id: 'TEST-2024-016', patient: 'Priya Sharma', test: 'Lipid Profile', received: '11:00 AM', priority: 'routine', status: 'Sample Collection' },
-          { id: 'TEST-2024-017', patient: 'Suresh Patel', test: 'Urine Culture', received: '11:30 AM', priority: 'routine', status: 'Culture In Progress' },
-          { id: 'TEST-2024-018', patient: 'Anita Mehta', test: 'Liver Function', received: '12:00 PM', priority: 'urgent', status: 'Testing' }
-        ],
-        criticalResults: [
-          { id: 'TEST-2024-012', patient: 'Ravi Kumar', test: 'Creatinine', value: '4.2 mg/dL', alert: 'Critical High', time: '09:45 AM', notified: 'Yes' },
-          { id: 'TEST-2024-013', patient: 'Sunita Rao', test: 'Potassium', value: '6.5 mEq/L', alert: 'Critical High', time: '10:15 AM', notified: 'Pending' },
-          { id: 'TEST-2024-014', patient: 'Mohan Singh', test: 'Glucose', value: '40 mg/dL', alert: 'Critical Low', time: '10:30 AM', notified: 'Yes' }
-        ],
-        equipmentStatus: [
-          { id: 'EQP-001', name: 'Hematology Analyzer', status: 'Operational', nextMaintenance: '2024-02-10', location: 'Hematology Lab' },
-          { id: 'EQP-002', name: 'Chemistry Analyzer', status: 'Maintenance', nextMaintenance: '2024-02-05', location: 'Chemistry Lab' },
-          { id: 'EQP-003', name: 'Centrifuge', status: 'Calibration Due', nextMaintenance: '2024-01-18', location: 'Sample Processing' }
-        ],
-        qcStatus: [
-          { test: 'CBC', status: 'Passed', value: 12.5, target: '12.0±0.5', time: '09:00 AM' },
-          { test: 'Glucose', status: 'Warning', value: 105, target: '100±5', time: '09:30 AM' },
-          { test: 'Creatinine', status: 'Failed', value: 2.5, target: '1.8±0.2', time: '10:00 AM' }
-        ],
-        // Additional data for enhanced charts
-        testVolumeData: [
-          { hour: '8 AM', tests: 18, completed: 15 },
-          { hour: '10 AM', tests: 35, completed: 28 },
-          { hour: '12 PM', tests: 42, completed: 32 },
-          { hour: '2 PM', tests: 38, completed: 30 },
-          { hour: '4 PM', tests: 25, completed: 20 },
-          { hour: '6 PM', tests: 12, completed: 10 }
-        ],
-        testCategoryData: [
-          { name: 'Hematology', value: 45, color: '#4f46e5' },
-          { name: 'Chemistry', value: 38, color: '#06b6d4' },
-          { name: 'Microbiology', value: 22, color: '#10b981' },
-          { name: 'Immunology', value: 18, color: '#f59e0b' },
-          { name: 'Molecular', value: 15, color: '#ef4444' }
-        ],
-        turnaroundData: [
-          { department: 'Hematology', time: 25, target: 30 },
-          { department: 'Chemistry', time: 45, target: 60 },
-          { department: 'Microbiology', time: 120, target: 180 },
-          { department: 'Immunology', time: 60, target: 90 },
-          { department: 'Molecular', time: 180, target: 240 }
-        ],
-        equipmentPerformance: [
-          { name: 'Analyzer A', efficiency: 95, downtime: 2 },
-          { name: 'Analyzer B', efficiency: 88, downtime: 5 },
-          { name: 'Centrifuge 1', efficiency: 92, downtime: 1 },
-          { name: 'Centrifuge 2', efficiency: 85, downtime: 3 },
-          { name: 'Incubator', efficiency: 97, downtime: 0.5 }
-        ],
-        dailyTrends: [
-          { day: 'Mon', tests: 145, critical: 2 },
-          { day: 'Tue', tests: 162, critical: 4 },
-          { day: 'Wed', tests: 138, critical: 1 },
-          { day: 'Thu', tests: 156, critical: 3 },
-          { day: 'Fri', tests: 172, critical: 5 },
-          { day: 'Sat', tests: 98, critical: 1 }
-        ]
-      })
+    try {
+      const params = new URLSearchParams()
+      if (date) params.append('for_date', date)
+      
+      const url = `/api/v1/lab/tech-dashboard${params.toString() ? `?${params.toString()}` : ''}`
+      const response = await apiFetch(url)
+      if (response.ok) {
+        const data = await response.json()
+        setDashboardData(data)
+      } else {
+        console.error('Failed to fetch lab dashboard data')
+      }
+    } catch (error) {
+      console.error('Error fetching lab dashboard data:', error)
+    } finally {
       setLoading(false)
-    }, 1000)
+    }
   }
 
   // Handle quick action button clicks
@@ -142,68 +89,101 @@ const LabOverview = () => {
 
   // Enhanced tests by status data
   const testsByStatus = useMemo(() => {
-    const pending = dashboardData.pendingTests || []
-    const statusCounts = {
-      'Sample Collection': 0,
-      'Sample Processing': 0,
-      'Testing': 0,
-      'Culture In Progress': 0,
-      'Analysis': 0,
-      'Reporting': 0
+    if (dashboardData.tests_by_workflow_status) {
+      const labels = dashboardData.tests_by_workflow_status.labels || []
+      const values = dashboardData.tests_by_workflow_status.values || []
+      return labels.map((label, index) => {
+        let color = '#ec4899'
+        if (label === 'Sample Collection' || label === 'RECEIVED' || label === 'PENDING') color = '#f97316'
+        else if (label === 'Sample Processing' || label === 'PROCESSING') color = '#3b82f6'
+        else if (label === 'Testing' || label === 'TESTING' || label === 'IN_PROGRESS') color = '#8b5cf6'
+        else if (label === 'Culture In Progress' || label === 'CULTURE') color = '#06b6d4'
+        else if (label === 'Analysis' || label === 'ANALYSIS' || label === 'VERIFYING') color = '#10b981'
+        else if (label === 'Completed' || label === 'COMPLETED' || label === 'READY') color = '#22c55e'
+        else if (label === 'CANCELLED') color = '#ef4444'
+        
+        return {
+          status: label,
+          count: values[index] || 0,
+          color: color
+        }
+      })
     }
-    
-    pending.forEach((t) => {
-      const status = t.status || 'Other'
-      if (statusCounts[status] !== undefined) {
-        statusCounts[status]++
-      } else {
-        statusCounts['Analysis']++
-      }
-    })
-
-    // Add some random distribution for demo
-    statusCounts['Sample Collection'] = 6
-    statusCounts['Sample Processing'] = 8
-    statusCounts['Testing'] = 5
-    statusCounts['Culture In Progress'] = 3
-    statusCounts['Analysis'] = 1
-    statusCounts['Reporting'] = 1
-
-    return Object.keys(statusCounts).map(key => ({
-      status: key,
-      count: statusCounts[key],
-      color: key === 'Sample Collection' ? '#f97316' :
-             key === 'Sample Processing' ? '#3b82f6' :
-             key === 'Testing' ? '#8b5cf6' :
-             key === 'Culture In Progress' ? '#06b6d4' :
-             key === 'Analysis' ? '#10b981' :
-             '#ec4899'
-    }))
-  }, [dashboardData.pendingTests])
+    return []
+  }, [dashboardData])
 
   // QC trend data
   const qcTrend = useMemo(() => {
-    return [
-      { time: '8 AM', value: 98, status: 'Passed' },
-      { time: '9 AM', value: 102, status: 'Passed' },
-      { time: '10 AM', value: 105, status: 'Warning' },
-      { time: '11 AM', value: 101, status: 'Passed' },
-      { time: '12 PM', value: 99, status: 'Passed' },
-      { time: '1 PM', value: 104, status: 'Warning' },
-      { time: '2 PM', value: 97, status: 'Passed' }
-    ]
-  }, [])
+    if (!dashboardData.qc_trend || !dashboardData.qc_trend.points) return []
+    const min = dashboardData.qc_trend.min_acceptable || 0
+    const max = dashboardData.qc_trend.max_acceptable || 0
+    const target = (min + max) / 2
+    return dashboardData.qc_trend.points.map(p => ({
+      time: p.time || p.label,
+      value: p.value,
+      status: p.status || (p.value >= min && p.value <= max ? 'Passed' : 'Warning'),
+      target: target
+    }))
+  }, [dashboardData])
+
+  // Test category data for pie chart
+  const testCategoryData = useMemo(() => {
+    const categories = dashboardData.test_categories || []
+    const defaultColors = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+    return categories.map((cat, index) => ({
+      name: cat.name || cat.category || 'Unknown',
+      value: cat.value || cat.count || 0,
+      color: cat.color || defaultColors[index % defaultColors.length]
+    }))
+  }, [dashboardData])
+
+  // Test volume data for combo chart
+  const testVolumeData = useMemo(() => {
+    if (!dashboardData.test_volume_today) return []
+    const labels = dashboardData.test_volume_today.labels || []
+    const series = dashboardData.test_volume_today.series || {}
+    
+    const keys = Object.keys(series)
+    if (keys.length === 0) return labels.map(l => ({ hour: l, tests: 0, completed: 0 }))
+    
+    const testsKey = keys.find(k => k.toLowerCase().includes('received') || k.toLowerCase().includes('total') || k.toLowerCase().includes('tests')) || keys[0]
+    const completedKey = keys.find(k => k.toLowerCase().includes('completed') || k.toLowerCase().includes('done')) || keys[1]
+    
+    const tests = testsKey ? series[testsKey] || [] : []
+    const completed = completedKey ? series[completedKey] || [] : []
+    
+    return labels.map((label, index) => ({
+      hour: label,
+      tests: tests[index] || 0,
+      completed: completed[index] || 0
+    }))
+  }, [dashboardData])
 
   // Equipment performance data
-  const equipmentPerformance = dashboardData.equipmentPerformance || []
+  const equipmentPerformance = dashboardData.equipment_performance || []
   // Daily trends data
-  const dailyTrends = dashboardData.dailyTrends || []
-  // Test category data for pie chart
-  const testCategoryData = dashboardData.testCategoryData || []
-  // Turnaround data for radar chart
-  const turnaroundData = dashboardData.turnaroundData || []
-  // Test volume data for combo chart
-  const testVolumeData = dashboardData.testVolumeData || []
+  const dailyTrends = dashboardData.weekly_test_trends || []
+  
+  const totalTests = dashboardData?.kpis?.total_tests?.value || 0
+  const totalTestsSubtitle = dashboardData?.kpis?.total_tests?.subtitle || 'tests processed today'
+  const totalTestsTrend = dashboardData?.kpis?.total_tests?.trend_percent != null ? `${dashboardData.kpis.total_tests.trend_percent > 0 ? '+' : ''}${dashboardData.kpis.total_tests.trend_percent}%` : '+0%'
+
+  const pendingTestsCount = dashboardData?.kpis?.pending_tests?.value || 0
+  const pendingTestsSubtitle = dashboardData?.kpis?.pending_tests?.subtitle || 'awaiting processing'
+  const pendingTestsTrend = dashboardData?.kpis?.pending_tests?.trend_percent != null ? `${dashboardData.kpis.pending_tests.trend_percent > 0 ? '+' : ''}${dashboardData.kpis.pending_tests.trend_percent}%` : '0%'
+
+  const completedTestsCount = dashboardData?.kpis?.completed_tests?.value || 0
+  const completedTestsSubtitle = dashboardData?.kpis?.completed_tests?.subtitle || 'reports generated'
+  const completedTestsTrend = dashboardData?.kpis?.completed_tests?.trend_percent != null ? `${dashboardData.kpis.completed_tests.trend_percent > 0 ? '+' : ''}${dashboardData.kpis.completed_tests.trend_percent}%` : '0%'
+
+  const criticalResultsCount = dashboardData?.kpis?.critical_results?.value || 0
+  const criticalResultsSubtitle = dashboardData?.kpis?.critical_results?.subtitle || 'needs immediate review'
+  const criticalResultsTrend = dashboardData?.kpis?.critical_results?.trend_percent != null ? `${dashboardData.kpis.critical_results.trend_percent > 0 ? '+' : ''}${dashboardData.kpis.critical_results.trend_percent}%` : '0%'
+  
+  const completionPercentage = dashboardData?.kpis?.completed_tests?.completion_rate_percent ?? (totalTests > 0 ? Math.round((completedTestsCount / totalTests) * 100) : 0)
+
+  const avgDailyTests = dashboardData?.weekly_avg_tests_per_day || 0
+  const weeklyChange = dashboardData?.weekly_change_percent || 0
 
   if (loading) return <LoadingSpinner />
   return (
@@ -216,7 +196,17 @@ const LabOverview = () => {
           </h2>
           <p className="text-sm text-gray-500">Real-time overview of lab operations and performance</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <div className="flex items-center gap-2">
+            <label htmlFor="dashboard-date" className="text-sm font-medium text-gray-700">Date:</label>
+            <input
+              id="dashboard-date"
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+            />
+          </div>
           <button onClick={() => handleQuickAction('critical-results')}
             className="px-4 py-2 bg-gradient-to-r from-red-100 to-red-50 text-red-700 rounded-lg hover:from-red-200 hover:to-red-100 transition-all text-sm font-medium border border-red-200" >
             <i className="fas fa-flask mr-2"></i>Critical Results
@@ -238,7 +228,7 @@ const LabOverview = () => {
             <div>
               <h3 className="font-semibold text-yellow-800">Lab Alerts</h3>
               <p className="text-yellow-700 text-sm">
-                Chemistry Analyzer requires calibration • QC failed for Creatinine test • 3 critical results pending physician notification
+                {dashboardData.alerts && dashboardData.alerts.length > 0 ? dashboardData.alerts.map(a => a.message || a).join(' • ') : 'No new alerts'}
               </p>
             </div>
           </div>
@@ -256,7 +246,7 @@ const LabOverview = () => {
              onClick={() => handleQuickAction('test-registration')}>
           <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent pointer-events-none" />
           <span className="absolute top-4 right-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs font-semibold px-2 py-0.5 rounded">
-            +12%
+            {totalTestsTrend}
           </span>
           <div className="relative flex justify-between items-end">
             <div>
@@ -264,8 +254,8 @@ const LabOverview = () => {
                 <i className="fas fa-flask text-white text-lg"></i>
               </div>
               <p className="text-sm text-gray-500">Total Tests</p>
-              <p className="text-2xl font-bold text-gray-900">{dashboardData.stats.totalTests}</p>
-              <p className="text-xs text-gray-400 mt-1">tests processed today</p>
+              <p className="text-2xl font-bold text-gray-900">{totalTests}</p>
+              <p className="text-xs text-gray-400 mt-1 max-w-[150px] truncate" title={totalTestsSubtitle}>{totalTestsSubtitle}</p>
             </div>
             {/* Mini bar chart visualization */}
             <div className="flex items-end gap-1 h-14">
@@ -281,7 +271,7 @@ const LabOverview = () => {
              onClick={() => handleQuickAction('test-registration')}>
           <div className="absolute inset-0 bg-gradient-to-br from-yellow-50/50 to-transparent pointer-events-none" />
           <span className="absolute top-4 right-4 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white text-xs font-semibold px-2 py-0.5 rounded">
-            {dashboardData.stats.pendingTests}
+            {pendingTestsTrend}
           </span>
           <div className="relative flex justify-between items-end">
             <div>
@@ -289,8 +279,8 @@ const LabOverview = () => {
                 <i className="fas fa-hourglass-half text-white text-lg"></i>
               </div>
               <p className="text-sm text-gray-500">Pending Tests</p>
-              <p className="text-2xl font-bold text-gray-900">{dashboardData.stats.pendingTests}</p>
-              <p className="text-xs text-gray-400 mt-1">awaiting processing</p>
+              <p className="text-2xl font-bold text-gray-900">{pendingTestsCount}</p>
+              <p className="text-xs text-gray-400 mt-1 max-w-[150px] truncate" title={pendingTestsSubtitle}>{pendingTestsSubtitle}</p>
             </div>
             {/* Clock visualization */}
             <div className="relative h-14 w-14">
@@ -307,7 +297,7 @@ const LabOverview = () => {
              onClick={() => handleQuickAction('report-generation')}>
           <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 to-transparent pointer-events-none" />
           <span className="absolute top-4 right-4 bg-gradient-to-r from-green-500 to-green-600 text-white text-xs font-semibold px-2 py-0.5 rounded">
-            {dashboardData.stats.completedTests}
+            {completedTestsTrend}
           </span>
           <div className="relative flex justify-between items-end">
             <div>
@@ -315,19 +305,19 @@ const LabOverview = () => {
                 <i className="fas fa-check-circle text-white text-lg"></i>
               </div>
               <p className="text-sm text-gray-500">Completed Tests</p>
-              <p className="text-2xl font-bold text-gray-900">{dashboardData.stats.completedTests}</p>
-              <p className="text-xs text-gray-400 mt-1">reports generated</p>
+              <p className="text-2xl font-bold text-gray-900">{completedTestsCount}</p>
+              <p className="text-xs text-gray-400 mt-1 max-w-[150px] truncate" title={completedTestsSubtitle}>{completedTestsSubtitle}</p>
             </div>
             {/* Progress circle */}
             <div className="relative h-14 w-14">
               <svg className="w-full h-full" viewBox="0 0 36 36">
                 <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#e5e7eb" strokeWidth="3"/>
                 <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#10b981" strokeWidth="3"
-                  strokeDasharray={`${(dashboardData.stats.completedTests / dashboardData.stats.totalTests) * 100}, 100`}/>
+                  strokeDasharray={`${completionPercentage}, 100`}/>
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-green-600 font-bold text-sm">
-                  {Math.round((dashboardData.stats.completedTests / dashboardData.stats.totalTests) * 100)}%
+                  {completionPercentage}%
                 </div>
               </div>
             </div>
@@ -339,7 +329,7 @@ const LabOverview = () => {
              onClick={() => handleQuickAction('critical-results')}>
           <div className="absolute inset-0 bg-gradient-to-br from-red-50/50 to-transparent pointer-events-none" />
           <span className="absolute top-4 right-4 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-semibold px-2 py-0.5 rounded">
-            Action
+            {criticalResultsTrend}
           </span>
           <div className="relative flex justify-between items-end">
             <div>
@@ -347,8 +337,8 @@ const LabOverview = () => {
                 <i className="fas fa-exclamation-circle text-white text-lg"></i>
               </div>
               <p className="text-sm text-gray-500">Critical Results</p>
-              <p className="text-2xl font-bold text-gray-900">{dashboardData.stats.criticalResults}</p>
-              <p className="text-xs text-gray-400 mt-1">needs immediate review</p>
+              <p className="text-2xl font-bold text-gray-900">{criticalResultsCount}</p>
+              <p className="text-xs text-gray-400 mt-1 max-w-[150px] truncate" title={criticalResultsSubtitle}>{criticalResultsSubtitle}</p>
             </div>
             {/* Warning triangle */}
             <div className="relative h-12 w-12">
@@ -429,7 +419,7 @@ const LabOverview = () => {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-bold text-gray-900">{dashboardData.stats.totalTests}</p>
+                <p className="text-2xl font-bold text-gray-900">{totalTests}</p>
                 <p className="text-sm text-gray-500">Total Tests</p>
               </div>
             </div>
@@ -467,7 +457,7 @@ const LabOverview = () => {
                     <div className="text-right">
                       <span className="text-sm font-bold text-gray-900">{item.value}</span>
                       <span className="text-xs text-gray-500 ml-2">
-                        ({Math.round((item.value / dashboardData.stats.totalTests) * 100)}%)
+                        ({totalTests > 0 ? Math.round((item.value / totalTests) * 100) : 0}%)
                       </span>
                     </div>
                   </div>
@@ -530,7 +520,7 @@ const LabOverview = () => {
               </div>
               <div className="flex flex-col items-end">
                 <p className="text-xs text-gray-500">Acceptable Range</p>
-                <p className="text-sm font-bold text-gray-900">95-105 mg/dL</p>
+                <p className="text-sm font-bold text-gray-900">{dashboardData.qc_trend?.min_acceptable || 0}-{dashboardData.qc_trend?.max_acceptable || 0} {dashboardData.qc_trend?.unit || ''}</p>
               </div>
             </div>
             
@@ -549,22 +539,22 @@ const LabOverview = () => {
                   <ReTooltip content={<CustomTooltip />} />
                   <Area type="monotone" dataKey="value" name="QC Value" stroke="#06b6d4" strokeWidth={3} fillOpacity={1} 
                     fill="url(#colorValue)" activeDot={{ r: 6, fill: "#06b6d4", stroke: "#fff", strokeWidth: 2 }}/>
-                  <Line type="monotone" dataKey={100} stroke="#ef4444" strokeWidth={2} strokeDasharray="5 5" dot={false} name="Target"/>
+                  <Line type="monotone" dataKey="target" stroke="#ef4444" strokeWidth={2} strokeDasharray="5 5" dot={false} name="Target"/>
                 </AreaChart>
               </ResponsiveContainer>
             </div>
             
             <div className="grid grid-cols-3 gap-4 mt-4">
               <div className="text-center p-3 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
-                <p className="text-2xl font-bold text-green-700">5</p>
+                <p className="text-2xl font-bold text-green-700">{dashboardData.qc_trend?.within_range || 0}</p>
                 <p className="text-xs text-green-600 font-medium">Within Range</p>
               </div>
               <div className="text-center p-3 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg border border-yellow-200">
-                <p className="text-2xl font-bold text-yellow-700">2</p>
+                <p className="text-2xl font-bold text-yellow-700">{dashboardData.qc_trend?.warnings || 0}</p>
                 <p className="text-xs text-yellow-600 font-medium">Warnings</p>
               </div>
               <div className="text-center p-3 bg-gradient-to-br from-red-50 to-red-100 rounded-lg border border-red-200">
-                <p className="text-2xl font-bold text-red-700">0</p>
+                <p className="text-2xl font-bold text-red-700">{dashboardData.qc_trend?.failures || 0}</p>
                 <p className="text-xs text-red-600 font-medium">Failures</p>
               </div>
             </div>
@@ -633,8 +623,8 @@ const LabOverview = () => {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">Avg: 145 tests/day</p>
-                <p className="text-xs text-gray-500">+8% from last week</p>
+                <p className="text-sm font-medium text-gray-900">Avg: {avgDailyTests} tests/day</p>
+                <p className="text-xs text-gray-500">{weeklyChange >= 0 ? '+' : ''}{weeklyChange}% from last week</p>
               </div>
             </div>
             
@@ -693,7 +683,7 @@ const LabOverview = () => {
                 },
                 { key: 'status', title: 'Status', sortable: true }
               ]}
-              data={dashboardData.pendingTests}
+              data={dashboardData.pending_tests_table || []}
               onRowClick={handleTestClick}
             />
           </div>
@@ -745,7 +735,7 @@ const LabOverview = () => {
                   )
                 }
               ]}
-              data={dashboardData.criticalResults}
+              data={dashboardData.critical_results_table || []}
               onRowClick={handleCriticalResultClick}
             />
           </div>
@@ -793,7 +783,7 @@ const LabOverview = () => {
                 { key: 'nextMaintenance', title: 'Next Maintenance', sortable: true },
                 { key: 'location', title: 'Location', sortable: true }
               ]}
-              data={dashboardData.equipmentStatus}
+              data={dashboardData.equipment_status || []}
               onRowClick={handleEquipmentClick}
             />
           </div>
@@ -838,7 +828,7 @@ const LabOverview = () => {
                 { key: 'target', title: 'Target', sortable: true },
                 { key: 'time', title: 'Time', sortable: true }
               ]}
-              data={dashboardData.qcStatus}
+              data={dashboardData.qc_status_today || []}
               emptyMessage="No QC data available"
             />
           </div>

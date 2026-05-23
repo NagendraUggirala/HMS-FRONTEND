@@ -1,659 +1,794 @@
-import React, { useState } from 'react'
+// src/pages/dashboards/AdminDashboard/pages/Settings.jsx
+import React, { useState, useEffect, useRef } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { updateLogo, updateHospitalInfo } from '../../../../redux/slices/hospitalSlice';
+import SaveIcon from '@mui/icons-material/Save';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import SecurityIcon from '@mui/icons-material/Security';
+import LockIcon from '@mui/icons-material/Lock';
+import PersonIcon from '@mui/icons-material/Person';
+import BusinessIcon from '@mui/icons-material/Business';
+import SettingsIcon from '@mui/icons-material/Settings';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import CreditCardIcon from '@mui/icons-material/CreditCard';
+import ViewModuleIcon from '@mui/icons-material/ViewModule';
+import InfoIcon from '@mui/icons-material/Info';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import SignalCellularAltIcon from '@mui/icons-material/SignalCellularAlt';
+
+import { apiFetch } from '../../../../services/apiClient';
+import { 
+  HOSPITAL_ADMIN_ME, 
+  HOSPITAL_ADMIN_ME_AVATAR, 
+  HOSPITAL_ADMIN_ME_CHANGE_PASSWORD, 
+  HOSPITAL_ADMIN_PLATFORM_FEATURES,
+  HOSPITAL_ADMIN_PLATFORM_SUBSCRIPTION,
+  HOSPITAL_ADMIN_PLATFORM_PLAN,
+  HOSPITAL_ADMIN_PLATFORM_HOSPITAL,
+  HOSPITAL_ADMIN_PLATFORM_MODULES,
+  HOSPITAL_ADMIN_PLATFORM_USAGE,
+  HOSPITAL_ADMIN_PLATFORM_COMBINED,
+  PUBLIC_API_BASE_URL 
+} from '../../../../config/api';
 
 const Settings = () => {
-  const [hospitalProfile, setHospitalProfile] = useState({
-    name: 'Sanctuary General Hospital',
-    registrationNumber: 'SGH-TX-99201-B',
-    address: '1022 Ethereal Plaza, Suite 400, Clinical District, Metropolitan City, MC 88201',
-    contactEmail: 'admin@sanctuary-hospital.com',
-    emergencyHotline: '+1 (555) 000-9111'
-  })
-
-  const [branches, setBranches] = useState([
-    {
-      id: 1,
-      name: 'City Center (Main)',
-      description: 'Central Healthcare Hub',
-      lat: 40.7128,
-      lng: -74.0060,
-      address: '1022 Ethereal Plaza, Suite 400'
-    },
-   
-  ])
-
-  const [operatingHours, setOperatingHours] = useState({
-    timeZone: 'Eastern Standard Time (EST)',
-    schedule: {
-      'Mon - Fri': '00:00 - 24:00',
-      'Saturday': '08:00 - 20:00',
-      'Sunday': 'EMERGENCY ONLY'
+  const dispatch = useDispatch();
+  const { logo: hospitalLogo, name: hospitalName } = useSelector(state => state.hospital);
+  const [activeTab, setActiveTab] = useState('profile');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [successMsg, setSuccessMsg] = useState(null);
+  
+  // Profile Data
+  const [profile, setProfile] = useState({
+    first_name: '',
+    last_name: '',
+    middle_name: '',
+    email: '',
+    phone_number: '',
+    profile_picture_url: '',
+    timezone: '',
+    language: '',
+    security: {
+      is_two_factor_enabled: false,
+      enable_login_alerts: true,
+      enable_suspicious_activity_alerts: true,
+      inactivity_timeout_minutes: 30,
+      enable_account_auto_lock: true,
+      active_sessions: []
     }
-  })
+  });
 
-  const [departments, setDepartments] = useState([
-    {
-      id: 1,
-      name: 'OPD Unit',
-      description: 'Outpatient consultations and preliminary checkups.',
-      icon: 'fas fa-briefcase-medical',
-      iconBg: 'bg-blue-500',
-      status: 'ACTIVE',
-    
-    },
-    {
-      id: 2,
-      name: 'IPD Unit',
-      description: 'Inpatient care with 24/7 monitoring and bed management.',
-      icon: 'fas fa-bed',
-      iconBg: 'bg-cyan-500',
-      status: 'ACTIVE',
-      statusColor: 'text-green-600',
-     
-    },
-    {
-      id: 3,
-      name: 'ICU Unit',
-      description: 'Critical care requiring specialized life-support equipment.',
-      icon: 'fas fa-heartbeat',
-      iconBg: 'bg-red-500',
-      status: 'HIGH PRIORITY',
-      statusColor: 'text-orange-600',
-     
-    },
-    {
-      id: 4,
-      name: 'Diagnostics Lab',
-      description: 'Pathology, radiology, and advanced diagnostics.',
-      icon: 'fas fa-flask',
-      iconBg: 'bg-teal-500',
-      status: 'ACTIVE',
-      statusColor: 'text-green-600',
-    
+  const [passwordForm, setPasswordForm] = useState({
+    current_password: '',
+    new_password: '',
+    confirm_password: ''
+  });
+  
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState(null);
+  const [passwordSuccess, setPasswordSuccess] = useState(null);
+  
+  // Platform Data
+  const [platformFeatures, setPlatformFeatures] = useState({
+    plan_name: '',
+    plan_display_name: '',
+    features: {}
+  });
+  const [subscription, setSubscription] = useState(null);
+  const [plan, setPlan] = useState(null);
+  const [hospitalRegistry, setHospitalRegistry] = useState(null);
+  const [modules, setModules] = useState([]);
+  const [usage, setUsage] = useState(null);
+  const [platformLoading, setPlatformLoading] = useState(false);
+  
+  const fileInputRef = useRef(null);
+  
+  useEffect(() => {
+    fetchProfile();
+    fetchPlatformSettings();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await apiFetch(HOSPITAL_ADMIN_ME);
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setProfile(data.data);
+      }
+      else {
+        setError(data.message || 'Failed to fetch profile.');
+      }
     }
-  ])
+    catch (err) {
+      setError('An error occurred while fetching the profile.');
+    }
+    finally {
+      setLoading(false);
+    }
+  };
+  
+  const fetchPlatformSettings = async () => {
+    try {
+      setPlatformLoading(true);
+      const [featRes, subRes, planRes, hospRes, modRes, usageRes] = await Promise.all([
+        apiFetch(HOSPITAL_ADMIN_PLATFORM_FEATURES),
+        apiFetch(HOSPITAL_ADMIN_PLATFORM_SUBSCRIPTION),
+        apiFetch(HOSPITAL_ADMIN_PLATFORM_PLAN),
+        apiFetch(HOSPITAL_ADMIN_PLATFORM_HOSPITAL),
+        apiFetch(HOSPITAL_ADMIN_PLATFORM_MODULES),
+        apiFetch(HOSPITAL_ADMIN_PLATFORM_USAGE)
+      ]);
 
+      const [feat, sub, plan, hosp, mod, use] = await Promise.all([
+        featRes.json(),
+        subRes.json(),
+        planRes.json(),
+        hospRes.json(),
+        modRes.json(),
+        usageRes.json()
+      ]);
 
-  const [isEditing, setIsEditing] = useState(false)
-  const [editFormData, setEditFormData] = useState(hospitalProfile)
-  const [hasChanges, setHasChanges] = useState(false)
-  const [isEditingPhoto, setIsEditingPhoto] = useState(false)
-  const [photoPreview, setPhotoPreview] = useState('https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=100&h=100&fit=crop')
-  const [tempPhotoPreview, setTempPhotoPreview] = useState(photoPreview)
+      if (featRes.ok) setPlatformFeatures(feat);
+      if (subRes.ok) setSubscription(sub);
+      if (planRes.ok) setPlan(plan);
+      if (hospRes.ok) setHospitalRegistry(hosp);
+      if (modRes.ok) setModules(mod.modules || []);
+      if (usageRes.ok) setUsage(use);
 
-  const [isEditingSchedule, setIsEditingSchedule] = useState(false)
-  const [editScheduleData, setEditScheduleData] = useState(operatingHours.schedule)
+    }catch (err) {
+      console.error('Failed to fetch platform settings:', err);
+    } finally {
+      setPlatformLoading(false);
+    }
+  };
 
   const handleInputChange = (field, value) => {
-    setEditFormData(prev => ({
+    setProfile(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSecurityChange = (field, value) => {
+    setProfile(prev => ({
       ...prev,
-      [field]: value
-    }))
-    setHasChanges(true)
-  }
+      security: { ...prev.security, [field]: value }
+    }));
+  };
 
-  const handleSaveChanges = () => {
-    setHospitalProfile(editFormData)
-    setIsEditing(false)
-    setHasChanges(false)
-    alert('Hospital profile updated successfully!')
-  }
+  const handleSaveProfile = async () => {
+    try {
+      setSaving(true);
+      setError(null);
+      setSuccessMsg(null);
+      const payload = {
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        email: profile.email,
+        phone_number: profile.phone_number,
+        middle_name: profile.middle_name,
+        timezone: profile.timezone,
+        language: profile.language,
+        security: {
+          enable_login_alerts: profile.security.enable_login_alerts,
+          enable_suspicious_activity_alerts: profile.security.enable_suspicious_activity_alerts,
+          inactivity_timeout_minutes: parseInt(profile.security.inactivity_timeout_minutes) || 30,
+          enable_account_auto_lock: profile.security.enable_account_auto_lock
+        }
+      };
 
-  const handleDiscardChanges = () => {
-    setEditFormData(hospitalProfile)
-    setIsEditing(false)
-    setHasChanges(false)
-  }
-
-  const handlePhotoEdit = () => {
-    setIsEditingPhoto(true)
-    setTempPhotoPreview(photoPreview)
-  }
-
-  const handlePhotoChange = (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setTempPhotoPreview(reader.result)
+      const res = await apiFetch(HOSPITAL_ADMIN_ME, {
+        method: 'PATCH',
+        body: payload
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setProfile(data.data);
+        setSuccessMsg('Profile updated successfully!');
+        setTimeout(() => setSuccessMsg(null), 3000);
       }
-      reader.readAsDataURL(file)
+      else {
+        setError(data.message || 'Failed to update profile.');
+      }
     }
+    catch (err) {
+      setError('An error occurred while updating the profile.');
+    }
+    finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      setPasswordError('New passwords do not match.');
+      return;
+    }
+    try {
+      setPasswordSaving(true);
+      setPasswordError(null);
+      setPasswordSuccess(null);
+      const res = await apiFetch(HOSPITAL_ADMIN_ME_CHANGE_PASSWORD, {
+        method: 'POST',
+        body: passwordForm
+      });
+      let data = {};
+      try {
+        data = await res.json();
+      }
+      catch (e) {
+        // sometimes 200 response may just be a string or empty
+      }
+      
+      if (res.ok) {
+        setPasswordSuccess('Password changed successfully!');
+        setPasswordForm({ current_password: '', new_password: '', confirm_password: '' });
+        setTimeout(() => setPasswordSuccess(null), 3000);
+      }
+      else {
+        setPasswordError(data.message || data.detail?.[0]?.msg || 'Failed to change password.');
+      }
+    }
+    catch (err) {
+      setPasswordError('An error occurred while changing password.');
+    }
+    finally {
+      setPasswordSaving(false);
+    }
+  };
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      setSaving(true);
+      setError(null);
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await apiFetch(HOSPITAL_ADMIN_ME_AVATAR, {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setProfile(data.data);
+        setSuccessMsg('Avatar updated successfully!');
+        setTimeout(() => setSuccessMsg(null), 3000);
+      } else {
+        setError(data.message || 'Failed to upload avatar.');
+      }
+    }
+    catch (err) {
+      setError('An error occurred while uploading the avatar.');
+    }
+    finally {
+      setSaving(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleHospitalLogoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const logoData = event.target.result;
+      dispatch(updateLogo(logoData));
+      setSuccessMsg('Hospital logo updated successfully!');
+      setTimeout(() => setSuccessMsg(null), 3000);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64 animate-fade-in">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-gray-500 font-medium">Loading settings...</p>
+        </div>
+      </div>
+    );
   }
 
-  const handleSavePhoto = () => {
-    setPhotoPreview(tempPhotoPreview)
-    setIsEditingPhoto(false)
-    alert('Hospital photo updated successfully!')
-  }
-
-  const handleCancelPhotoEdit = () => {
-    setTempPhotoPreview(photoPreview)
-    setIsEditingPhoto(false)
-  }
-
-  const handleScheduleChange = (day, value) => {
-    setEditScheduleData(prev => ({
-      ...prev,
-      [day]: value
-    }))
-  }
-
-  const handleSaveSchedule = () => {
-    setOperatingHours(prev => ({
-      ...prev,
-      schedule: editScheduleData
-    }))
-    setIsEditingSchedule(false)
-    alert('Operating schedule updated successfully!')
-  }
-
-  const handleCancelScheduleEdit = () => {
-    setEditScheduleData(operatingHours.schedule)
-    setIsEditingSchedule(false)
-  }
+  const tabs = [
+    { id: 'profile', label: 'My Profile', icon: <AccountCircleIcon /> },
+    { id: 'hospital', label: 'Hospital Registry', icon: <BusinessIcon /> },
+    { id: 'subscription', label: 'Subscription & Plan', icon: <CreditCardIcon /> },
+    { id: 'modules', label: 'Platform Modules', icon: <ViewModuleIcon /> },
+  ];
 
   return (
-    <div className="animate-fade-in space-y-6">
+    <div className="animate-fade-in space-y-6 max-w-7xl mx-auto pb-12">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Hospital Settings</h1>
-          <p className="text-gray-600 mt-2 max-w-2xl">
-            Manage hospital profile and location details
+          <h1 className="text-3xl font-bold text-gray-900">Settings & Configuration</h1>
+          <p className="text-gray-600 mt-1">
+            Manage your account, hospital profile, and platform subscription.
           </p>
         </div>
-      </div>
-
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Hospital Profile Section */}
-        <div className="bg-gradient-to-br from-blue-50 via-white to-blue-50 rounded-2xl border border-blue-100 shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300">
-          {/* Premium Header with Photo */}
-          <div className="bg-gradient-to-r from-blue-600 via-blue-500 to-blue-700 px-8 py-4 text-white relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-40 h-40 bg-white opacity-5 rounded-full -mr-20 -mt-20"></div>
-            <div className="relative z-10 flex items-end gap-6">
-              {/* Photo Container */}
-              <div className="relative group">
-                <img 
-                  src={photoPreview} 
-                  className="w-28 h-28 rounded-2xl object-cover shadow-lg border-4 border-white" 
-                  alt="Hospital Logo" 
-                />
-                <button
-                  onClick={handlePhotoEdit}
-                  className="absolute inset-0 bg-black bg-opacity-40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                >
-                  <div className="text-center">
-                    <i className="fas fa-camera text-white text-2xl mb-1 block"></i>
-                    <span className="text-white text-xs font-bold">EDIT PHOTO</span>
-                  </div>
-                </button>
-              </div>
-
-              {/* Header Info */}
-              <div className="flex-1 pb-2">
-                <h2 className="font-bold text-3xl text-white mb-2">{hospitalProfile.name}</h2>
-                <div className="flex items-center gap-2 text-blue-100">
-                  <i className="fas fa-check-circle text-green-300 text-lg"></i>
-                  <span className="font-semibold text-base">Leading Healthcare Provider</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Profile Fields */}
-          <div className="p-8 space-y-5">
-            {!isEditing ? (
-              <>
-                {/* View Mode */}
-                {/* Address */}
-                <div className="p-5 bg-gradient-to-br from-blue-50 to-white rounded-xl border-2 border-blue-200 hover:border-blue-400 hover:shadow-md transition-all duration-300 cursor-default">
-                  <label className="block text-xs font-bold text-blue-600 uppercase tracking-widest mb-3 flex items-center gap-2">
-                    <i className="fas fa-map-marker-alt text-lg"></i> Address
-                  </label>
-                  <p className="text-gray-800 font-medium text-base leading-relaxed">{hospitalProfile.address}</p>
-                </div>
-
-                {/* Contact */}
-                <div className="p-5 bg-gradient-to-br from-green-50 to-white rounded-xl border-2 border-green-200 hover:border-green-400 hover:shadow-md transition-all duration-300 cursor-default">
-                  <label className="block text-xs font-bold text-green-600 uppercase tracking-widest mb-3 flex items-center gap-2">
-                    <i className="fas fa-phone text-lg"></i> Contact
-                  </label>
-                  <p className="text-gray-800 font-medium text-base">{hospitalProfile.emergencyHotline}</p>
-                </div>
-
-                {/* Email */}
-                <div className="p-5 bg-gradient-to-br from-purple-50 to-white rounded-xl border-2 border-purple-200 hover:border-purple-400 hover:shadow-md transition-all duration-300 cursor-default">
-                  <label className="block text-xs font-bold text-purple-600 uppercase tracking-widest mb-3 flex items-center gap-2">
-                    <i className="fas fa-envelope text-lg"></i> Email
-                  </label>
-                  <p className="text-gray-800 font-medium text-base">{hospitalProfile.contactEmail}</p>
-                </div>
-              </>
+        {/* {activeTab === 'profile' && (
+          <button className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+            onClick={handleSaveProfile} disabled={saving}>
+            {saving ? (
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
             ) : (
-              <>
-                {/* Edit Mode */}
-                {/* Hospital Name */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-3">
-                    Hospital Name
-                  </label>
-                  <input
-                    type="text"
-                    value={editFormData.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-blue-300 rounded-lg focus:outline-none focus:border-blue-600 focus:shadow-lg bg-white text-gray-900 font-medium transition-all"
-                  />
-                </div>
-
-                {/* Registration Number */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-3">
-                    Registration Number
-                  </label>
-                  <input
-                    type="text"
-                    value={editFormData.registrationNumber}
-                    onChange={(e) => handleInputChange('registrationNumber', e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-blue-300 rounded-lg focus:outline-none focus:border-blue-600 focus:shadow-lg bg-white text-gray-900 font-medium transition-all"
-                  />
-                </div>
-
-                {/* Corporate Address */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-3">
-                    Corporate Address
-                  </label>
-                  <textarea
-                    value={editFormData.address}
-                    onChange={(e) => handleInputChange('address', e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-blue-300 rounded-lg focus:outline-none focus:border-blue-600 focus:shadow-lg bg-white text-gray-900 font-medium resize-none transition-all"
-                    rows="3"
-                  />
-                </div>
-
-                {/* Contact Email */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-3 flex items-center gap-2">
-                    <i className="fas fa-envelope text-blue-600"></i> Contact Email
-                  </label>
-                  <input
-                    type="email"
-                    value={editFormData.contactEmail}
-                    onChange={(e) => handleInputChange('contactEmail', e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-blue-300 rounded-lg focus:outline-none focus:border-blue-600 focus:shadow-lg bg-white text-gray-900 transition-all"
-                  />
-                </div>
-
-                {/* Emergency Hotline */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-3 flex items-center gap-2">
-                    <i className="fas fa-phone text-blue-600"></i> Emergency Hotline
-                  </label>
-                  <input
-                    type="tel"
-                    value={editFormData.emergencyHotline}
-                    onChange={(e) => handleInputChange('emergencyHotline', e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-blue-300 rounded-lg focus:outline-none focus:border-blue-600 focus:shadow-lg bg-white text-gray-900 transition-all"
-                  />
-                </div>
-              </>
+              <SaveIcon />
             )}
-
-            {/* Edit/Save/Cancel Buttons */}
-            <div className="pt-4 flex gap-3">
-              {!isEditing ? (
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-base rounded-xl hover:from-blue-700 hover:to-blue-800 hover:shadow-2xl hover:scale-105 transition-all duration-300 shadow-lg flex items-center justify-center gap-3 group border border-blue-500"
-                >
-                  <i className="fas fa-edit text-lg group-hover:rotate-12 transition-transform duration-300"></i>
-                  <span>Edit Profile</span>
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={handleDiscardChanges}
-                    className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-100 transition-colors duration-300"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSaveChanges}
-                    className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white font-semibold rounded-lg hover:from-green-700 hover:to-green-800 hover:shadow-lg transition-all duration-300 shadow-md"
-                  >
-                    Save Changes
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Branches Section */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-          <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center">
-                <i className="fas fa-map-marked-alt text-white"></i>
-              </div>
-              <div>
-                <h2 className="font-bold text-xl text-gray-800">Location</h2>
-               
-              </div>
-            </div>
-           
-          </div>
-
-          {/* Branches Map */}
-          <div className="flex-1 p-6">
-            <div className="w-full h-96 rounded-xl overflow-hidden border-2 border-gray-200 shadow-md bg-gradient-to-br from-blue-50 to-cyan-50">
-              <iframe
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3024.1215445686907!2d-74.00601!3d40.71282!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x89c25a316bb7ae2b%3A0x55d53f90981689d2!2s1022%20Ethereal%20Plaza%2C%20New%20York%2C%20NY!5e0!3m2!1sen!2sus!4v1609459200000"
-                width="100%"
-                height="100%"
-                style={{ border: 'none' }}
-                allowFullScreen=""
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              ></iframe>
-            </div>
-
-            {/* Branch List */}
-            <div className="mt-4 space-y-3">
-              {branches.map((branch) => (
-                <div key={branch.id} className="p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border border-blue-200 hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="font-bold text-gray-800">{branch.name}</h4>
-                      <p className="text-sm text-gray-600 mt-1">{branch.description}</p>
-                      <p className="text-xs text-gray-500 mt-2 flex items-center gap-2">
-                        <i className="fas fa-map-marker-alt text-blue-600"></i>
-                        {branch.address}
-                      </p>
-                    </div>
-                    <button className="text-blue-600 hover:text-blue-800 transition-colors">
-                      <i className="fas fa-map-pin text-lg"></i>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+            <span>{saving ? 'Saving...' : 'Save Profile'}</span>
+          </button>
+        )} */}
       </div>
 
-      {/* Operating Hours & Departments Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Operating Hours */}
-        <div className="bg-gradient-to-br from-white to-blue-50 rounded-2xl border border-blue-100 shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
-          {/* Premium Header */}
-          <div className="bg-gradient-to-r from-blue-500 via-blue-400 to-blue-600 px-6 py-8 text-white relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-5 rounded-full -mr-16 -mt-16"></div>
-            <div className="relative z-10">
-              <div className="flex items-center gap-3 mb-1">
-                <div className="bg-white bg-opacity-30 p-1 rounded-xl backdrop-blur-sm">
-                  <i className="fas fa-clock text-2xl"></i>
-                </div>
-                <h2 className="font-bold text-2xl">Operating Hours</h2>
-              </div>
-          
-            </div>
-          </div>
-
-          {/* Card Content */}
-          <div className="p-7 space-y-8">
-         
-
-            {/* Schedule Section */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide text-gray-600">Weekly Schedule</h3>
-              {Object.entries(operatingHours.schedule).map(([day, time], index) => (
-                <div 
-                  key={day} 
-                  className="group bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-300 cursor-default"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {time === 'EMERGENCY ONLY' ? (
-                        <div className="bg-red-100 p-2.5 rounded-lg">
-                        
-                        </div>
-                      ) : (
-                        <div className="bg-blue-100 p-2.5 rounded-lg">
-                          <i className="fas fa-calendar-alt text-blue-600"></i>
-                        </div>
-                      )}
-                      <span className="text-gray-800 font-bold text-base">{day}</span>
-                    </div>
-                    <span className={`font-bold text-base px-4 py-2 rounded-lg transition-all ${
-                      time === 'EMERGENCY ONLY' 
-                        ? 'bg-red-100 text-red-700 font-black tracking-wide' 
-                        : 'bg-blue-100 text-blue-700 font-bold'
-                    }`}>
-                      {time}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Edit Schedule Button with Premium Styling */}
-            <button
-              onClick={() => {
-                setEditScheduleData(operatingHours.schedule)
-                setIsEditingSchedule(true)
-              }}
-              className="w-full mt-8 px-6 py-4 bg-gradient-to-r from-blue-500 via-blue-550 to-blue-600 text-white font-bold text-lg rounded-xl hover:from-blue-600 hover:via-blue-600 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-2xl hover:scale-105 transform flex items-center justify-center gap-3 group border border-blue-400 hover:border-blue-500"
-            >
-              <i className="fas fa-edit text-xl group-hover:rotate-12 transition-transform duration-300"></i>
-              <span>Edit Schedule</span>
-              <i className="fas fa-arrow-right text-sm ml-1 group-hover:translate-x-1 transition-transform duration-300"></i>
-            </button>
-
-         
-          </div>
-        </div>
-
-        {/* Departments & Units */}
-        
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          {/* Header */}
-          
-          <div className="bg-gradient-to-r from-blue-50 to-blue-100 px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="font-bold text-2xl text-gray-900 flex items-center gap-3">
-              <i className="fas fa-network-wired text-blue-600 text-3xl"></i>
-              Departments & Units
-            </h2>
-            
-          </div>
-
-          {/* Department Cards Grid */}
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              {departments.map((dept) => (
-                <div key={dept.id} className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-all">
-                  {/* Header with Icon and Status */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className={`w-14 h-14 ${dept.iconBg} rounded-xl flex items-center justify-center shadow-md`}>
-                      <i className={`${dept.icon} text-white text-xl`}></i>
-                      
-                    </div>
-                    <h3 className="font-bold text-lg text-gray-900 mb-2 ">{dept.name}</h3>
-                  </div>
-
-                  {/* Manage Button */}
-                  <button className="w-full text-blue-600 hover:text-blue-800 font-bold uppercase tracking-wide text-sm transition-colors flex items-center justify-center gap-2">
-                    Manage <i className="fas fa-arrow-right"></i>
-                  </button>
-                </div>
-              ))}
-            </div>
-
-          </div>
-        </div>
-        
+      {/* Tabs */}
+      <div className="flex items-center gap-2 border-b border-gray-200 overflow-x-auto pb-px">
+        {tabs.map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 px-6 py-4 border-b-2 transition-all whitespace-nowrap font-medium ${
+              activeTab === tab.id 
+                ? 'border-blue-600 text-blue-600 bg-blue-50/50' 
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+            }`}>
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* Edit Schedule Modal */}
-      {isEditingSchedule && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-            {/* Modal Header */}
-            <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-6 text-white flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <i className="fas fa-clock text-2xl"></i>
-                <h3 className="text-2xl font-bold">Edit Operating Hours</h3>
-              </div>
-              <button
-                onClick={handleCancelScheduleEdit}
-                className="text-white hover:text-orange-100 transition-colors"
-              >
-                <i className="fas fa-times text-xl"></i>
-              </button>
-            </div>
+      {error && (
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-200 flex items-center gap-3">
+          <i className="fas fa-exclamation-circle text-lg"></i>
+          <p className="font-medium">{error}</p>
+        </div>
+      )}
 
-            {/* Modal Content */}
-            <div className="p-6 space-y-6">
-              {/* Time Zone Display */}
-              <div>
-                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-2">
-                  Time Zone (UTC-5)
-                </label>
-                <p className="text-gray-700 font-medium">{operatingHours.timeZone}</p>
-              </div>
+      {successMsg && (
+        <div className="bg-green-50 text-green-600 p-4 rounded-xl border border-green-200 flex items-center gap-3">
+          <CheckCircleIcon className="text-lg" />
+          <p className="font-medium">{successMsg}</p>
+        </div>
+      )}
 
-              {/* Schedule Inputs */}
-              <div className="space-y-4">
-                {Object.entries(editScheduleData).map(([day, time]) => (
-                  <div key={day} className="space-y-2">
-                    <label className="block text-sm font-bold text-gray-700">
-                      {day}
-                    </label>
-                    {day === 'Sunday' ? (
-                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                        <input
-                          type="checkbox"
-                          checked={time === 'EMERGENCY ONLY'}
-                          onChange={(e) => {
-                            handleScheduleChange(day, e.target.checked ? 'EMERGENCY ONLY' : '24:00 hours')
-                          }}
-                          className="w-4 h-4 text-orange-500 rounded focus:ring-2 focus:ring-orange-500 cursor-pointer"
-                        />
-                        <label className="text-gray-700 font-medium cursor-pointer">Emergency Only</label>
-                      </div>
-                    ) : (
-                      <input
-                        type="text"
-                        value={time}
-                        onChange={(e) => handleScheduleChange(day, e.target.value)}
-                        placeholder="HH:MM - HH:MM"
-                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 transition-colors font-medium"
+      {/* Tab Content */}
+      <div className="mt-6">
+        {activeTab === 'profile' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Profile Card */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden lg:col-span-1">
+                <div className="bg-gradient-to-br from-blue-600 to-indigo-700 h-24"></div>
+                <div className="px-6 pb-6 relative">
+                  <div className="absolute -top-12 left-6">
+                    <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                      <img 
+                        src={profile.profile_picture_url ? (profile.profile_picture_url.startsWith('http') ? profile.profile_picture_url : `${PUBLIC_API_BASE_URL}${profile.profile_picture_url.startsWith('/') ? '' : '/'}${profile.profile_picture_url}`) : 'https://via.placeholder.com/150'} 
+                        alt="Profile"
+                        className="w-24 h-24 rounded-2xl object-cover border-4 border-white shadow-md bg-white"
+                        onError={(e) => { e.target.src = 'https://ui-avatars.com/api/?name=' + (profile.first_name || 'Admin') + '&background=0D8ABC&color=fff'; }}
                       />
+                      <div className="absolute inset-0 bg-black bg-opacity-40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <PhotoCameraIcon className="text-white text-xl" />
+                      </div>
+                      <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAvatarUpload} />
+                    </div>
+                  </div>
+                  <div className="pt-14">
+                    <h3 className="text-xl font-bold text-gray-900">{profile.first_name} {profile.last_name}</h3>
+                    <p className="text-gray-500 text-sm">{profile.email}</p>
+                    <div className="mt-4 flex items-center gap-2 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                      <SecurityIcon className="text-green-500" />
+                      <span>Hospital Admin</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Security Overview */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden lg:col-span-2">
+                <div className="border-b border-gray-200 bg-gray-50/50 px-6 py-4 flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <LockIcon className="text-blue-600" />
+                    Security & Access
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">2FA Status:</span>
+                    {profile.security?.is_two_factor_enabled ? (
+                      <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded uppercase">Enabled</span>
+                    ) : (
+                      <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded uppercase">Disabled</span>
                     )}
                   </div>
-                ))}
-              </div>
-
-              {/* Modal Footer */}
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
-                <button
-                  onClick={handleCancelScheduleEdit}
-                  className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveSchedule}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 font-semibold transition-all shadow-md hover:shadow-lg"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Photo Edit Modal */}
-      {isEditingPhoto && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
-            {/* Modal Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-6 text-white flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <i className="fas fa-camera text-2xl"></i>
-                <h3 className="text-2xl font-bold">Edit Hospital Photo</h3>
-              </div>
-              <button
-                onClick={handleCancelPhotoEdit}
-                className="text-white hover:text-blue-100 transition-colors text-xl"
-              >
-                <i className="fas fa-times"></i>
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-6 space-y-6">
-              {/* Photo Preview */}
-              <div className="flex flex-col items-center">
-                <div className="relative mb-4">
-                  <img 
-                    src={tempPhotoPreview} 
-                    className="w-40 h-40 rounded-2xl object-cover shadow-lg border-4 border-blue-100" 
-                    alt="Preview" 
-                  />
                 </div>
-                <p className="text-gray-700 text-sm font-medium text-center text-gray-600">
-                  Current hospital photo
-                </p>
-              </div>
-
-              {/* File Upload */}
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                  Choose New Photo
-                </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handlePhotoChange}
-                  className="w-full px-4 py-3 border-2 border-dashed border-blue-300 rounded-lg focus:outline-none focus:border-blue-600 bg-blue-50 cursor-pointer hover:bg-blue-100 transition-colors file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
-                />
-                <p className="text-xs text-gray-600 mt-2">
-                  Supported formats: JPG, PNG. Maximum size: 5MB
-                </p>
-              </div>
-
-              {/* Info Note */}
-              <div className="bg-blue-50 border-l-4 border-blue-400 rounded p-3">
-                <p className="text-blue-800 text-sm font-medium">
-                  <i className="fas fa-info-circle text-blue-600 mr-2"></i>
-                  Photo will be updated across all hospital dashboards
-                </p>
+                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">Login Alerts</p>
+                        <p className="text-xs text-gray-500">Notify on new device login</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input className="sr-only peer" type="checkbox" checked={profile.security?.enable_login_alerts || false}
+                          onChange={(e) => handleSecurityChange('enable_login_alerts', e.target.checked)} />
+                        <div className="w-10 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">Auto-Lock</p>
+                        <p className="text-xs text-gray-500">Lock after inactivity</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input className="sr-only peer" type="checkbox" checked={profile.security?.enable_account_auto_lock || false}
+                          onChange={(e) => handleSecurityChange('enable_account_auto_lock', e.target.checked)} />
+                        <div className="w-10 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                      <p className="text-sm font-bold text-gray-900 mb-1">Timezone</p>
+                      <select className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        value={profile.timezone || ''} onChange={(e) => handleInputChange('timezone', e.target.value)}>
+                        <option value="UTC">UTC</option>
+                        <option value="EST">EST</option>
+                        <option value="PST">PST</option>
+                        <option value="IST">IST</option>
+                      </select>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                      <p className="text-sm font-bold text-gray-900 mb-1">Language</p>
+                      <select className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        value={profile.language || 'en'} onChange={(e) => handleInputChange('language', e.target.value)}>
+                        <option value="en">English</option>
+                        <option value="hi">Hindi</option>
+                        <option value="es">Spanish</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Modal Footer */}
-            <div className="flex gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
-              <button
-                onClick={handleCancelPhotoEdit}
-                className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-semibold transition-colors duration-300"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSavePhoto}
-                className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 font-semibold transition-all shadow-md hover:shadow-lg"
-              >
-                Save Photo
+            {/* Forms Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Personal Information Form */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="border-b border-gray-200 bg-gray-50/50 px-6 py-4">
+                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <PersonIcon className="text-blue-600" />
+                    Personal Information
+                  </h3>
+                </div>
+                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="col-span-1">
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">First Name</label>
+                    <input className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                      type="text" value={profile.first_name || ''}
+                      onChange={(e) => handleInputChange('first_name', e.target.value)} />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Last Name</label>
+                    <input className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                      type="text" value={profile.last_name || ''}
+                      onChange={(e) => handleInputChange('last_name', e.target.value)} />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email Address</label>
+                    <input className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                      type="email" value={profile.email || ''}
+                      onChange={(e) => handleInputChange('email', e.target.value)} />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Phone Number</label>
+                    <input className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                      type="tel" value={profile.phone_number || ''}
+                      onChange={(e) => handleInputChange('phone_number', e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Change Password Form */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="border-b border-gray-200 bg-gray-50/50 px-6 py-4">
+                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <LockIcon className="text-blue-600" />
+                    Change Password
+                  </h3>
+                </div>
+                <div className="p-6">
+                  <form onSubmit={handlePasswordChange} className="space-y-4">
+                    {passwordError && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-xs">{passwordError}</div>}
+                    {passwordSuccess && <div className="bg-green-50 text-green-600 p-3 rounded-lg text-xs">{passwordSuccess}</div>}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Current Password</label>
+                      <input type="password" required className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                        value={passwordForm.current_password} onChange={(e) => setPasswordForm({...passwordForm, current_password: e.target.value})} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">New Password</label>
+                        <input type="password" required className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                          value={passwordForm.new_password} onChange={(e) => setPasswordForm({...passwordForm, new_password: e.target.value})} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Confirm New</label>
+                        <input type="password" required className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                          value={passwordForm.confirm_password} onChange={(e) => setPasswordForm({...passwordForm, confirm_password: e.target.value})} />
+                      </div>
+                    </div>
+                    <button type="submit" disabled={passwordSaving} className="w-full py-3 bg-gray-900 hover:bg-black text-white font-bold rounded-xl transition-all disabled:opacity-50 mt-2">
+                      {passwordSaving ? 'Updating...' : 'Update Password'}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'hospital' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Logo Card */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col items-center gap-6">
+                <div className="relative group">
+                  <div className="w-40 h-40 rounded-3xl bg-gray-50 border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden">
+                    {hospitalLogo ? (
+                      <img src={hospitalLogo} alt="Hospital Logo" className="w-full h-full object-contain p-4" />
+                    ) : (
+                      <div className="text-center text-gray-400">
+                        <BusinessIcon style={{ fontSize: 64 }} className="mb-2" />
+                        <p className="text-xs font-bold">NO LOGO</p>
+                      </div>
+                    )}
+                  </div>
+                  <button className="absolute inset-0 bg-black/40 rounded-3xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => document.getElementById('hosp-logo-up').click()}>
+                    <PhotoCameraIcon className="text-white" />
+                  </button>
+                  <input id="hosp-logo-up" type="file" className="hidden" accept="image/*" onChange={handleHospitalLogoUpload} />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-xl font-bold text-gray-900">{hospitalName}</h3>
+                  <p className="text-gray-500 text-sm">Main Identity & Branding</p>
+                </div>
+              </div>
+
+              {/* Registry Details */}
+              <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="border-b border-gray-200 bg-gray-50/50 px-6 py-4">
+                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <InfoIcon className="text-blue-600" />
+                    Platform Registry Information
+                  </h3>
+                </div>
+                <div className="p-6">
+                  {platformLoading ? (
+                    <div className="flex justify-center py-12"><div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>
+                  ) : hospitalRegistry ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-12">
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Registration Number</p>
+                        <p className="font-semibold text-gray-900">{hospitalRegistry.registration_number || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Status</p>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${hospitalRegistry.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {hospitalRegistry.status || (hospitalRegistry.is_active ? 'ACTIVE' : 'INACTIVE')}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Primary Email</p>
+                        <p className="font-semibold text-gray-900">{hospitalRegistry.email || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Phone</p>
+                        <p className="font-semibold text-gray-900">{hospitalRegistry.phone || 'N/A'}</p>
+                      </div>
+                      <div className="col-span-1 md:col-span-2">
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Address</p>
+                        <p className="font-semibold text-gray-900">{hospitalRegistry.address}, {hospitalRegistry.city}, {hospitalRegistry.state}, {hospitalRegistry.pincode}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">License Number</p>
+                        <p className="font-semibold text-gray-900">{hospitalRegistry.license_number || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Established Date</p>
+                        <p className="font-semibold text-gray-900">{hospitalRegistry.established_date ? new Date(hospitalRegistry.established_date).toLocaleDateString() : 'N/A'}</p>
+                      </div>
+                    </div>
+                  ) : <p className="text-gray-500 text-center py-12">No registry data found.</p>}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {activeTab === 'subscription' && (
+          <div className="space-y-6">
+            {/* Subscription Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
+                  <CreditCardIcon />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase">Current Plan</p>
+                  <p className="text-lg font-bold text-gray-900">{subscription?.plan_id || 'Free Tier'}</p>
+                </div>
+              </div>
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex items-center gap-4">
+                <div className="w-12 h-12 bg-green-100 text-green-600 rounded-xl flex items-center justify-center">
+                  <CalendarTodayIcon />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase">Renewal Date</p>
+                  <p className="text-lg font-bold text-gray-900">{subscription?.end_date ? new Date(subscription.end_date).toLocaleDateString() : 'Never'}</p>
+                </div>
+              </div>
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex items-center gap-4">
+                <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center">
+                  <SignalCellularAltIcon />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase">Status</p>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${subscription?.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                    {subscription?.status || 'UNKNOWN'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Plan Quotas */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="border-b border-gray-200 bg-gray-50/50 px-6 py-4">
+                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <SignalCellularAltIcon className="text-blue-600" />
+                    Plan Quotas & Limits
+                  </h3>
+                </div>
+                <div className="p-6 space-y-6">
+                  {plan ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                          <p className="text-xs font-bold text-gray-400 uppercase mb-1">Max Doctors</p>
+                          <p className="text-xl font-bold text-gray-900">{plan.unlimited_doctors ? 'Unlimited' : plan.max_doctors}</p>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                          <p className="text-xs font-bold text-gray-400 uppercase mb-1">Max Patients</p>
+                          <p className="text-xl font-bold text-gray-900">{plan.unlimited_patients ? 'Unlimited' : plan.max_patients}</p>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                          <p className="text-xs font-bold text-gray-400 uppercase mb-1">Monthly Appointments</p>
+                          <p className="text-xl font-bold text-gray-900">{plan.max_appointments_per_month || '∞'}</p>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                          <p className="text-xs font-bold text-gray-400 uppercase mb-1">Storage Limit</p>
+                          <p className="text-xl font-bold text-gray-900">{plan.max_storage_gb} GB</p>
+                        </div>
+                      </div>
+                      <div className="pt-4 border-t border-gray-100">
+                        <p className="text-sm text-gray-500 mb-2">{plan.description}</p>
+                        <div className="flex items-center justify-between">
+                          <p className="font-bold text-gray-900">₹{plan.monthly_price}/mo</p>
+                          <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-sm">Change Plan</button>
+                        </div>
+                      </div>
+                    </>
+                  ) : <p className="text-gray-500 text-center py-12">No plan information available.</p>}
+                </div>
+              </div>
+
+              {/* Usage Comparison */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="border-b border-gray-200 bg-gray-50/50 px-6 py-4">
+                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <SignalCellularAltIcon className="text-blue-600" />
+                    Resource Usage
+                  </h3>
+                </div>
+                <div className="p-6 space-y-6">
+                  {usage ? (
+                    <>
+                      {Object.entries(usage.current_usage || {}).map(([key, value]) => {
+                        const limit = usage.limits?.[key] || 0;
+                        const percentage = limit > 0 ? Math.min(100, (value / limit) * 100) : 0;
+                        const colorClass = percentage > 90 ? 'bg-red-500' : percentage > 70 ? 'bg-yellow-500' : 'bg-blue-600';
+                        
+                        return (
+                          <div key={key}>
+                            <div className="flex justify-between mb-2">
+                              <span className="text-sm font-bold text-gray-700 capitalize">{key.replace(/_/g, ' ')}</span>
+                              <span className="text-sm text-gray-500 font-medium">{value} / {limit || '∞'}</span>
+                            </div>
+                            <div className="w-full bg-gray-100 rounded-full h-2">
+                              <div className={`${colorClass} h-2 rounded-full transition-all duration-500`} style={{ width: `${limit > 0 ? percentage : 0}%` }}></div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>
+                  ) : <p className="text-gray-500 text-center py-12">Usage data not available.</p>}
+                  
+                  <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 flex items-start gap-3">
+                    <InfoIcon className="text-blue-600 mt-0.5" />
+                    <p className="text-xs text-blue-800 leading-relaxed">
+                      Usage metrics are updated every hour. If you exceed your plan limits, some features may be temporarily restricted.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'modules' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="border-b border-gray-200 bg-gray-50/50 px-6 py-4">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <ViewModuleIcon className="text-blue-600" />
+                  Available Platform Modules
+                </h3>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {modules.length > 0 ? modules.map((module) => (
+                    <div key={module.key} className={`p-5 rounded-2xl border transition-all ${module.enabled ? 'bg-white border-blue-100 shadow-sm' : 'bg-gray-50 border-gray-200 grayscale opacity-60'}`}>
+                      <div className="flex items-start justify-between mb-4">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${module.enabled ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-gray-300 text-gray-500'}`}>
+                          <i className={`fas ${module.key === 'lab_tests' ? 'fa-vial' : module.key === 'video_consultation' ? 'fa-video' : module.key === 'pharmacy' ? 'fa-pills' : 'fa-cube'}`}></i>
+                        </div>
+                        {module.enabled ? (
+                          <span className="px-2 py-1 bg-green-100 text-green-700 text-[10px] font-bold rounded uppercase">Active</span>
+                        ) : (
+                          <span className="px-2 py-1 bg-gray-200 text-gray-500 text-[10px] font-bold rounded uppercase">Locked</span>
+                        )}
+                      </div>
+                      <h4 className="text-base font-bold text-gray-900 mb-1">{module.label}</h4>
+                      <p className="text-xs text-gray-500 leading-relaxed mb-4">{module.description || 'Enhance your hospital operations with this integrated module.'}</p>
+                      
+                      {!module.enabled && (
+                        <button className="w-full py-2 bg-gray-900 text-white rounded-lg text-xs font-bold hover:bg-black transition-colors">
+                          Unlock Module
+                        </button>
+                      )}
+                    </div>
+                  )) : (
+                    <div className="col-span-full py-12 text-center text-gray-500">
+                      No modules information available.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-blue-600 to-indigo-800 rounded-2xl p-8 text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-xl">
+              <div className="text-center md:text-left">
+                <h3 className="text-2xl font-bold mb-2">Ready to expand your capabilities?</h3>
+                <p className="text-blue-100 max-w-xl">
+                  Unlock advanced modules like Video Consultations, Pharmacy Inventory, and Lab Management with our Enterprise plan.
+                </p>
+              </div>
+              <button className="px-8 py-4 bg-white text-blue-600 font-bold rounded-2xl hover:bg-blue-50 transition-all shadow-lg whitespace-nowrap">
+                Upgrade Now
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
-  )
-}
+  );
+};
 
-export default Settings
+export default Settings;

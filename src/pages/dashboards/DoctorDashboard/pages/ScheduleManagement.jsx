@@ -6,21 +6,16 @@ import {
   DOCTOR_SCHEDULE_WEEKLY,
   DOCTOR_SCHEDULE_SLOTS,
   DOCTOR_SCHEDULE_CREATE,
-  DOCTOR_SCHEDULE_SLOT_DETAILS
+  DOCTOR_SCHEDULE_SLOT_DETAILS,
+  DOCTOR_STATISTICS_SUMMARY
 } from '../../../../config/api'
 
 const WEEK_DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']
 
 const EMPTY_FORM = {
-  day_of_week: 'MONDAY',
+  date: '',
   start_time: '',
-  end_time: '',
-  slot_duration_minutes: 30,
-  max_patients_per_slot: 1,
-  break_start_time: '',
-  break_end_time: '',
-  notes: '',
-  is_emergency_available: false
+  end_time: ''
 }
 
 const ScheduleManagement = () => {
@@ -28,6 +23,7 @@ const ScheduleManagement = () => {
   const [refreshing, setRefreshing] = useState(false)
   const [weeklySchedule, setWeeklySchedule] = useState(null)
   const [scheduleSlots, setScheduleSlots] = useState([])
+  const [statistics, setStatistics] = useState(null)
   const [error, setError] = useState('')
   const [selectedWeekStart, setSelectedWeekStart] = useState(getStartOfWeekISO(new Date()))
   const [modalState, setModalState] = useState({ add: false, edit: false })
@@ -44,16 +40,18 @@ const ScheduleManagement = () => {
       const weeklyParams = new URLSearchParams()
       if (selectedWeekStart) weeklyParams.set('week_start', selectedWeekStart)
 
-      const [weeklyRes, slotsRes] = await Promise.all([
+      const [weeklyRes, slotsRes, statsRes] = await Promise.all([
         apiFetchWithFallback(
           buildCandidatePaths('weekly', { weekStart: selectedWeekStart }),
           { method: 'GET' }
         ),
-        apiFetchWithFallback(buildCandidatePaths('slots'), { method: 'GET' })
+        apiFetchWithFallback(buildCandidatePaths('slots'), { method: 'GET' }),
+        apiFetchWithFallback(buildCandidatePaths('statistics'), { method: 'GET' })
       ])
 
       const weeklyData = await weeklyRes.json().catch(() => ({}))
       const slotsData = await slotsRes.json().catch(() => ({}))
+      const statsData = await statsRes.json().catch(() => ({}))
 
       if (!weeklyRes.ok) {
         throw new Error(
@@ -72,10 +70,12 @@ const ScheduleManagement = () => {
 
       setWeeklySchedule(getDataPayload(weeklyData))
       setScheduleSlots(normalizeScheduleSlots(getDataPayload(slotsData)))
+      setStatistics(getDataPayload(statsData))
     } catch (loadError) {
       setError(loadError?.message || 'Unable to load schedule information.')
       setWeeklySchedule(null)
       setScheduleSlots([])
+      setStatistics(null)
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -87,11 +87,18 @@ const ScheduleManagement = () => {
   }, [selectedWeekStart])
 
   const stats = useMemo(() => {
+    if (statistics) {
+      return {
+        totalSlots: Number(statistics.total_slots || 0),
+        totalAppointments: Number(statistics.total_appointments || 0),
+        availableSlots: Number(statistics.available_slots || 0)
+      }
+    }
     const totalSlots = Number(weeklySchedule?.total_slots || 0)
     const totalAppointments = Number(weeklySchedule?.total_appointments || 0)
     const availableSlots = Number(weeklySchedule?.available_slots || 0)
     return { totalSlots, totalAppointments, availableSlots }
-  }, [weeklySchedule])
+  }, [statistics, weeklySchedule])
 
   const openAddModal = () => {
     setCurrentSlot(null)
@@ -102,15 +109,9 @@ const ScheduleManagement = () => {
   const openEditModal = (slot) => {
     setCurrentSlot(slot)
     setFormData({
-      day_of_week: slot.day_of_week || 'MONDAY',
+      date: slot.date || '',
       start_time: slot.start_time || '',
-      end_time: slot.end_time || '',
-      slot_duration_minutes: Number(slot.slot_duration_minutes || 30),
-      max_patients_per_slot: Number(slot.max_patients_per_slot || 1),
-      break_start_time: slot.break_start_time || '',
-      break_end_time: slot.break_end_time || '',
-      notes: slot.notes || '',
-      is_emergency_available: Boolean(slot.is_emergency_available)
+      end_time: slot.end_time || ''
     })
     setModalState({ add: false, edit: true })
   }
@@ -126,32 +127,18 @@ const ScheduleManagement = () => {
   }
 
   const buildPayload = () => ({
-    day_of_week: formData.day_of_week,
+    date: formData.date || null,
     start_time: formData.start_time,
-    end_time: formData.end_time,
-    slot_duration_minutes: Number(formData.slot_duration_minutes || 30),
-    max_patients_per_slot: Number(formData.max_patients_per_slot || 1),
-    break_start_time: formData.break_start_time || null,
-    break_end_time: formData.break_end_time || null,
-    notes: String(formData.notes || '').trim() || null,
-    is_emergency_available: Boolean(formData.is_emergency_available)
+    end_time: formData.end_time
   })
 
   const validateForm = () => {
-    if (!formData.day_of_week || !formData.start_time || !formData.end_time) {
-      window.alert('Please fill day, start time and end time.')
+    if (!formData.date || !formData.start_time || !formData.end_time) {
+      window.alert('Please fill date, start time and end time.')
       return false
     }
     if (formData.start_time >= formData.end_time) {
       window.alert('End time must be greater than start time.')
-      return false
-    }
-    if (
-      formData.break_start_time &&
-      formData.break_end_time &&
-      formData.break_start_time >= formData.break_end_time
-    ) {
-      window.alert('Break end time must be greater than break start time.')
       return false
     }
     return true
@@ -397,27 +384,14 @@ const ScheduleManagement = () => {
 
 const SlotForm = ({ formData, onChange, onCancel, onSubmit, submitText, submitLoading }) => (
   <div className="space-y-4">
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div>
-        <label className="block text-sm text-gray-700 mb-1">Day of Week</label>
-        <select
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-          value={formData.day_of_week}
-          onChange={(event) => onChange('day_of_week', event.target.value)}
-        >
-          {WEEK_DAYS.map((day) => (
-            <option key={day} value={day}>{humanizeDay(day)}</option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label className="block text-sm text-gray-700 mb-1">Slot Duration (mins)</label>
+        <label className="block text-sm text-gray-700 mb-1">Date</label>
         <input
-          type="number"
-          min="5"
+          type="date"
           className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-          value={formData.slot_duration_minutes}
-          onChange={(event) => onChange('slot_duration_minutes', event.target.value)}
+          value={formData.date}
+          onChange={(event) => onChange('date', event.target.value)}
         />
       </div>
       <div>
@@ -438,51 +412,6 @@ const SlotForm = ({ formData, onChange, onCancel, onSubmit, submitText, submitLo
           onChange={(event) => onChange('end_time', event.target.value)}
         />
       </div>
-      <div>
-        <label className="block text-sm text-gray-700 mb-1">Break Start</label>
-        <input
-          type="time"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-          value={formData.break_start_time}
-          onChange={(event) => onChange('break_start_time', event.target.value)}
-        />
-      </div>
-      <div>
-        <label className="block text-sm text-gray-700 mb-1">Break End</label>
-        <input
-          type="time"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-          value={formData.break_end_time}
-          onChange={(event) => onChange('break_end_time', event.target.value)}
-        />
-      </div>
-      <div>
-        <label className="block text-sm text-gray-700 mb-1">Max Patients / Slot</label>
-        <input
-          type="number"
-          min="1"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-          value={formData.max_patients_per_slot}
-          onChange={(event) => onChange('max_patients_per_slot', event.target.value)}
-        />
-      </div>
-      <label className="inline-flex items-center gap-2 mt-7 text-sm text-gray-700">
-        <input
-          type="checkbox"
-          checked={Boolean(formData.is_emergency_available)}
-          onChange={(event) => onChange('is_emergency_available', event.target.checked)}
-        />
-        Emergency available
-      </label>
-    </div>
-    <div>
-      <label className="block text-sm text-gray-700 mb-1">Notes</label>
-      <textarea
-        rows="3"
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-        value={formData.notes}
-        onChange={(event) => onChange('notes', event.target.value)}
-      />
     </div>
     <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
       <button onClick={onCancel} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700">Cancel</button>
@@ -605,6 +534,15 @@ function buildCandidatePaths(type, { scheduleId, weekStart } = {}) {
       `/api/v1/doctors/schedules/slots/${scheduleIdSafe}`,
       `/api/v1/doctor/schedule/${scheduleIdSafe}`,
       `/api/v1/doctors/schedule/${scheduleIdSafe}`
+    ],
+    statistics: [
+      DOCTOR_STATISTICS_SUMMARY('month'),
+      '/api/v1/doctor-management/statistics/summary?period=month',
+      '/api/v1/doctor-management/statistics/summary',
+      '/api/v1/doctor/statistics/summary?period=month',
+      '/api/v1/doctor/statistics/summary',
+      '/api/v1/doctors/statistics/summary?period=month',
+      '/api/v1/doctors/statistics/summary'
     ]
   }
 

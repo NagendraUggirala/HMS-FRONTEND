@@ -13,6 +13,7 @@ import DoctorProfile from './pages/DoctorProfile'
 import RaiseticketDoctor from './pages/RaiseticketDoctor'
 import ScheduleManagement from './pages/ScheduleManagement'
 import AppointmentTracking from './pages/AppointmentTracking'
+import ReportsAndAnalytics from './pages/ReportsAndAnalytics'
 import TreatmentPlans from './pages/TreatmentPlans'
 
 const DoctorDashboard = () => {
@@ -78,6 +79,8 @@ const DoctorDashboard = () => {
         return <RaiseticketDoctor {...pageProps} />
       case 'profile':
         return <DoctorProfile {...pageProps} />
+      case 'reports-analytics':
+        return <ReportsAndAnalytics {...pageProps} />
 
       default:
         return <DoctorOverview {...pageProps} />

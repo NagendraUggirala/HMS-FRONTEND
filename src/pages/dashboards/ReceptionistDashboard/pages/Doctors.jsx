@@ -27,7 +27,7 @@ import {
     DOCTOR_LIST, DOCTOR_STATISTICS, DOCTOR_DETAILS, DOCTOR_SEARCH, DOCTOR_DROPDOWN, RECEPTIONIST_DOCTORS, RECEPTIONIST_DOCTORS_SEARCH, RECEPTIONIST_DOCTORS_DROPDOWN, RECEPTIONIST_DOCTORS_STATISTICS, RECEPTIONIST_DOCTOR_DETAILS
 } from '../../../../config/api';
 
-
+import { DOCTOR_LIST, DOCTOR_STATISTICS, DOCTOR_DETAILS} from '../../../../config/api';
 
 const Doctors = () => {
     const [doctors, setDoctors] = useState([]);
@@ -55,6 +55,9 @@ const Doctors = () => {
     // Filter doctors retrieved from the API to only show active ones
     const activeDoctors = useMemo(() => {
         return doctors.filter(doc => doc.status === 'Active');
+    // Filter active doctors
+    const activeDoctors = useMemo(() => {
+        return doctors.filter(doc => doc.status?.toLowerCase() === 'active');
     }, [doctors]);
 
     // Get list of unique departments from active doctors
@@ -121,6 +124,7 @@ const Doctors = () => {
                 fetchDoctors(false),
                 fetchStatistics(),
                 fetchDropdownData(selectedDeptFilter)
+                fetchStatistics()
             ]);
         } catch (err) {
             setError('Failed to synchronize medical staff data.');
@@ -143,6 +147,12 @@ const Doctors = () => {
                 const list = data.data?.doctors || data.data || data || [];
                 const mappedList = (Array.isArray(list) ? list : []).map(mapDoctorData);
                 setDoctors(mappedList);
+            const res = await apiFetch(DOCTOR_LIST);
+            const data = await res.json();
+            if (res.ok) {
+                // Handle various potential API response structures
+                const list = data.data?.doctors || data.data || data;
+                setDoctors(Array.isArray(list) ? list : []);
                 setError(null);
             }
         } catch (err) {
@@ -213,6 +223,12 @@ const Doctors = () => {
                     busy: stats.busy || stats.busy_doctors || stats.in_consultation || 0,
                     onLeave: stats.onLeave || stats.on_leave || stats.unavailable || 0
                 });
+    const fetchStatistics = async () => {
+        try {
+            const res = await apiFetch(DOCTOR_STATISTICS);
+            const data = await res.json();
+            if (res.ok) {
+                setStatsData(data.data || data);
             }
         } catch (err) {
             console.error('Error fetching statistics:', err);
@@ -248,6 +264,10 @@ const Doctors = () => {
                     emergencyContact: d.emergencyContact || d.emergency_contact || d.phone || d.contact || '+91 9999999999'
                 };
                 setFormData(mappedDoc);
+            const res = await apiFetch(DOCTOR_DETAILS(doctorId));
+            const data = await res.json();
+            if (res.ok) {
+                setFormData(data.data?.doctor || data.data || data);
             }
         } catch (err) {
             console.error('Error fetching doctor details:', err);
@@ -278,7 +298,6 @@ const Doctors = () => {
     useEffect(() => {
         fetchDropdownData(selectedDeptFilter);
     }, [selectedDeptFilter]);
-
 
     // Dynamic Statistics calculated from the filtered doctors shown in the table
     const stats = useMemo(() => {
@@ -327,7 +346,6 @@ const Doctors = () => {
         return uniqueDoctorsForFilter;
     }, [dropdownDoctors, uniqueDoctorsForFilter, activeDoctors]);
 
-
     const getStatusBadge = (status) => {
 
         switch (status) {
@@ -366,6 +384,10 @@ const Doctors = () => {
                     { label: 'Available ', val: displayStats.available, icon: CheckCircleIcon, color: 'text-emerald-600', bg: 'bg-emerald-50' },
                     { label: 'In Consultation', val: displayStats.busy, icon: AccessTimeIcon, color: 'text-amber-600', bg: 'bg-amber-50' },
                     { label: 'On Leave', val: displayStats.onLeave, icon: CancelIcon, color: 'text-rose-600', bg: 'bg-rose-50' }
+                    { label: 'Total Doctors', val: stats.total, icon: WorkIcon, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                    { label: 'Available ', val: stats.available, icon: CheckCircleIcon, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                    { label: 'In Consultation', val: stats.busy, icon: AccessTimeIcon, color: 'text-amber-600', bg: 'bg-amber-50' },
+                    { label: 'On Leave', val: stats.onLeave, icon: CancelIcon, color: 'text-rose-600', bg: 'bg-rose-50' }
                 ].map((stat, i) => (
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
@@ -425,6 +447,7 @@ const Doctors = () => {
                     >
                         <option value="all">All Doctors</option>
                         {doctorFilterOptions.map(doc => (
+                        {uniqueDoctorsForFilter.map(doc => (
                             <option key={doc.id} value={doc.id}>
                                 {doc.name}
                             </option>
@@ -666,7 +689,6 @@ const Doctors = () => {
                     </div>
                 )}
             </Modal>
-
 
             {/* Decorative background elements */}
             <div className="fixed top-20 right-0 w-96 h-96 bg-indigo-200/10 blur-3xl -z-10 pointer-events-none rounded-full" />

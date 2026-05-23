@@ -11,7 +11,11 @@ import {
   Close as CloseIcon, PowerSettingsNew as PowerSettingsNewIcon, Check as CheckIcon,
   Add as AddIcon, Description as DescriptionIcon, KeyboardArrowUp as KeyboardArrowUpIcon,
   Groups as GroupsIcon, PendingActions as PendingActionsIcon, TaskAlt as TaskAltIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon, CalendarMonth as CalendarMonthIcon, Payments as PaymentsIcon,
+  BarChart as BarChartIcon, Timeline as TimelineIcon, ReceiptLong as ReceiptLongIcon,
+  Science as ScienceIcon, Medication as MedicationIcon, Assessment as AssessmentIcon,
+  Edit as EditIcon, ExitToApp as ExitToAppIcon, Info as InfoIcon,
+  HistoryEdu as HistoryEduIcon
 } from '@mui/icons-material';
 import { apiFetch } from '../../../../services/apiClient';
 import {
@@ -27,55 +31,72 @@ const OPDManagement = () => {
   const [doctors, setDoctors] = useState([]);
   const [apiDepartments, setApiDepartments] = useState([]);
   const [showConsultationForm, setShowConsultationForm] = useState(false);
-  const [showQueueModal, setShowQueueModal] = useState(false);
-  const [showDoctorModal, setShowDoctorModal] = useState(false);
+  const formattedCurrentDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [tokenStep, setTokenStep] = useState('form'); // 'form' or 'slip'
   const [generatedToken, setGeneratedToken] = useState(null);
-
   const [activeTab, setActiveTab] = useState('patients');
   const [selectedPatient, setSelectedPatient] = useState(null);
-
   // View Patient Details State
   const [showViewPatientModal, setShowViewPatientModal] = useState(false);
   const [selectedPatientForView, setSelectedPatientForView] = useState(null);
-
   // Transfer Patient Modal State
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferPatient, setTransferPatient] = useState(null);
   const [selectedTransferDoctor, setSelectedTransferDoctor] = useState(null);
-
   // Deactivate Doctor Modal State
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [doctorToDeactivate, setDoctorToDeactivate] = useState(null);
   const [patientsToReassign, setPatientsToReassign] = useState([]);
-  const [selectedDoctorForQueue, setSelectedDoctorForQueue] = useState(null);
-
+  const [showLabResultModal, setShowLabResultModal] = useState(false);
+  const [selectedLabRecord, setSelectedLabRecord] = useState(null);
+  const [showQueueDetailModal, setShowQueueDetailModal] = useState(false);
+  const [selectedQueuePatient, setSelectedQueuePatient] = useState(null);
+  const [showPharmacyModal, setShowPharmacyModal] = useState(false);
+  const [selectedPharmacyRecord, setSelectedPharmacyRecord] = useState(null);
+  const [showExitModal, setShowExitModal] = useState(false);
+  const [selectedExitPatient, setSelectedExitPatient] = useState(null);
+  const [exitForm, setExitForm] = useState({
+    billingStatus: 'Paid',
+    followUpRequired: false,
+    followUpDate: '',
+    remarks: ''
+  });
   // Token Form State
   const [tokenForm, setTokenForm] = useState({
+    uhid: '',
+    visitId: '',
+    tokenNumber: '',
+    queueNumber: '',
     patientId: '',
     patientName: '',
-    phoneNo: '',
-    email: '',
     age: '',
     gender: 'Male',
     bloodGroup: '',
     Type: '',
+    phoneNo: '',
+    email: '',
     address: '',
     department: '',
     doctorId: '',
-    type: 'Regular',
-    priority: 'Normal'
+    visitType: 'New',
+    appointmentType: 'Walk-in',
+    priority: 'Normal',
+    arrivalTime: '',
+    estimatedWaitTime: '',
+    queuePosition: 0,
+    tokenStatus: 'Waiting',
+    referredBy: ''
   });
 
   // Searchable Dropdown State for Token Creation
   const [deptSearchTerm, setDeptSearchTerm] = useState('');
   const [isDeptDropdownOpen, setIsDeptDropdownOpen] = useState(false);
   const deptDropdownRef = useRef(null);
-
   const [docSearchTerm, setDocSearchTerm] = useState('');
   const [isDocDropdownOpen, setIsDocDropdownOpen] = useState(false);
   const docDropdownRef = useRef(null);
+  const [docNameSearchTerm, setDocNameSearchTerm] = useState('');
   const [isDocNameDropdownOpen, setIsDocNameDropdownOpen] = useState(false);
   const docNameDropdownRef = useRef(null);
 
@@ -84,6 +105,7 @@ const OPDManagement = () => {
   const patientDropdownRef = useRef(null);
   const [registeredPatients, setRegisteredPatients] = useState([]);
   // State for Payment Modal
+  {/* Add this state near your other state declarations */ }
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPaymentPatient, setSelectedPaymentPatient] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
@@ -95,10 +117,75 @@ const OPDManagement = () => {
     age: '',
     gender: 'Male',
     email: '',
-    contact: '',
-    isActive: true
+    doctor: '',
+    consultationFee: 0,
+    labTests: []
   });
 
+  const updatePaymentBillingData = (field, value) => {
+    setPaymentBillingData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const addPaymentLabTest = () => {
+    setPaymentBillingData(prev => ({
+      ...prev,
+      labTests: [...prev.labTests, { name: '', fee: 0 }]
+    }));
+  };
+
+  const updatePaymentLabTest = (index, field, value) => {
+    setPaymentBillingData(prev => {
+      const updatedTests = [...prev.labTests];
+      updatedTests[index] = { ...updatedTests[index], [field]: value };
+      return { ...prev, labTests: updatedTests };
+    });
+  };
+
+  const removePaymentLabTest = (index) => {
+    setPaymentBillingData(prev => ({
+      ...prev,
+      labTests: prev.labTests.filter((_, i) => i !== index)
+    }));
+  };
+  const calculatePaymentTotal = () => {
+    const consultation = parseFloat(paymentBillingData.consultationFee) || 0;
+    const tests = paymentBillingData.labTests.reduce((sum, test) => sum + (parseFloat(test.fee) || 0), 0);
+    return (consultation + tests).toFixed(2);
+  };
+  const [patientQueueSearch, setPatientQueueSearch] = useState('');
+  const [consultationSearch, setConsultationSearch] = useState('');
+  const [labSearch, setLabSearch] = useState('');
+  const [billingSearch, setBillingSearch] = useState('');
+  const [pharmacySearch, setPharmacySearch] = useState('');
+  const [reportsSearch, setReportsSearch] = useState('');
+  const [exitSearch, setExitSearch] = useState('');
+  // Helper function for dynamic waiting time
+  const calculateWaitingTime = (queuePosition) => {
+    const baseTimePerPatient = 15; // average minutes per patient
+    const time = queuePosition * baseTimePerPatient;
+    return time > 0 ? `${time} mins` : 'Immediate';
+  };
+  // Helper to update doctor queue counts dynamically
+  const getDoctorQueueCount = (doctorId) => {
+    return opdPatients.filter(p =>
+      p.assignedDoctorId === doctorId &&
+      !['Completed', 'Exited'].includes(p.status)
+    ).length;
+  };
+  const STATUS_WORKFLOW = [
+    'Token Generated',
+    'Waiting',
+    'Vitals Completed',
+    'In Consultation',
+    'Lab Ordered',
+    'Billing Pending',
+    'Pharmacy Pending',
+    'Completed',
+    'Exited'
+  ];
   const [consultationForm, setConsultationForm] = useState({
     patientId: '',
     doctorId: '',
@@ -109,26 +196,66 @@ const OPDManagement = () => {
       temperature: '',
       spo2: '',
       weight: '',
-      height: ''
+      height: '',
+      respiratoryRate: '',
+      bmi: '',
+      bloodSugar: '',
+      painScore: ''
     },
     symptoms: '',
     history: '',
     allergies: '',
     examination: '',
     diagnosis: '',
-    prescription: '',
-    testsRecommended: [{ id: 1, description: '', customDescription: '', samples: '', customSamples: '' }],
+    diagnosisCode: '',
+    clinicalNotes: '',
+    medications: [
+      {
+        name: '',
+        genericName: '',
+        dosage: '',
+        route: '',
+        duration: '',
+        beforeFood: false,
+        afterFood: false,
+        frequency: {
+          morning: false,
+          afternoon: false,
+          night: false
+        },
+        instructions: ''
+      }
+    ],
+    testsRecommended: [
+      {
+        id: 1,
+        description: '',
+        samples: '',
+        labStatus: 'Ordered',
+        sampleCollected: false,
+        sampleCollectedAt: '',
+        labTechnician: '',
+        resultValue: '',
+        referenceRange: '',
+        remarks: '',
+        reportFile: '',
+        verifiedBy: '',
+        verifiedAt: ''
+      }
+    ],
     instructions: '',
-    nextVisitDate: '',
+    followUpRequired: false,
+    followUpDate: '',
+    consultationStatus: 'Pending',
+    consultationStartTime: '',
+    consultationEndTime: '',
     remarks: ''
   });
-
 
   useEffect(() => {
     loadOPDData();
     loadApiDepartments();
   }, []);
-
   // Debounced patient search from API
   useEffect(() => {
     if (!patientSearchTerm.trim()) {
@@ -178,12 +305,51 @@ const OPDManagement = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
-
+  
   const DEPARTMENTS = [...new Set([
     ...apiDepartments.map(d => d.name || d),
     ...doctors.map(d => d.department)
   ])].filter(Boolean);
   const AVAILABLE_DOCTORS = doctors;
+
+  const TEST_PRICES = {
+    'Blood Test': 250,
+    'CBC': 300,
+    'Lipid Profile': 500,
+    'Blood Sugar': 150,
+    'X-Ray': 600,
+    'ECG': 400,
+    'MRI': 3500,
+    'Ultrasound': 1200,
+    'CT Scan': 4500,
+    'Urine Test': 200,
+    'Biopsy': 1500,
+    'Other': 500
+  };
+
+  const SURGERY_PRICES = {
+    'Minor Surgery': 5000,
+    'Stitching': 1500,
+    'Cataract': 15000,
+    'Appendix': 25000,
+    'Dental Extraction': 2000
+  };
+
+  const DEPARTMENTS = [...new Set(doctors.map(d => d.department))];
+  const AVAILABLE_DOCTORS = [
+    { name: 'Dr. Arun Varma', department: 'Cardiology', specialization: 'Senior Cardiologist', qualification: 'MBBS, MD (Cardiology)', email: 'arun.varma@hospital.com', contact: '+91 9998887771' },
+    { name: 'Dr. Sarah Khan', department: 'Pediatrics', specialization: 'Pediatrician', qualification: 'MBBS, MD (Pediatrics)', email: 'sarah.khan@hospital.com', contact: '+91 9998887772' },
+    { name: 'Dr. John Doe', department: 'Neurology', specialization: 'Neurosurgeon', qualification: 'MBBS, MS, MCh (Neuro)', email: 'john.doe@hospital.com', contact: '+91 9998887773' },
+    { name: 'Dr. Emily Blunt', department: 'Dermatology', specialization: 'Dermatologist', qualification: 'MBBS, MD (Derm)', email: 'emily.blunt@hospital.com', contact: '+91 9998887774' },
+    { name: 'Dr. Robert Miller', department: 'Orthopedics', specialization: 'Orthopedic Surgeon', qualification: 'MBBS, MS (Ortho)', email: 'robert.miller@hospital.com', contact: '+91 9998887775' }
+  ];
+
+  const REGISTERED_PATIENTS = [
+    { id: 'PAT-101', name: 'Rahul Sharma', phoneNo: '9876543210', email: 'rahul@example.com', age: '28', gender: 'Male', bloodGroup: 'O+', address: 'Andheri West, Mumbai' },
+    { id: 'PAT-102', name: 'Surbhi Gupta', phoneNo: '9988776655', email: 'surbhi@example.com', age: '24', gender: 'Female', bloodGroup: 'B+', address: 'Bandra East, Mumbai' },
+    { id: 'PAT-103', name: 'Anita Verma', phoneNo: '9123456789', email: 'anita@example.com', age: '45', gender: 'Female', bloodGroup: 'A-', address: 'Khar Road, Mumbai' },
+    { id: 'PAT-104', name: 'Vikram Singh', phoneNo: '9822334455', email: 'vikram@example.com', age: '35', gender: 'Male', bloodGroup: 'AB+', address: 'Goregaon, Mumbai' }
+  ];
 
   const TEST_PRICES = {
     'Blood Test': 250,
@@ -226,20 +392,6 @@ const OPDManagement = () => {
     });
     setDocSearchTerm(doc.name);
     setIsDocDropdownOpen(false);
-  };
-
-  const handleSelectDocName = (doc) => {
-    setDoctorForm({
-      ...doctorForm,
-      name: doc.name,
-      department: doc.department,
-      specialization: doc.specialization,
-      qualification: doc.qualification || '',
-      email: doc.email || '',
-      contact: doc.contact || ''
-    });
-    setDocNameSearchTerm(doc.name);
-    setIsDocNameDropdownOpen(false);
   };
 
   const handleSelectPatient = (patient) => {
@@ -354,7 +506,9 @@ const OPDManagement = () => {
           arrivalTime: '9:15 AM',
           bloodGroup: 'B+',
           type: 'Regular',
-          phoneNo: '+91 98765 43210'
+          visitType: 'New',
+          phoneNo: '+91 98765 43210',
+          vitals: { bp: '130/85', pulse: '78', temperature: '98.6', spo2: '97', weight: '78', height: '175' }
         },
         {
           id: 'OPD-002',
@@ -369,33 +523,23 @@ const OPDManagement = () => {
           doctor: mappedDoctors[0]?.name || 'Dr. Meena Rao',
           department: mappedDoctors[0]?.department || 'Cardiology',
           priority: 'Normal',
-          queuePosition: 0,
+          queuePosition: 1,
+          tests: ['CBC', 'Lipid Profile', 'Blood Sugar', 'ECG', 'Urine Routine'],
+          performedTests: ['CBC', 'Lipid Profile', 'Blood Sugar', 'ECG', 'Urine Routine'],
+          diagnosis: 'Mild Hypertension & Dyslipidemia',
+          prescription: '1. Tab. Amlodipine 5mg - OD - 30 Days\n2. Tab. Atorvastatin 10mg - HS - 30 Days\n3. Tab. Multivitamin - OD - 15 Days',
+          advice: 'Reduce salt intake. Morning walk for 30 mins daily. Review after 1 month.',
+          uploadedBy: 'Lab Tech (Ravi)',
+          date: '12 May 2026',
+          vitals: { bp: '145/95', pulse: '82', temperature: '98.4', spo2: '98', weight: '65', height: '162' },
           arrivalTime: '9:00 AM',
           bloodGroup: 'A+',
           type: 'Follow-up',
+          visitType: 'Follow-up',
           phoneNo: '+91 87654 32109'
         },
         {
           id: 'OPD-003',
-          patientId: 'PAT-003',
-          patientName: 'Suresh Patel',
-          age: 58,
-          gender: 'Male',
-          token: 'T-103',
-          waitingTime: '25 mins',
-          status: 'Waiting',
-          assignedDoctorId: 'D-002',
-          doctor: 'Dr. Sharma',
-          department: 'Orthopedics',
-          priority: 'Urgent',
-          queuePosition: 1,
-          arrivalTime: '9:30 AM',
-          bloodGroup: 'O+',
-          type: 'Emergency',
-          phoneNo: '+91 76543 21098'
-        },
-        {
-          id: 'OPD-004',
           patientId: 'PAT-004',
           patientName: 'Kiran Reddy',
           age: 28,
@@ -407,7 +551,7 @@ const OPDManagement = () => {
           doctor: mappedDoctors[3]?.name || mappedDoctors[0]?.name || 'Dr. Gupta',
           department: mappedDoctors[3]?.department || mappedDoctors[0]?.department || 'General Medicine',
           priority: 'Normal',
-          queuePosition: 0,
+          queuePosition: 1,
           arrivalTime: '8:45 AM',
           bloodGroup: 'AB+',
           type: 'New Patient',
@@ -439,6 +583,9 @@ const OPDManagement = () => {
           assignedDoctorId: mappedDoctors[1]?.id || mappedDoctors[0]?.id || 'D-002',
           doctor: mappedDoctors[1]?.name || mappedDoctors[0]?.name || 'Dr. Sharma',
           department: mappedDoctors[1]?.department || mappedDoctors[0]?.department || 'Orthopedics',
+          assignedDoctorId: 'D-002',
+          doctor: 'Dr. Sharma',
+          department: 'Orthopedics',
           priority: 'Normal',
           queuePosition: 1,
           arrivalTime: '8:00 AM',
@@ -471,6 +618,9 @@ const OPDManagement = () => {
           assignedDoctorId: mappedDoctors[3]?.id || mappedDoctors[0]?.id || 'D-004',
           doctor: mappedDoctors[3]?.name || mappedDoctors[0]?.name || 'Dr. Gupta',
           department: mappedDoctors[3]?.department || mappedDoctors[0]?.department || 'General Medicine',
+          assignedDoctorId: 'D-004',
+          doctor: 'Dr. Gupta',
+          department: 'General Medicine',
           priority: 'Urgent',
           queuePosition: 0,
           arrivalTime: '10:45 AM',
@@ -526,6 +676,7 @@ const OPDManagement = () => {
   };
 
   // Open Payment Modal
+  {/* Add this function */ }
   const handleOpenPaymentModal = (patient) => {
     setSelectedPaymentPatient(patient);
     setPaymentMethod('cash');
@@ -553,20 +704,53 @@ const OPDManagement = () => {
     setShowPaymentModal(true);
   };
 
-  const removeTestRow = (index) => {
-    setConsultationForm(prev => {
-      const updatedTests = prev.testsRecommended.filter((_, i) => i !== index)
-        .map((test, i) => ({ ...test, id: i + 1 }));
-      return { ...prev, testsRecommended: updatedTests };
+    setPaymentBillingData({
+      token: patient.token || 'TK-782',
+      patientName: patient.patientName || 'Aditya Sharma',
+      patientId: patient.patientId || 'UHID-2024-0012',
+      age: patient.age || '32',
+      gender: patient.gender || 'Male',
+      email: patient.email || 'aditya.sharma@example.com',
+      doctor: patient.doctor || doc?.name || 'Dr. Sameer Varma',
+      consultationFee: doc?.consultationFee || 500,
+      labTests: dummyTests
     });
+
+    setShowPaymentModal(true);
   };
 
-  const updateTestRow = (index, field, value) => {
-    setConsultationForm(prev => {
-      const updatedTests = [...prev.testsRecommended];
-      updatedTests[index] = { ...updatedTests[index], [field]: value };
-      return { ...prev, testsRecommended: updatedTests };
-    });
+  const handleProcessPaymentWithModal = async () => {
+    setPaymentProcessing(true);
+    // Simulate payment processing
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Update patient status
+    setOpdPatients(prev => prev.map(p =>
+      p.id === selectedPaymentPatient.id ? {
+        ...p,
+        status: 'Completed',
+        patientName: paymentBillingData.patientName,
+        age: paymentBillingData.age,
+        gender: paymentBillingData.gender,
+        email: paymentBillingData.email,
+        doctor: paymentBillingData.doctor,
+        tests: paymentBillingData.labTests.map(t => t.name)
+      } : p
+    ));
+
+    setPaymentProcessing(false);
+    setShowPaymentModal(false);
+
+    // Show success message
+    alert(`Payment of ₹${calculatePaymentTotal()} received successfully from ${paymentBillingData.patientName}`);
+
+    // Optional: Print receipt automatically
+    if (window.confirm('Would you like to print the receipt?')) {
+      handlePrintInvoice({
+        ...selectedPaymentPatient,
+        ...paymentBillingData,
+        status: 'Completed'
+      });
+    }
   };
 
   const handleStartConsultation = (patient) => {
@@ -575,11 +759,67 @@ const OPDManagement = () => {
       ...consultationForm,
       patientId: patient.patientId,
       doctorId: patient.assignedDoctorId,
-      consultationType: patient.status === 'Completed' ? 'Follow-up' : 'New'
+      consultationType: patient.status === 'Completed' ? 'Follow-up' : 'New',
+      vitalSigns: patient.vitals ? { ...consultationForm.vitalSigns, ...patient.vitals } : consultationForm.vitalSigns,
+      diagnosis: patient.diagnosis || '',
+      diagnosisCode: patient.diagnosisCode || '',
+      clinicalNotes: patient.clinicalNotes || '',
+      medications: patient.medicationList || [
+        {
+          name: '',
+          genericName: '',
+          dosage: '',
+          route: '',
+          duration: '',
+          beforeFood: false,
+          afterFood: false,
+          frequency: { morning: false, afternoon: false, night: false },
+          instructions: ''
+        }
+      ],
+      symptoms: patient.symptoms || '',
+      history: patient.history || '',
+      allergies: patient.allergies || '',
+      instructions: patient.advice || '',
+      followUpRequired: patient.followUpRequired || false,
+      followUpDate: patient.followUpDate || '',
+      consultationStatus: patient.status === 'Completed' ? 'Completed' : 'Pending',
+      consultationStartTime: new Date().toLocaleTimeString(),
+      testsRecommended: (patient.tests || []).map((t, i) => ({
+        id: i + 1,
+        description: t,
+        samples: 'Not specified',
+        labStatus: 'Ordered',
+        sampleCollected: false,
+        sampleCollectedAt: '',
+        labTechnician: '',
+        resultValue: '',
+        referenceRange: '',
+        remarks: '',
+        reportFile: '',
+        verifiedBy: '',
+        verifiedAt: ''
+      })).concat(patient.tests?.length ? [] : [
+        {
+          id: 1,
+          description: '',
+          samples: '',
+          labStatus: 'Ordered',
+          sampleCollected: false,
+          sampleCollectedAt: '',
+          labTechnician: '',
+          resultValue: '',
+          referenceRange: '',
+          remarks: '',
+          reportFile: '',
+          verifiedBy: '',
+          verifiedAt: ''
+        }
+      ])
     });
     setShowConsultationForm(true);
 
-    if (patient.status === 'Waiting') {
+    if (['Token Generated', 'Waiting', 'Vitals Completed'].includes(patient.status)) {
       const updatedPatients = opdPatients.map(p => {
         if (p.id === patient.id) {
           return { ...p, status: 'In Consultation' };
@@ -587,134 +827,53 @@ const OPDManagement = () => {
         return p;
       });
       setOpdPatients(updatedPatients);
-
-      const updatedDoctors = doctors.map(doctor => {
-        if (doctor.id === patient.assignedDoctorId) {
-          return {
-            ...doctor,
-            currentPatient: patient.token,
-            currentPatientName: patient.patientName
-          };
-        }
-        return doctor;
-      });
-      setDoctors(updatedDoctors);
     }
   };
 
-  const handleCompleteConsultation = () => {
-    if (!consultationForm.diagnosis || !consultationForm.prescription) {
-      alert('Please enter diagnosis and prescription');
-      return;
-    }
-
-    const updatedPatients = opdPatients.map(p => {
-      if (p.id === selectedPatient.id) {
+  const handlePatientExit = (patient) => {
+    setOpdPatients(prev => prev.map(p => {
+      if (p.id === patient.id) {
         return {
           ...p,
-          status: 'Completed',
-          waitingTime: '0 mins'
+          status: 'Exited',
+          exitDate: new Date().toLocaleDateString(),
+          exitTime: new Date().toLocaleTimeString(),
+          billingStatus: 'Paid',
+          followUpRequired: exitForm.followUpRequired,
+          followUpDate: exitForm.followUpDate,
+          exitRemarks: exitForm.remarks
         };
       }
       return p;
-    });
-
-    const doctor = doctors.find(d => d.id === selectedPatient.assignedDoctorId);
-    if (doctor) {
-      const waitingPatients = updatedPatients.filter(
-        patient => patient.assignedDoctorId === doctor.id &&
-          patient.status === 'Waiting'
-      ).sort((a, b) => a.queuePosition - b.queuePosition);
-
-      let nextPatients = [...waitingPatients];
-
-      if (waitingPatients.length > 0) {
-        const nextPatient = waitingPatients[0];
-        const patientIndex = updatedPatients.findIndex(p => p.id === nextPatient.id);
-
-        if (patientIndex !== -1) {
-          updatedPatients[patientIndex] = {
-            ...nextPatient,
-            status: 'In Consultation',
-            waitingTime: '0 mins'
-          };
-
-          nextPatients = waitingPatients.slice(1);
-        }
-      }
-
-      const finalPatients = updatedPatients.map(patient => {
-        if (patient.assignedDoctorId === doctor.id && patient.status === 'Waiting') {
-          const newPosition = nextPatients.findIndex(p => p.id === patient.id);
-          return {
-            ...patient,
-            queuePosition: newPosition,
-            waitingTime: `${(newPosition + 1) * 15} mins`
-          };
-        }
-        return patient;
-      });
-
-      setOpdPatients(finalPatients);
-
-      const updatedDoctors = doctors.map(d => {
-        if (d.id === doctor.id) {
-          return {
-            ...d,
-            currentPatient: waitingPatients.length > 0 ? waitingPatients[0].token : null,
-            currentPatientName: waitingPatients.length > 0 ? waitingPatients[0].patientName : null,
-            queue: Math.max(0, d.queue - 1)
-          };
-        }
-        return d;
-      });
-
-      setDoctors(updatedDoctors);
-    }
-
-    alert('Consultation completed successfully!');
-    setShowConsultationForm(false);
-    setSelectedPatient(null);
-    setConsultationForm({
-      patientId: '',
-      doctorId: '',
-      consultationType: 'New',
-      vitalSigns: {
-        bp: '',
-        pulse: '',
-        temperature: '',
-        spo2: '',
-        weight: '',
-        height: ''
-      },
-      symptoms: '',
-      history: '',
-      allergies: '',
-      examination: '',
-      diagnosis: '',
-      prescription: '',
-      testsRecommended: [{ id: 1, description: '', customDescription: '', samples: '', customSamples: '' }],
-      instructions: '',
-      nextVisitDate: '',
-      remarks: ''
-    });
+    }));
+    alert(`${patient.patientName} has been successfully checked out and visit record finalized.`);
   };
 
   const generateToken = () => {
     setTokenStep('form');
     setTokenForm({
+      uhid: '',
+      visitId: '',
+      tokenNumber: '',
+      queueNumber: '',
       patientId: '',
       patientName: '',
-      phoneNo: '',
-      email: '',
       age: '',
       gender: 'Male',
       bloodGroup: '',
+      phoneNo: '',
+      email: '',
       address: '',
       department: '',
       doctorId: '',
-      type: 'Regular',
-      priority: 'Normal'
+      visitType: 'New',
+      appointmentType: 'Walk-in',
+      priority: 'Normal',
+      arrivalTime: '',
+      estimatedWaitTime: '',
+      queuePosition: 0,
+      tokenStatus: 'Waiting',
+      referredBy: ''
     });
     setPatientSearchTerm('');
     setDeptSearchTerm('');
@@ -743,24 +902,29 @@ const OPDManagement = () => {
 
     const newToken = {
       id: `OPD-${Date.now()}`,
-      patientId: tokenForm.patientId || `UHID-${Math.floor(100000 + Math.random() * 900000)}`,
+      uhid: tokenForm.uhid || `UHID-${Math.floor(100000 + Math.random() * 900000)}`,
+      visitId: `VST-${Math.floor(10000 + Math.random() * 90000)}`,
+      tokenNumber: `T-${tokenNumber}`,
+      patientId: tokenForm.patientId || tokenForm.uhid || `PAT-${Math.floor(1000 + Math.random() * 9000)}`,
       patientName: tokenForm.patientName,
       phoneNo: tokenForm.phoneNo || 'Not specified',
       email: tokenForm.email || 'Not specified',
       age: tokenForm.age || 'Not specified',
       gender: tokenForm.gender,
       token: `T-${tokenNumber}`,
-      waitingTime: `${(queuePosition + 1) * 15} mins`,
-      status: 'Waiting',
+      waitingTime: calculateWaitingTime(queuePosition + 1),
+      status: 'Token Generated',
       assignedDoctorId: tokenForm.doctorId,
       doctor: selectedDoctor.name,
       department: tokenForm.department,
-      type: tokenForm.type,
+      visitType: tokenForm.visitType,
+      appointmentType: tokenForm.appointmentType,
       priority: tokenForm.priority,
-      queuePosition: queuePosition,
+      queuePosition: queuePosition + 1,
       arrivalTime: arrivalTime,
       bloodGroup: tokenForm.bloodGroup || 'Not specified',
-      address: tokenForm.address || 'Not specified'
+      address: tokenForm.address || 'Not specified',
+      referredBy: tokenForm.referredBy
     };
 
     setOpdPatients([newToken, ...opdPatients]);
@@ -777,9 +941,376 @@ const OPDManagement = () => {
     setGeneratedToken(newToken);
     setTokenStep('slip');
   };
+
+  const handlePrintPrescription = () => {
+    if (!selectedPatient) return;
+
+    const printWindow = window.open('', '', 'width=900,height=1000');
+
+    const prescriptionHTML = `
+    <html>
+      <head>
+        <title>Prescription - ${selectedPatient.patientName}</title>
+        <style>
+          @page {
+            size: A4;
+            margin: 20mm;
+          }
+          body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            color: #000;
+          }
+          .container {
+            width: 100%;
+            max-width: 800px;
+            margin: auto;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 2px solid #000;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+          }
+          .header h2 {
+            margin: 0;
+            font-size: 24px;
+          }
+          .header p {
+            margin: 5px 0;
+            font-size: 14px;
+          }
+          .section {
+            margin-bottom: 20px;
+          }
+          .row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 14px;
+          }
+          .label {
+            font-weight: bold;
+          }
+          .box {
+            border: 1px solid #000;
+            padding: 10px;
+            min-height: 60px;
+          }
+          .footer {
+            margin-top: 40px;
+            display: flex;
+            justify-content: space-between;
+          }
+          .signature {
+            text-align: right;
+          }
+          .signature-line {
+            margin-top: 40px;
+            border-top: 1px solid #000;
+            width: 200px;
+          }
+          @media print {
+            body {
+              margin: 0;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <!-- Header -->
+          <div class="header">
+            <h2>HOSPITAL NAME</h2>
+            <p>OPD Prescription</p>
+            <p>Date: ${new Date().toLocaleDateString()}</p>
+          </div>
+          <!-- Patient Info -->
+          <div class="section">
+            <div class="row">
+              <span><span class="label">Patient:</span> ${selectedPatient.patientName}</span>
+              <span><span class="label">Age:</span> ${selectedPatient.age}</span>
+            </div>
+            <div class="row">
+              <span><span class="label">Gender:</span> ${selectedPatient.gender}</span>
+              <span><span class="label">Token:</span> ${selectedPatient.token}</span>
+            </div>
+            <div class="row">
+              <span><span class="label">Doctor:</span> ${selectedPatient.doctor}</span>
+              <span><span class="label">Department:</span> ${selectedPatient.department}</span>
+            </div>
+          </div>
+          <!-- Vitals -->
+          <div class="section">
+            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; background: #f9f9f9; padding: 10px; border: 1px solid #eee;">
+              <div><span class="label" style="font-size: 10px;">BP</span><br/>${consultationForm.vitalSigns.bp || '-'}</div>
+              <div><span class="label" style="font-size: 10px;">PULSE</span><br/>${consultationForm.vitalSigns.pulse || '-'}</div>
+              <div><span class="label" style="font-size: 10px;">TEMP</span><br/>${consultationForm.vitalSigns.temperature || '-'}°F</div>
+              <div><span class="label" style="font-size: 10px;">SPO2</span><br/>${consultationForm.vitalSigns.spo2 || '-'}%</div>
+              <div><span class="label" style="font-size: 10px;">WT/HT</span><br/>${consultationForm.vitalSigns.weight || '-'}kg / ${consultationForm.vitalSigns.height || '-'}cm</div>
+            </div>
+          </div>
+          <!-- History & Allergies -->
+          <div class="section" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div>
+              <p class="label">Clinical History</p>
+              <div class="box" style="min-height: 40px; font-size: 13px;">${consultationForm.history || '-'}</div>
+            </div>
+            <div>
+              <p class="label" style="color: #d32f2f;">Allergies</p>
+              <div class="box" style="min-height: 40px; font-size: 13px; border-color: #ffcdd2; background: #fff8f8;">${consultationForm.allergies || 'NIL'}</div>
+            </div>
+          </div>
+          <!-- Symptoms & Examination -->
+          <div class="section" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div>
+              <p class="label">Symptoms / Complaints</p>
+              <div class="box" style="min-height: 50px; font-size: 13px;">${consultationForm.symptoms || '-'}</div>
+            </div>
+            <div>
+              <p class="label">Physical Examination</p>
+              <div class="box" style="min-height: 50px; font-size: 13px;">${consultationForm.examination || '-'}</div>
+            </div>
+          </div>
+          <!-- Diagnosis -->
+          <div class="section">
+            <p class="label">Diagnosis / Impression</p>
+            <div class="box" style="font-weight: bold; color: #1a237e;">${consultationForm.diagnosis || '-'}</div>
+          </div>
+          <!-- Prescription -->
+          <div class="section">
+            <p class="label">Prescription (Rx)</p>
+            <div class="box" style="min-height: 120px; padding: 0;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <thead style="background: #f5f5f5;">
+                  <tr>
+                    <th style="padding: 8px; text-align: left; border-bottom: 1px solid #000; font-size: 12px;">Medicine</th>
+                    <th style="padding: 8px; text-align: left; border-bottom: 1px solid #000; font-size: 12px;">Dosage</th>
+                    <th style="padding: 8px; text-align: left; border-bottom: 1px solid #000; font-size: 12px;">Duration</th>
+                    <th style="padding: 8px; text-align: left; border-bottom: 1px solid #000; font-size: 12px;">Shifts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${consultationForm.medications?.length > 0 && consultationForm.medications[0].name
+        ? consultationForm.medications.map(m => `
+                    <tr>
+                      <td style="padding: 8px; border-bottom: 1px solid #eee; font-size: 12px;">${m.name || '-'}</td>
+                      <td style="padding: 8px; border-bottom: 1px solid #eee; font-size: 12px;">${m.dosage || '-'}</td>
+                      <td style="padding: 8px; border-bottom: 1px solid #eee; font-size: 12px;">${m.duration || '-'}</td>
+                      <td style="padding: 8px; border-bottom: 1px solid #eee; font-size: 12px;">
+                        ${m.frequency.morning ? 'M ' : ''}${m.frequency.afternoon ? 'A ' : ''}${m.frequency.night ? 'N ' : ''}
+                      </td>
+                    </tr>
+                  `).join('')
+        : `<tr><td colspan="4" style="padding: 20px; text-align: center; color: #999; font-style: italic;">${consultationForm.prescription || 'No medications prescribed'}</td></tr>`}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <!-- Tests -->
+          <div class="section">
+            <p class="label">Tests Recommended</p>
+            <div class="box">
+              <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                <thead>
+                  <tr style="border-bottom: 1px solid #000; text-align: left;">
+                    <th style="padding: 4px;">id</th>
+                    <th style="padding: 4px;">Test Description</th>
+                    <th style="padding: 4px;">Samples</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${consultationForm.testsRecommended?.length > 0
+        ? consultationForm.testsRecommended.map(t => `
+                    <tr style="border-bottom: 1px dotted #ccc;">
+                      <td style="padding: 4px;">${t.id}</td>
+                      <td style="padding: 4px;">${t.description === 'Other' ? t.customDescription : (t.description || '-')}</td>
+                      <td style="padding: 4px;">${t.samples === 'Other' ? t.customSamples : (t.samples || '-')}</td>
+                    </tr>
+                  `).join('')
+        : '<tr><td colspan="3" style="padding: 4px; text-align: center;">None</td></tr>'
+      }
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <!-- Instructions -->
+          <div class="section">
+            <p class="label">Patient Instructions / Advice</p>
+            <div class="box" style="min-height: 50px; font-size: 13px; background: #fffde7; border-color: #fff59d;">${consultationForm.instructions || '-'}</div>
+          </div>
+          <!-- Footer -->
+          <div class="footer">
+            <div>
+              <p><strong>Next Visit:</strong> ${consultationForm.nextVisitDate || '-'}</p>
+            </div>
+            <div class="signature">
+              <div class="signature-line"></div>
+              <p>Doctor Signature</p>
+            </div>
+          </div>
+        </div>
+        <script>
+          setTimeout(() => {
+            window.print();
+            window.close();
+          }, 500);
+        </script>
+      </body>
+    </html>
+    `;
+    printWindow.document.write(prescriptionHTML);
+    printWindow.document.close();
+  };
+
+  const handleConfirmDeactivation = () => {
+    if (!doctorToDeactivate) return;
+    const doctorId = doctorToDeactivate.id;
+    const activeDoctors = doctors.filter(d => d.isActive && d.id !== doctorId);
+    if (activeDoctors.length === 0) {
+      alert('No other active doctors available. Cannot deactivate.');
+      return;
+    }
+
+    let updatedPatients = [...opdPatients];
+    let currentDoctors = [...doctors];
+    patientsToReassign.forEach(patient => {
+      const bestDoctor = activeDoctors.reduce((prev, curr) =>
+        prev.queue < curr.queue ? prev : curr
+      );
+      const newQueuePosition = updatedPatients.filter(
+        p => p.assignedDoctorId === bestDoctor.id && p.status === 'Waiting'
+      ).length;
+      updatedPatients = updatedPatients.map(p => {
+        if (p.id === patient.id) {
+          return {
+            ...p,
+            assignedDoctorId: bestDoctor.id,
+            doctor: bestDoctor.name,
+            department: bestDoctor.department,
+            queuePosition: newQueuePosition + 1,
+            waitingTime: `${(newQueuePosition + 1) * 15} mins`
+          };
+        }
+        return p;
+      });
+
+      // Update the queue count for the best doctor in our local copy
+      const bestDocIndex = activeDoctors.findIndex(d => d.id === bestDoctor.id);
+      if (bestDocIndex !== -1) {
+        activeDoctors[bestDocIndex].queue += 1;
+      }
+    });
+    // Update doctors state
+    const finalDoctors = currentDoctors.map(d => {
+      const matchingActiveDoc = activeDoctors.find(ad => ad.id === d.id);
+      if (matchingActiveDoc) {
+        return { ...d, queue: matchingActiveDoc.queue };
+      }
+      if (d.id === doctorId) {
+        return { ...d, isActive: false, queue: 0, currentPatient: null, currentPatientName: null };
+      }
+      return d;
+    });
+
+    setOpdPatients(updatedPatients);
+    setDoctors(finalDoctors);
+    setShowDeactivateModal(false);
+    setDoctorToDeactivate(null);
+    setPatientsToReassign([]);
+  };
+
+  const handleTransferPatient = (patient) => {
+    const availableDoctors = doctors.filter(d =>
+      d.isActive && d.id !== patient.assignedDoctorId
+    );
+    if (availableDoctors.length === 0) {
+      alert('No other active doctors available for transfer');
+      return;
+    }
+    setTransferPatient(patient);
+    setSelectedTransferDoctor(null);
+    setShowTransferModal(true);
+  };
+
+  const handleConfirmTransfer = () => {
+    if (!selectedTransferDoctor || !transferPatient) return;
+    const newDoctor = selectedTransferDoctor;
+    const patient = transferPatient;
+    const newQueueCount = opdPatients.filter(
+      p => p.assignedDoctorId === newDoctor.id && p.status === 'Waiting'
+    ).length;
+    const oldDoctor = doctors.find(d => d.id === patient.assignedDoctorId);
+    const updatedDoctors = doctors.map(doctor => {
+      if (doctor.id === oldDoctor.id) {
+        return { ...doctor, queue: Math.max(0, doctor.queue - 1) };
+      }
+      if (doctor.id === newDoctor.id) {
+        return { ...doctor, queue: doctor.queue + 1 };
+      }
+      return doctor;
+    });
+
+    const updatedPatients = opdPatients.map(p => {
+      if (p.id === patient.id) {
+        return {
+          ...p,
+          assignedDoctorId: newDoctor.id,
+          doctor: newDoctor.name,
+          department: newDoctor.department,
+          queuePosition: newQueueCount + 1,
+          waitingTime: `${(newQueueCount + 1) * 15} mins`
+        };
+      }
+      if (p.assignedDoctorId === oldDoctor.id && p.status === 'Waiting' && p.queuePosition > patient.queuePosition) {
+        return { ...p, queuePosition: p.queuePosition - 1 };
+      }
+      return p;
+    });
+    setDoctors(updatedDoctors);
+    setOpdPatients(updatedPatients);
+    setShowTransferModal(false);
+    setTransferPatient(null);
+    setSelectedTransferDoctor(null);
+  };
+
+  const handleCancelPatient = (patient) => {
+    if (window.confirm(`Cancel token ${patient.token} for ${patient.patientName}?`)) {
+      if (patient.assignedDoctorId) {
+        const updatedDoctors = doctors.map(doctor => {
+          if (doctor.id === patient.assignedDoctorId) {
+            const newQueue = patient.status === 'In Consultation' ? doctor.queue : Math.max(0, doctor.queue - 1);
+            const currentPatient = patient.status === 'In Consultation' ? null : doctor.currentPatient;
+            const currentPatientName = patient.status === 'In Consultation' ? null : doctor.currentPatientName;
+            return {
+              ...doctor,
+              queue: newQueue,
+              currentPatient,
+              currentPatientName
+            };
+          }
+          return doctor;
+        });
+
+        const updatedPatients = opdPatients
+          .filter(p => p.id !== patient.id)
+          .map(p => {
+            if (p.assignedDoctorId === patient.assignedDoctorId &&
+              p.status === 'Waiting' &&
+              p.queuePosition > patient.queuePosition) {
+              return { ...p, queuePosition: p.queuePosition - 1 };
+            }
+            return p;
+          });
+        setDoctors(updatedDoctors);
+        setOpdPatients(updatedPatients);
+      } else {
+        setOpdPatients(opdPatients.filter(p => p.id !== patient.id));
+      }
+    }
+  };
   const handlePrintSlip = () => {
     const printWindow = window.open('', '', 'width=800,height=800');
-
     const invoiceHTML = `
       <html>
         <head>
@@ -815,7 +1346,7 @@ const OPDManagement = () => {
             .header h2 {
               margin: 0 0 10px 0;
               font-size: 24px;
-              text-transform: uppercase;
+              text-transform: ;
               letter-spacing: 2px;
             }
             .token-container {
@@ -854,7 +1385,7 @@ const OPDManagement = () => {
               <p>${new Date().toLocaleString()}</p>
             </div>
             <div class="token-container">
-              <div style="font-size: 12px; text-transform: uppercase;">Token Number</div>
+              <div style="font-size: 12px; text-transform: ;">Token Number</div>
               <div class="token-number">${generatedToken?.token || '-'}</div>
             </div>
             <div class="info-row"><span>Patient:</span> <b>${generatedToken?.patientName || '-'}</b></div>
@@ -871,478 +1402,192 @@ const OPDManagement = () => {
         </body>
       </html>
     `;
-
     printWindow.document.write(invoiceHTML);
     printWindow.document.close();
   };
 
-  const handlePrintPrescription = () => {
-    if (!selectedPatient) return;
-
-    const printWindow = window.open('', '', 'width=900,height=1000');
-
-    const prescriptionHTML = `
-    <html>
-      <head>
-        <title>Prescription - ${selectedPatient.patientName}</title>
-        <style>
-          @page {
-            size: A4;
-            margin: 20mm;
-          }
-
-          body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-            color: #000;
-          }
-
-          .container {
-            width: 100%;
-            max-width: 800px;
-            margin: auto;
-          }
-
-          .header {
-            text-align: center;
-            border-bottom: 2px solid #000;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-          }
-
-          .header h2 {
-            margin: 0;
-            font-size: 24px;
-          }
-
-          .header p {
-            margin: 5px 0;
-            font-size: 14px;
-          }
-
-          .section {
-            margin-bottom: 20px;
-          }
-
-          .row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            font-size: 14px;
-          }
-
-          .label {
-            font-weight: bold;
-          }
-
-          .box {
-            border: 1px solid #000;
-            padding: 10px;
-            min-height: 60px;
-          }
-
-          .footer {
-            margin-top: 40px;
-            display: flex;
-            justify-content: space-between;
-          }
-
-          .signature {
-            text-align: right;
-          }
-
-          .signature-line {
-            margin-top: 40px;
-            border-top: 1px solid #000;
-            width: 200px;
-          }
-
-          @media print {
-            body {
-              margin: 0;
-            }
-          }
-        </style>
-      </head>
-
-      <body>
-        <div class="container">
-
-          <!-- Header -->
-          <div class="header">
-            <h2>HOSPITAL NAME</h2>
-            <p>OPD Prescription</p>
-            <p>Date: ${new Date().toLocaleDateString()}</p>
-          </div>
-
-          <!-- Patient Info -->
-          <div class="section">
-            <div class="row">
-              <span><span class="label">Patient:</span> ${selectedPatient.patientName}</span>
-              <span><span class="label">Age:</span> ${selectedPatient.age}</span>
+  const handlePrintInvoice = (patient) => {
+    const printWindow = window.open('', '', 'width=900,height=900');
+    const total = calculateTotalAmount(patient);
+    const consult = doctors.find(d => d.id === patient.assignedDoctorId)?.consultationFee || 300;
+    const testsTotal = calculateTestsFee(patient);
+    const surgeryTotal = calculateSurgeryFee(patient);
+    const invoiceHTML = `
+      <html>
+        <head>
+          <title>Invoice - ${patient.patientName}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+            body { font-family: 'Inter', sans-serif; padding: 40px; color: #1a1a1a; line-height: 1.5; }
+            .invoice-card { max-width: 800px; margin: auto; border: 1px solid #eee; padding: 40px; border-radius: 12px; }
+            .header { display: flex; justify-content: space-between; align-items: start; border-bottom: 2px solid #f3f4f6; padding-bottom: 30px; margin-bottom: 30px; }
+            .hospital-info h1 { margin: 0; font-size: 24px; font-weight: 900; color: #2563eb; }
+            .hospital-info p { margin: 4px 0; font-size: 12px; color: #666; font-weight: 600; }
+            .invoice-meta { text-align: right; }
+            .invoice-meta h2 { margin: 0; font-size: 32px; font-weight: 900; letter-spacing: -1px; }
+            .invoice-meta p { margin: 4px 0; font-size: 12px; color: #999; font-weight: bold; }
+            .section-title { font-size: 10px; font-weight: 900; text-transform: ; letter-spacing: 2px; color: #999; margin-bottom: 12px; border-bottom: 1px solid #f3f4f6; padding-bottom: 8px; }
+            .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px; margin-bottom: 40px; }
+            .info-block p { margin: 4px 0; font-size: 14px; font-weight: 700; }
+            .info-block span { font-size: 10px; font-weight: bold; color: #aaa; text-transform: ; }
+            table { width: 100%; border-collapse: collapse; margin: 30px 0; }
+            th { text-align: left; font-size: 10px; font-weight: 900; text-transform: ; color: #999; padding: 12px; border-bottom: 2px solid #f3f4f6; }
+            td { padding: 16px 12px; font-size: 14px; font-weight: 700; border-bottom: 1px solid #f3f4f6; }
+            .total-row { background: #f8fafc; }
+            .total-row td { font-size: 20px; font-weight: 900; color: #2563eb; }
+            .status-badge { display: inline-block; padding: 6px 12px; border-radius: 6px; font-size: 10px; font-weight: 900; text-transform: ; letter-spacing: 1px; }
+            .status-paid { background: #dcfce7; color: #166534; }
+            .status-pending { background: #fef9c3; color: #854d0e; }
+            .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #aaa; font-weight: 600; }
+            @media print { .invoice-card { border: none; padding: 0; } body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <div class="invoice-card">
+            <div class="header">
+              <div class="hospital-info">
+                <h1>LIFELINE MEDICAL CENTER</h1>
+                <p>123 Health Avenue, Medical District</p>
+                <p>New Delhi, India - 110001</p>
+                <p>Tel: +91 11 2345 6789 | contact@lifeline.com</p>
+              </div>
+              <div class="invoice-meta">
+                <h2>INVOICE</h2>
+                <p>#INV-${patient.id.slice(-6).toUpperCase()}</p>
+                <p>Date: ${new Date().toLocaleDateString('en-GB')}</p>
+                <div class="status-badge ${patient.status === 'Completed' ? 'status-paid' : 'status-pending'}" style="margin-top: 10px;">
+                  ${patient.status === 'Completed' ? 'Payment Received' : 'Payment Pending'}
+                </div>
+              </div>
             </div>
-            <div class="row">
-              <span><span class="label">Gender:</span> ${selectedPatient.gender}</span>
-              <span><span class="label">Token:</span> ${selectedPatient.token}</span>
+
+            <div class="section-title">Patient & Visit Information</div>
+            <div class="grid">
+              <div class="info-block">
+                <span>Patient Name</span>
+                <p>${patient.patientName}</p>
+                <span style="margin-top: 10px; display: block;">UHID</span>
+                <p>${patient.patientId}</p>
+              </div>
+              <div class="info-block">
+                <span>Consulting Doctor</span>
+                <p>${patient.doctor}</p>
+                <span style="margin-top: 10px; display: block;">Department</span>
+                <p>${patient.department}</p>
+              </div>
             </div>
-            <div class="row">
-              <span><span class="label">Doctor:</span> ${selectedPatient.doctor}</span>
-              <span><span class="label">Department:</span> ${selectedPatient.department}</span>
+            <div class="section-title">Billing Breakdown</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th>Service Category</th>
+                  <th style="text-align: right;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Doctor's Consultation Fee</td>
+                  <td>OPD Services</td>
+                  <td style="text-align: right;">₹${consult}.00</td>
+                </tr>
+                ${testsTotal > 0 ? `
+                <tr>
+                  <td>Laboratory Investigations (${patient.tests?.join(', ') || 'Standard Profile'})</td>
+                  <td>Diagnostics</td>
+                  <td style="text-align: right;">₹${testsTotal}.00</td>
+                </tr>
+                ` : ''}
+                ${surgeryTotal > 0 ? `
+                <tr>
+                  <td>Clinical Procedures / Minor Surgery</td>
+                  <td>Medical Procedures</td>
+                  <td style="text-align: right;">₹${surgeryTotal}.00</td>
+                </tr>
+                ` : ''}
+                <tr class="total-row">
+                  <td colspan="2" style="text-align: right; font-size: 12px; color: #666; font-weight: bold;">GRAND TOTAL</td>
+                  <td style="text-align: right;">₹${total}.00</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="footer">
+              <p>This is a computer-generated document. No signature is required.</p>
+              <p>Wishing you a speedy recovery. Please keep this for your records.</p>
             </div>
           </div>
-
-          <!-- Vitals -->
-          <div class="section">
-            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; background: #f9f9f9; padding: 10px; border: 1px solid #eee;">
-              <div><span class="label" style="font-size: 10px;">BP</span><br/>${consultationForm.vitalSigns.bp || '-'}</div>
-              <div><span class="label" style="font-size: 10px;">PULSE</span><br/>${consultationForm.vitalSigns.pulse || '-'}</div>
-              <div><span class="label" style="font-size: 10px;">TEMP</span><br/>${consultationForm.vitalSigns.temperature || '-'}°F</div>
-              <div><span class="label" style="font-size: 10px;">SPO2</span><br/>${consultationForm.vitalSigns.spo2 || '-'}%</div>
-              <div><span class="label" style="font-size: 10px;">WT/HT</span><br/>${consultationForm.vitalSigns.weight || '-'}kg / ${consultationForm.vitalSigns.height || '-'}cm</div>
-            </div>
-          </div>
-
-          <!-- History & Allergies -->
-          <div class="section" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-            <div>
-              <p class="label">Clinical History</p>
-              <div class="box" style="min-height: 40px; font-size: 13px;">${consultationForm.history || '-'}</div>
-            </div>
-            <div>
-              <p class="label" style="color: #d32f2f;">Allergies</p>
-              <div class="box" style="min-height: 40px; font-size: 13px; border-color: #ffcdd2; background: #fff8f8;">${consultationForm.allergies || 'NIL'}</div>
-            </div>
-          </div>
-
-          <!-- Symptoms & Examination -->
-          <div class="section" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-            <div>
-              <p class="label">Symptoms / Complaints</p>
-              <div class="box" style="min-height: 50px; font-size: 13px;">${consultationForm.symptoms || '-'}</div>
-            </div>
-            <div>
-              <p class="label">Physical Examination</p>
-              <div class="box" style="min-height: 50px; font-size: 13px;">${consultationForm.examination || '-'}</div>
-            </div>
-          </div>
-
-          <!-- Diagnosis -->
-          <div class="section">
-            <p class="label">Diagnosis / Impression</p>
-            <div class="box" style="font-weight: bold; color: #1a237e;">${consultationForm.diagnosis || '-'}</div>
-          </div>
-
-          <!-- Prescription -->
-          <div class="section">
-            <p class="label">Prescription (Rx)</p>
-            <div class="box" style="min-height: 120px; font-family: 'Courier New', monospace; white-space: pre-line;">${consultationForm.prescription || '-'}</div>
-          </div>
-
-          <!-- Tests -->
-          <div class="section">
-            <p class="label">Tests Recommended</p>
-            <div class="box">
-              <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                <thead>
-                  <tr style="border-bottom: 1px solid #000; text-align: left;">
-                    <th style="padding: 4px;">id</th>
-                    <th style="padding: 4px;">Test Description</th>
-                    <th style="padding: 4px;">Samples</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${consultationForm.testsRecommended?.length > 0
-        ? consultationForm.testsRecommended.map(t => `
-                    <tr style="border-bottom: 1px dotted #ccc;">
-                      <td style="padding: 4px;">${t.id}</td>
-                      <td style="padding: 4px;">${t.description === 'Other' ? t.customDescription : (t.description || '-')}</td>
-                      <td style="padding: 4px;">${t.samples === 'Other' ? t.customSamples : (t.samples || '-')}</td>
-                    </tr>
-                  `).join('')
-        : '<tr><td colspan="3" style="padding: 4px; text-align: center;">None</td></tr>'
-      }
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Instructions -->
-          <div class="section">
-            <p class="label">Patient Instructions / Advice</p>
-            <div class="box" style="min-height: 50px; font-size: 13px; background: #fffde7; border-color: #fff59d;">${consultationForm.instructions || '-'}</div>
-          </div>
-
-          <!-- Footer -->
-          <div class="footer">
-            <div>
-              <p><strong>Next Visit:</strong> ${consultationForm.nextVisitDate || '-'}</p>
-            </div>
-            <div class="signature">
-              <div class="signature-line"></div>
-              <p>Doctor Signature</p>
-            </div>
-          </div>
-
-        </div>
-
-        <script>
-          setTimeout(() => {
-            window.print();
-            window.close();
-          }, 500);
-        </script>
-
-      </body>
-    </html>
-    `;
-
-    printWindow.document.write(prescriptionHTML);
+          <script>
+            setTimeout(() => { window.print(); window.close(); }, 500);
+          </script>
+        </body>
+      </html>`;
+    printWindow.document.write(invoiceHTML);
     printWindow.document.close();
   };
 
-  const handleDoctorStatusToggle = (doctorId) => {
-    const doctor = doctors.find(d => d.id === doctorId);
-    const isActivating = !doctor.isActive;
-
-    if (isActivating) {
-      setDoctors(doctors.map(d =>
-        d.id === doctorId ? { ...d, isActive: !d.isActive } : d
-      ));
-    } else {
-      const doctorPatients = opdPatients.filter(p =>
-        p.assignedDoctorId === doctorId && (p.status === 'Waiting' || p.status === 'In Consultation')
-      );
-
-      if (doctorPatients.length > 0) {
-        setDoctorToDeactivate(doctor);
-        setPatientsToReassign(doctorPatients);
-        setShowDeactivateModal(true);
-      } else {
-        setDoctors(doctors.map(d =>
-          d.id === doctorId ? { ...d, isActive: !d.isActive, queue: 0, currentPatient: null, currentPatientName: null } : d
-        ));
-      }
+  const handleViewLabResult = (patient) => {
+    let patientTests = patient.tests || [];
+    if (patientTests.length < 5) {
+      const dummyTests = ['Complete Blood Count (CBC)', 'Lipid Profile', 'Thyroid Function Test', 'Liver Function Test', 'Urinalysis'];
+      patientTests = [...new Set([...patientTests, ...dummyTests])].slice(0, 5);
     }
+    const diagnosticResult = patient.diagnosis
+      ? `Diagnostic findings correlate with ${patient.diagnosis}. Clinical parameters show expected variations. No critical deviations requiring immediate intervention.`
+      : patient.status === 'Completed'
+        ? 'All diagnostic parameters within normal physiological range. No clinical anomalies detected during this cycle.'
+        : 'Investigation currently in progress. Preliminary findings being validated by senior clinical staff.';
+
+    setSelectedLabRecord({
+      ...patient,
+      date: patient.date || formattedCurrentDate,
+      prescribedTests: patientTests.join(', '),
+      performedTests: (patient.performedTests || patientTests).join(', '),
+      result: diagnosticResult,
+      uploadedBy: patient.uploadedBy || 'Senior Lab Tech (Ravi Kumar)',
+      reportId: `DGN-${patient.id.split('-')[1] || patient.id.slice(-4)}-${Math.floor(1000 + Math.random() * 9000)}`
+    });
+    setShowLabResultModal(true);
   };
 
-  const handleConfirmDeactivation = () => {
-    if (!doctorToDeactivate) return;
-
-    const doctorId = doctorToDeactivate.id;
-    const activeDoctors = doctors.filter(d => d.isActive && d.id !== doctorId);
-
-    if (activeDoctors.length === 0) {
-      alert('No other active doctors available. Cannot deactivate.');
-      return;
-    }
-
-    let updatedPatients = [...opdPatients];
-    let currentDoctors = [...doctors];
-
-    patientsToReassign.forEach(patient => {
-      const bestDoctor = activeDoctors.reduce((prev, curr) =>
-        prev.queue < curr.queue ? prev : curr
-      );
-
-      const newQueuePosition = updatedPatients.filter(
-        p => p.assignedDoctorId === bestDoctor.id && p.status === 'Waiting'
-      ).length;
-
-      updatedPatients = updatedPatients.map(p => {
-        if (p.id === patient.id) {
-          return {
-            ...p,
-            assignedDoctorId: bestDoctor.id,
-            doctor: bestDoctor.name,
-            department: bestDoctor.department,
-            queuePosition: newQueuePosition,
-            waitingTime: `${(newQueuePosition + 1) * 15} mins`
-          };
-        }
-        return p;
-      });
-
-      // Update the queue count for the best doctor in our local copy
-      const bestDocIndex = activeDoctors.findIndex(d => d.id === bestDoctor.id);
-      if (bestDocIndex !== -1) {
-        activeDoctors[bestDocIndex].queue += 1;
-      }
-    });
-
-    // Update doctors state
-    const finalDoctors = currentDoctors.map(d => {
-      const matchingActiveDoc = activeDoctors.find(ad => ad.id === d.id);
-      if (matchingActiveDoc) {
-        return { ...d, queue: matchingActiveDoc.queue };
-      }
-      if (d.id === doctorId) {
-        return { ...d, isActive: false, queue: 0, currentPatient: null, currentPatientName: null };
-      }
-      return d;
-    });
-
-    setOpdPatients(updatedPatients);
-    setDoctors(finalDoctors);
-    setShowDeactivateModal(false);
-    setDoctorToDeactivate(null);
-    setPatientsToReassign([]);
-  };
-
-  const handleAddDoctor = () => {
-    if (!doctorForm.name || !doctorForm.department) {
-      alert('Please enter doctor name and department');
-      return;
-    }
-
-    const newDoctor = {
-      id: `D-${Date.now().toString().slice(-6)}`,
-      name: doctorForm.name,
-      department: doctorForm.department,
-      opdRoom: doctorForm.opdRoom || `Room ${Math.floor(Math.random() * 50) + 100}`,
-      specialization: doctorForm.specialization || doctorForm.department,
-      qualification: doctorForm.qualification || 'Not specified',
-      email: doctorForm.email || 'Not specified',
-      contact: doctorForm.contact || 'Not specified',
-      isActive: doctorForm.isActive,
-      currentPatient: null,
-      currentPatientName: null,
-      queue: 0,
-      maxPatientsPerDay: 30,
-      consultationFee: 400,
-      workingHours: '9:00 AM - 5:00 PM',
-      rating: 4.5,
-      experience: '5 years'
-    };
-
-    setDoctors([...doctors, newDoctor]);
-    setShowDoctorModal(false);
-    setDoctorForm({
-      name: '',
-      department: '',
-      opdRoom: '',
-      specialization: '',
-      qualification: '',
-      email: '',
-      contact: '',
-      isActive: true
-    });
-    setDocNameSearchTerm('');
-
-    alert(`Dr. ${doctorForm.name} added successfully!`);
-  };
-
-
-  const handleTransferPatient = (patient) => {
-    const availableDoctors = doctors.filter(d =>
-      d.isActive && d.id !== patient.assignedDoctorId
-    );
-
-    if (availableDoctors.length === 0) {
-      alert('No other active doctors available for transfer');
-      return;
-    }
-
-    setTransferPatient(patient);
-    setSelectedTransferDoctor(null);
-    setShowTransferModal(true);
-  };
-
-  const handleConfirmTransfer = () => {
-    if (!selectedTransferDoctor || !transferPatient) return;
-
-    const newDoctor = selectedTransferDoctor;
-    const patient = transferPatient;
-
-    const newQueueCount = opdPatients.filter(
-      p => p.assignedDoctorId === newDoctor.id && p.status === 'Waiting'
-    ).length;
-
-    const oldDoctor = doctors.find(d => d.id === patient.assignedDoctorId);
-    const updatedDoctors = doctors.map(doctor => {
-      if (doctor.id === oldDoctor.id) {
-        return { ...doctor, queue: Math.max(0, doctor.queue - 1) };
-      }
-      if (doctor.id === newDoctor.id) {
-        return { ...doctor, queue: doctor.queue + 1 };
-      }
-      return doctor;
-    });
-
-    const updatedPatients = opdPatients.map(p => {
-      if (p.id === patient.id) {
-        return {
-          ...p,
-          assignedDoctorId: newDoctor.id,
-          doctor: newDoctor.name,
-          department: newDoctor.department,
-          queuePosition: newQueueCount,
-          waitingTime: `${(newQueueCount + 1) * 15} mins`
-        };
-      }
-      if (p.assignedDoctorId === oldDoctor.id && p.status === 'Waiting' && p.queuePosition > patient.queuePosition) {
-        return { ...p, queuePosition: p.queuePosition - 1 };
-      }
-      return p;
-    });
-
-    setDoctors(updatedDoctors);
-    setOpdPatients(updatedPatients);
-    setShowTransferModal(false);
-    setTransferPatient(null);
-    setSelectedTransferDoctor(null);
-  };
-
-  const handleCancelPatient = (patient) => {
-    if (window.confirm(`Cancel token ${patient.token} for ${patient.patientName}?`)) {
-      if (patient.assignedDoctorId) {
-        const updatedDoctors = doctors.map(doctor => {
-          if (doctor.id === patient.assignedDoctorId) {
-            const newQueue = patient.status === 'In Consultation' ? doctor.queue : Math.max(0, doctor.queue - 1);
-            const currentPatient = patient.status === 'In Consultation' ? null : doctor.currentPatient;
-            const currentPatientName = patient.status === 'In Consultation' ? null : doctor.currentPatientName;
-
-            return {
-              ...doctor,
-              queue: newQueue,
-              currentPatient,
-              currentPatientName
-            };
-          }
-          return doctor;
-        });
-
-        const updatedPatients = opdPatients
-          .filter(p => p.id !== patient.id)
-          .map(p => {
-            if (p.assignedDoctorId === patient.assignedDoctorId &&
-              p.status === 'Waiting' &&
-              p.queuePosition > patient.queuePosition) {
-              return { ...p, queuePosition: p.queuePosition - 1 };
-            }
-            return p;
-          });
-
-        setDoctors(updatedDoctors);
-        setOpdPatients(updatedPatients);
-      } else {
-        setOpdPatients(opdPatients.filter(p => p.id !== patient.id));
-      }
-    }
+  const handleAssignDoctor = (patient) => {
+    alert(`Assigning doctor for ${patient.patientName}`);
+    // Future logic: Open assignment modal
   };
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'Completed': return 'bg-green-50 text-green-700 border border-green-200';
-      case 'In Consultation': return 'bg-blue-50 text-blue-700 border border-blue-200';
+      case 'Token Generated': return 'bg-purple-50 text-purple-700 border border-purple-200';
       case 'Waiting': return 'bg-yellow-50 text-yellow-700 border border-yellow-200';
+      case 'Vitals Completed': return 'bg-cyan-50 text-cyan-700 border border-cyan-200';
+      case 'In Consultation': return 'bg-blue-50 text-blue-700 border border-blue-200';
+      case 'Lab Ordered': return 'bg-orange-50 text-orange-700 border border-orange-200';
+      case 'Billing Pending': return 'bg-pink-50 text-pink-700 border border-pink-200';
+      case 'Pharmacy Pending': return 'bg-indigo-50 text-indigo-700 border border-indigo-200';
+      case 'Completed': return 'bg-green-50 text-green-700 border border-green-200';
+      case 'Exited': return 'bg-gray-100 text-gray-600 border border-gray-300';
       default: return 'bg-gray-50 text-gray-700 border border-gray-200';
     }
   };
 
+  const calculateTestsFee = (patient) => {
+    if (!patient) return 0;
+    const tests = patient.tests || [];
+    return tests.reduce((sum, test) => sum + (TEST_PRICES[test] || 200), 0);
+  };
 
+  const calculateSurgeryFee = (patient) => {
+    if (!patient) return 0;
+    const surgeries = patient.surgeries || [];
+    return surgeries.reduce((sum, surgery) => sum + (SURGERY_PRICES[surgery] || 1000), 0);
+  };
+
+  const calculateTotalAmount = (patient) => {
+    if (!patient) return 0;
+    const doctor = doctors.find(d => d.id === patient.assignedDoctorId);
+    const consultationFee = doctor?.consultationFee || 300;
+    return consultationFee + calculateTestsFee(patient) + calculateSurgeryFee(patient);
+  };
   const activeDoctors = doctors.filter(d => d.isActive);
-  const inactiveDoctors = doctors.filter(d => !d.isActive);
-
   if (loading) return <LoadingSpinner />;
 
   return (
@@ -1355,133 +1600,112 @@ const OPDManagement = () => {
         </div>
         <div className="flex flex-wrap gap-2 sm:flex-nowrap">
 
-          <button
-            onClick={() => setShowDoctorModal(true)}
-            className="px-4 py-2 border border-blue-600 text-blue-700 bg-white rounded-lg hover:bg-gray-50 transition-colors flex items-center shadow-sm text-sm font-medium"
-          >
-            <MedicalServicesIcon className="mr-2" /> Manage Doctors
-          </button>
-          <button
-            onClick={() => setShowQueueModal(true)}
-            className="px-4 py-2 border border-green-600 text-green-700 bg-white rounded-lg hover:bg-gray-50 transition-colors flex items-center shadow-sm text-sm font-medium"
-          >
-            <QueueIcon className="mr-2" /> View Queue
-          </button>
-          <button
-            onClick={generateToken}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md flex items-center text-sm font-medium"
-          >
-            <ConfirmationNumberIcon className="mr-2" /> Generate Token
-          </button>
+          <button onClick={generateToken} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md flex items-center text-sm font-medium">
+            <ConfirmationNumberIcon className="mr-2" /> Generate Token </button>
         </div>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
-
         {/* TOTAL PATIENTS */}
         <div className="relative bg-white rounded-xl p-5 border border-gray-200 border-t-[3px] border-t-blue-500 shadow-sm overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-50/40 via-transparent to-transparent pointer-events-none" />
           <div className="relative flex flex-col">
-            <p className="text-3xl font-bold text-blue-600 mb-1">
-              {opdPatients.length}
-            </p>
-            <p className="text-sm font-semibold text-gray-800">
-              Total Patients
-            </p>
-            <p className="text-xs text-blue-500 mt-1">
-              Active: {opdPatients.filter(p => p.status === 'Waiting').length} waiting
-            </p>
+            <p className="text-3xl font-bold text-blue-600 mb-1">{opdPatients.length}</p>
+            <p className="text-sm font-semibold text-gray-800">Total Patients</p>
+            <p className="text-xs text-blue-500 mt-1">Active: {opdPatients.filter(p => p.status === 'Waiting').length} waiting </p>
           </div>
         </div>
-
         {/* ACTIVE DOCTORS */}
         <div className="relative bg-white rounded-xl p-5 border border-gray-200 border-t-[3px] border-t-green-500 shadow-sm overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-green-50/40 via-transparent to-transparent pointer-events-none" />
           <div className="relative flex flex-col">
-            <p className="text-3xl font-bold text-green-600 mb-1">
-              {activeDoctors.length}
-            </p>
-            <p className="text-sm font-semibold text-gray-800">
-              Active Doctors
-            </p>
-            <p className="text-xs text-green-500 mt-1">
-              {doctors.length} total doctors
-            </p>
+            <p className="text-3xl font-bold text-green-600 mb-1">{activeDoctors.length}</p>
+            <p className="text-sm font-semibold text-gray-800">Active Doctors</p>
+            <p className="text-xs text-green-500 mt-1">{doctors.length} total doctors</p>
           </div>
         </div>
-
         {/* IN CONSULTATION */}
         <div className="relative bg-white rounded-xl p-5 border border-gray-200 border-t-[3px] border-t-yellow-500 shadow-sm overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-yellow-50/40 via-transparent to-transparent pointer-events-none" />
           <div className="relative flex flex-col">
-            <p className="text-3xl font-bold text-yellow-500 mb-1">
-              {opdPatients.filter(p => p.status === 'In Consultation').length}
-            </p>
-            <p className="text-sm font-semibold text-gray-800">
-              In Consultation
-            </p>
-            <p className="text-xs text-yellow-600 mt-1">
-              Patients currently with doctors
-            </p>
+            <p className="text-3xl font-bold text-yellow-500 mb-1">{opdPatients.filter(p => p.status === 'In Consultation').length}</p>
+            <p className="text-sm font-semibold text-gray-800">In Consultation</p>
+            <p className="text-xs text-yellow-600 mt-1">Patients currently with doctors</p>
           </div>
         </div>
-
         {/* COMPLETED TODAY */}
         <div className="relative bg-white rounded-xl p-5 border border-gray-200 border-t-[3px] border-t-purple-500 shadow-sm overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-purple-50/40 via-transparent to-transparent pointer-events-none" />
           <div className="relative flex flex-col">
-            <p className="text-3xl font-bold text-purple-600 mb-1">
-              {opdPatients.filter(p => p.status === 'Completed').length}
-            </p>
-            <p className="text-sm font-semibold text-gray-800">
-              Completed Today
-            </p>
-            <p className="text-xs text-purple-500 mt-1">
-              Throughput for today
-            </p>
+            <p className="text-3xl font-bold text-purple-600 mb-1">{opdPatients.filter(p => p.status === 'Completed').length}</p>
+            <p className="text-sm font-semibold text-gray-800">Completed Today</p>
+            <p className="text-xs text-purple-500 mt-1">Throughput for today</p>
           </div>
         </div>
-
       </div>
 
-
       {/* Tabs */}
-      <div className="flex border-b border-gray-200 mb-6">
-        <button
-          className={`px-4 py-3 font-medium text-sm ${activeTab === 'patients' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
-          onClick={() => setActiveTab('patients')}
-        >
-          <PersonIcon className="mr-2" fontSize="small" /> Patients ({opdPatients.length})
+      <div className="flex border-b border-gray-200 mb-6 overflow-x-auto scrollbar-hide">
+        {/* Patients */}
+        <button className={`px-4 py-3 font-medium text-sm flex items-center whitespace-nowrap ${activeTab === 'patients' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'}`} onClick={() => setActiveTab('patients')}>
+          <PersonIcon className="mr-2" fontSize="small" />Patients ({opdPatients.length})
         </button>
-        <button
-          className={`px-4 py-3 font-medium text-sm ${activeTab === 'doctors' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
-          onClick={() => setActiveTab('doctors')}
-        >
-          <MedicalServicesIcon className="mr-2" fontSize="small" /> Doctors ({doctors.length})
+
+        {/* Emergency */}
+        <button className={`px-4 py-3 font-medium text-sm flex items-center whitespace-nowrap ${activeTab === 'emergency' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'}`} onClick={() => setActiveTab('emergency')}>
+          <WarningIcon className="mr-2" fontSize="small" />Emergency
         </button>
+
+        {/* Consultation */}
+        <button className={`px-4 py-3 font-medium text-sm flex items-center whitespace-nowrap ${activeTab === 'consultation' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'}`} onClick={() => setActiveTab('consultation')}>
+          <DescriptionIcon className="mr-2" fontSize="small" />Consultation
+        </button>
+
+        {/* Lab */}
+        <button className={`px-4 py-3 font-medium text-sm flex items-center whitespace-nowrap ${activeTab === 'lab' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'}`} onClick={() => setActiveTab('lab')}>
+          <ScienceIcon className="mr-2" fontSize="small" />Lab
+        </button>
+
+        {/* Pharmacy */}
+        <button className={`px-4 py-3 font-medium text-sm flex items-center whitespace-nowrap ${activeTab === 'pharmacy' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'}`} onClick={() => setActiveTab('pharmacy')}>
+          <MedicationIcon className="mr-2" fontSize="small" />Pharmacy
+        </button>
+
+        {/* Referrals */}
+        <button className={`px-4 py-3 font-medium text-sm flex items-center whitespace-nowrap ${activeTab === 'referrals' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'}`} onClick={() => setActiveTab('referrals')}>
+          <SwapHorizIcon className="mr-2" fontSize="small" />Referrals
+        </button>
+
+        {/* Billing */}
+        <button className={`px-4 py-3 font-medium text-sm flex items-center whitespace-nowrap ${activeTab === 'billing' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'}`} onClick={() => setActiveTab('billing')}>
+          <ReceiptLongIcon className="mr-2" fontSize="small" />Billing
+        </button>
+
+        {/* Reports */}
+        <button className={`px-4 py-3 font-medium text-sm flex items-center whitespace-nowrap ${activeTab === 'reports' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'}`} onClick={() => setActiveTab('reports')}>
+          <AssessmentIcon className="mr-2" fontSize="small" />Reports
+        </button>
+
+        {/* Patient Exit */}
+        <button className={`px-4 py-3 font-medium text-sm flex items-center whitespace-nowrap ${activeTab === 'exit' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'}`} onClick={() => setActiveTab('exit')}>
+          <ExitToAppIcon className="mr-2" fontSize="small" />Patient Exit
+        </button>
+
       </div>
 
       {/* Patients Tab */}
       {activeTab === 'patients' && (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-
           {/* Header */}
           <div className="p-5 border-b border-gray-200">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <h3 className="text-lg font-semibold text-gray-800">
-                Patient Queue
-              </h3>
-
+              <h3 className="text-lg font-semibold text-gray-800">Patient Queue</h3>
               {/* Search */}
               <div className="relative w-full sm:w-64">
-                <input
-                  type="text"
-                  placeholder="Search patients..."
+                <input type="text" placeholder="Search patients..."
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                  value={patientQueueSearch}
-                  onChange={(e) => setPatientQueueSearch(e.target.value)}
-                />
+                  value={patientQueueSearch} onChange={(e) => setPatientQueueSearch(e.target.value)} />
                 <SearchIcon className="absolute left-3 top-2.5 text-gray-400 text-sm" fontSize="small" />
               </div>
             </div>
@@ -1494,31 +1718,17 @@ const OPDManagement = () => {
               {/* Table Head */}
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase whitespace-nowrap">
-                    Patient
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase whitespace-nowrap">
-                    Doctor
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase whitespace-nowrap">
-                    Queue
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase whitespace-nowrap">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase whitespace-nowrap">
-                    Actions
-                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Patient</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Doctor</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Queue</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
 
               {/* Table Body */}
               <tbody className="divide-y divide-gray-200">
-                {opdPatients.filter(patient =>
-                  patient.patientName.toLowerCase().includes(patientQueueSearch.toLowerCase()) ||
-                  patient.token.toLowerCase().includes(patientQueueSearch.toLowerCase()) ||
-                  patient.patientId.toLowerCase().includes(patientQueueSearch.toLowerCase())
-                ).length === 0 ? (
+                {opdPatients.filter(patient => patient.patientName.toLowerCase().includes(patientQueueSearch.toLowerCase()) || patient.token.toLowerCase().includes(patientQueueSearch.toLowerCase()) || patient.patientId.toLowerCase().includes(patientQueueSearch.toLowerCase())).length === 0 ? (
                   <tr>
                     <td colSpan="5" className="px-4 py-10 text-center text-gray-500">
                       <div className="flex flex-col items-center justify-center">
@@ -1529,34 +1739,22 @@ const OPDManagement = () => {
                     </td>
                   </tr>
                 ) : (
-                  opdPatients.filter(patient =>
-                    patient.patientName.toLowerCase().includes(patientQueueSearch.toLowerCase()) ||
-                    patient.token.toLowerCase().includes(patientQueueSearch.toLowerCase()) ||
-                    patient.patientId.toLowerCase().includes(patientQueueSearch.toLowerCase())
+                  opdPatients.filter(patient => patient.status !== 'Exited' && (patient.patientName.toLowerCase().includes(patientQueueSearch.toLowerCase()) || patient.token.toLowerCase().includes(patientQueueSearch.toLowerCase()) || patient.patientId.toLowerCase().includes(patientQueueSearch.toLowerCase()))
                   ).map(patient => (
                     <tr key={patient.id} className="hover:bg-gray-50">
 
                       {/* Patient */}
                       <td className="px-4 py-4 align-middle">
                         <div>
-                          <p className="font-medium text-gray-900">
-                            {patient.patientName}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {patient.token} • {patient.age}y, {patient.gender}
-                          </p>
+                          <p className="font-medium text-gray-900">{patient.patientName}</p>
+                          <p className="text-xs text-gray-500 mt-1">{patient.token} • {patient.age}y, {patient.gender}</p>
                         </div>
                       </td>
 
-                      {/* Doctor */}
                       <td className="px-4 py-4 align-middle">
                         <div>
-                          <p className="font-medium text-gray-900">
-                            {patient.doctor}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {patient.department}
-                          </p>
+                          <p className="font-medium text-gray-900 cursor-pointer hover:text-blue-600 hover:underline transition-colors" onClick={() => setActiveTab('doctors')} title="Go to Doctor management">{patient.doctor}</p>
+                          <p className="text-xs text-gray-500">{patient.department}</p>
                         </div>
                       </td>
 
@@ -1565,34 +1763,22 @@ const OPDManagement = () => {
                         <div className="flex items-center min-h-[32px]">
                           {patient.status === 'Waiting' && patient.assignedDoctorId && (
                             <>
-                              <span className="w-7 h-7 mr-2 rounded-full bg-yellow-100 text-yellow-800 flex items-center justify-center text-xs font-semibold">
-                                {patient.queuePosition + 1}
-                              </span>
-                              <span className="text-sm text-gray-700">
-                                {patient.waitingTime}
-                              </span>
+                              <span className="w-7 h-7 mr-2 rounded-full bg-yellow-100 text-yellow-800 flex items-center justify-center text-xs font-semibold shadow-sm" title="Queue Position">{patient.queuePosition}</span>
+                              <span className="text-sm text-gray-700">{patient.waitingTime}</span>
                             </>
                           )}
 
                           {patient.status === 'Waiting' && !patient.assignedDoctorId && (
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-orange-500">
-                                Not Assigned
-                              </span>
-                              <button
-                                onClick={() => handleAssignDoctor(patient)}
-                                title="Assign Doctor Now"
-                                className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                              >
+                              <span className="text-sm font-medium text-orange-500">Not Assigned</span>
+                              <button onClick={() => handleAssignDoctor(patient)} title="Assign Doctor Now" className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors">
                                 <PersonAddIcon style={{ fontSize: 16 }} />
                               </button>
                             </div>
                           )}
 
                           {patient.status === 'In Consultation' && (
-                            <span className="text-sm font-medium text-blue-600">
-                              Consulting Now
-                            </span>
+                            <span className="text-sm font-medium text-blue-600">Consulting Now</span>
                           )}
 
                           {patient.status === 'Completed' && (
@@ -1607,18 +1793,16 @@ const OPDManagement = () => {
                       {/* Status */}
                       <td className="px-4 py-4 align-middle">
                         <div className="flex flex-col gap-1">
-                          <span
-                            className={`px-3 py-1 rounded-full text-xs font-medium w-fit ${getStatusColor(
-                              patient.status
-                            )}`}
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium w-fit transition-all ${patient.status !== 'Waiting' ? 'cursor-pointer hover:ring-2 hover:ring-offset-1' : 'cursor-default'} ${getStatusColor(patient.status)}`} onClick={() => {
+                            if (patient.status === 'In Consultation') setActiveTab('consultation');
+                            else if (patient.status === 'Completed') setActiveTab('billing');
+                          }} title={patient.status === 'Waiting' ? 'Patient is Waiting' : `Go to ${patient.status} management`}
                           >
                             {patient.status}
                           </span>
 
                           {patient.priority === 'Urgent' && (
-                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 w-fit">
-                              Urgent
-                            </span>
+                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 w-fit">Urgent</span>
                           )}
                         </div>
                       </td>
@@ -1627,68 +1811,37 @@ const OPDManagement = () => {
                       <td className="px-4 py-4 align-middle">
                         <div className="flex items-center gap-2">
 
-                          <button
-                            onClick={() => {
-                              setSelectedPatientForView(patient);
-                              setShowViewPatientModal(true);
-                            }}
-                            title="View Patient Details"
-                            className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded"
-                          >
+                          <button onClick={() => {
+                            setSelectedPatientForView(patient);
+                            setShowViewPatientModal(true);
+                          }} title="View Patient Details" className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded">
                             <VisibilityIcon fontSize="small" />
                           </button>
 
-                          {patient.status === 'Waiting' && !patient.assignedDoctorId && (
-                            <button
-                              onClick={() => handleAssignDoctor(patient)}
-                              title="Assign Doctor"
-                              className="w-8 h-8 flex items-center justify-center text-blue-600 hover:bg-blue-50 rounded"
-                            >
-                              <PersonAddIcon fontSize="small" />
-                            </button>
-                          )}
 
-
-                          {patient.status === 'Waiting' && patient.assignedDoctorId && (
+                          {['Waiting', 'Token Generated'].includes(patient.status) && patient.assignedDoctorId && (
                             <>
-                              <button
-                                onClick={() => handleStartConsultation(patient)}
-                                title="Start Consultation"
-                                className="w-8 h-8 flex items-center justify-center text-green-600 hover:bg-green-50 rounded"
-                              >
+                              <button onClick={() => handleStartConsultation(patient)} title="Start Consultation" className="w-8 h-8 flex items-center justify-center text-green-600 hover:bg-green-50 rounded">
                                 <PlayArrowIcon fontSize="small" />
                               </button>
 
-                              <button
-                                onClick={() => handleTransferPatient(patient)}
-                                title="Transfer"
-                                className="w-8 h-8 flex items-center justify-center text-yellow-600 hover:bg-yellow-50 rounded"
-                              >
+                              <button onClick={() => handleTransferPatient(patient)} title="Transfer" className="w-8 h-8 flex items-center justify-center text-yellow-600 hover:bg-yellow-50 rounded">
                                 <SwapHorizIcon fontSize="small" />
                               </button>
                             </>
                           )}
 
                           {patient.status === 'In Consultation' && (
-                            <button
-                              onClick={() => handleStartConsultation(patient)}
-                              title="View Consultation"
-                              className="w-8 h-8 flex items-center justify-center text-blue-600 hover:bg-blue-50 rounded"
-                            >
+                            <button onClick={() => handleStartConsultation(patient)} title="View Consultation" className="w-8 h-8 flex items-center justify-center text-blue-600 hover:bg-blue-50 rounded">
                               <DescriptionIcon fontSize="small" />
                             </button>
                           )}
 
-                          <button
-                            onClick={() => handleCancelPatient(patient)}
-                            title="Cancel"
-                            className="w-8 h-8 flex items-center justify-center text-red-600 hover:bg-red-50 rounded"
-                          >
+                          <button onClick={() => handleCancelPatient(patient)} title="Cancel" className="w-8 h-8 flex items-center justify-center text-red-600 hover:bg-red-50 rounded">
                             <CloseIcon fontSize="small" />
                           </button>
                         </div>
                       </td>
-
                     </tr>
                   ))
                 )}
@@ -1698,673 +1851,904 @@ const OPDManagement = () => {
 
         </div>
       )}
-
-
-      {/* Doctors Tab */}
-      {activeTab === 'doctors' && (
-        <div className="space-y-6">
-          {/* Active Doctors */}
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
-            <div className="flex justify-between items-center mb-5">
+      {/* Emergency Tab */}
+      {activeTab === 'emergency' && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4">
+          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-gray-800">Active Doctors</h3>
-                <p className="text-gray-600 text-sm mt-1">Doctors currently available for consultations</p>
+                <h3 className="text-lg font-black text-gray-900 tracking-tight">Emergency Triage Queue</h3>
               </div>
-              <span className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm font-medium">
-                {activeDoctors.length} Active
-              </span>
             </div>
+            <div className="relative w-64">
+              <input type="text" placeholder="Search emergency..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 shadow-sm" value={patientQueueSearch} onChange={(e) => setPatientQueueSearch(e.target.value)} />
+              <SearchIcon className="absolute left-3 top-2.5 text-gray-400" fontSize="small" />
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Patient</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Doctor</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Queue</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {opdPatients.filter(p => p.visitType === 'Emergency' || p.priority === 'Urgent').length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="px-4 py-12 text-center text-gray-500 italic">
+                      No active emergency cases currently recorded in triage.
+                    </td>
+                  </tr>
+                ) : (
+                  opdPatients.filter(p => p.visitType === 'Emergency' || p.priority === 'Urgent').map(patient => (
+                    <tr key={patient.id} className="hover:bg-red-50/20">
+                      <td className="px-4 py-4 align-middle">
+                        <div>
+                          <p className="font-medium text-gray-900">{patient.patientName}</p>
+                          <p className="text-xs text-gray-500 mt-1">{patient.token} • {patient.age}y, {patient.gender}</p>
+                          <div className="flex gap-2 mt-1.5">
+                            <span className="text-[9px] font-black text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-100">BP: {patient.vitals?.bp}</span>
+                            <span className="text-[9px] font-black text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-100">SpO2: {patient.vitals?.spo2}%</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 align-middle">
+                        <div>
+                          <p className="font-medium text-gray-900">{patient.doctor}</p>
+                          <p className="text-xs text-gray-500">{patient.department}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 align-middle">
+                        <div className="flex items-center">
+                          <span className={`text-sm font-bold ${patient.priority === 'Urgent' ? 'text-red-600' : 'text-gray-700'}`}>
+                            {patient.waitingTime}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 align-middle">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium w-fit transition-all cursor-default ${getStatusColor(patient.status)}`}>
+                          {patient.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 align-middle">
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => { setSelectedPatientForView(patient); setShowViewPatientModal(true); }} title="View Patient Details" className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded transition-colors">
+                            <VisibilityIcon fontSize="small" />
+                          </button>
+                          {['Waiting', 'Token Generated'].includes(patient.status) && patient.assignedDoctorId && (
+                            <>
+                              <button onClick={() => handleStartConsultation(patient)} title="Start Emergency Consultation" className="w-8 h-8 flex items-center justify-center text-green-600 hover:bg-red-50 rounded transition-colors">
+                                <PlayArrowIcon fontSize="small" />
+                              </button>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {activeDoctors.map(doctor => (
-                <div key={doctor.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center">
-                      <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center mr-3">
-                        <MedicalServicesIcon className="text-blue-600" />
+                              <button onClick={() => handleTransferPatient(patient)} title="Transfer" className="w-8 h-8 flex items-center justify-center text-yellow-600 hover:bg-blue-50 rounded transition-colors">
+                                <SwapHorizIcon fontSize="small" />
+                              </button>
+                            </>
+                          )}
+
+                          {patient.status === 'In Consultation' && (
+                            <button onClick={() => handleStartConsultation(patient)} title="View Consultation" className="w-8 h-8 flex items-center justify-center text-blue-600 hover:bg-blue-50 rounded transition-colors">
+                              <DescriptionIcon fontSize="small" />
+                            </button>
+                          )}
+                          <button onClick={() => handleCancelPatient(patient)} title="Cancel Emergency Record" className="w-8 h-8 flex items-center justify-center text-red-600 hover:bg-blue-50 rounded transition-colors">
+                             <CloseIcon fontSize="small" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {/* Consultation Tab */}
+      {activeTab === 'consultation' && (
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+          <div className="p-5 border-b border-gray-200">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <h3 className="text-lg font-semibold text-gray-800">Ongoing Consultations</h3>
+              <div className="relative w-full sm:w-64">
+                <input type="text" placeholder="Search consultations..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500" value={consultationSearch} onChange={(e) => setConsultationSearch(e.target.value)} />
+                <SearchIcon className="absolute left-3 top-2.5 text-gray-400 text-sm" fontSize="small" />
+              </div>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 ">Patient</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 ">Doctor</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 ">Room</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 ">Duration</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 ">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {opdPatients.filter(p => p.status === 'In Consultation' && p.patientName.toLowerCase().includes(consultationSearch.toLowerCase())).map(patient => (
+                  <tr key={patient.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-4 font-medium text-gray-900">{patient.patientName}<br /><span className="text-xs text-gray-500">{patient.token}</span></td>
+                    <td className="px-4 py-4">{patient.doctor}</td>
+                    <td className="px-4 py-4">{doctors.find(d => d.id === patient.assignedDoctorId)?.opdRoom || 'N/A'}</td>
+                    <td className="px-4 py-4">12 mins</td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => { setSelectedPatientForView(patient); setShowViewPatientModal(true); }} title="View Patient Details" className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded">
+                          <VisibilityIcon fontSize="small" />
+                        </button>
+                        <button onClick={() => handleStartConsultation(patient)} title="View Consultation Notes" className="w-8 h-8 flex items-center justify-center text-blue-600 hover:bg-blue-50 rounded">
+                          <DescriptionIcon fontSize="small" />
+                        </button>
+                        <button onClick={() => handleCancelPatient(patient)} title="Cancel/End Consultation" className="w-8 h-8 flex items-center justify-center text-red-600 hover:bg-red-50 rounded">
+                          <CloseIcon fontSize="small" />
+                        </button>
                       </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{doctor.name}</p>
-                        <p className="text-sm text-gray-600">{doctor.specialization}</p>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {/* Lab Tab */}
+      {activeTab === 'lab' && (
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+          <div className="p-5 border-b border-gray-200">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">Lab Investigations</h3>
+              </div>
+              <div className="relative w-full sm:w-64">
+                <input type="text" placeholder="Search lab orders..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500" value={labSearch} onChange={(e) => setLabSearch(e.target.value)} />
+                <SearchIcon className="absolute left-3 top-2.5 text-gray-400 text-sm" fontSize="small" />
+              </div>
+            </div>
+          </div>
+          <div className="overflow-x-auto bg-white rounded-2xl border border-slate-200 shadow-sm">
+            <table className="min-w-full text-sm border-collapse">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 tracking-[0.2em] ">Test Date</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 tracking-[0.2em] ">Patient Identity</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 tracking-[0.2em] ">Prescribed Panel</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 tracking-[0.2em] ">Fulfillment Status</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 tracking-[0.2em] ">Clinical Result</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 tracking-[0.2em] ">Authorized By</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 tracking-[0.2em] ">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {opdPatients.filter(p => p.status !== 'Exited' && p.patientName.toLowerCase().includes(labSearch.toLowerCase())).map(patient => (
+                  <tr key={patient.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-black text-slate-700">{formattedCurrentDate}</span>
+                        <span className="text-[9px] font-bold text-slate-400  tracking-tighter">Diagnostic Cycle</span>
                       </div>
-                    </div>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${doctor.queue > 5 ? 'bg-red-50 text-red-700' : doctor.queue > 0 ? 'bg-yellow-50 text-yellow-700' : 'bg-green-50 text-green-700'}`}>
-                      {doctor.queue} in queue
-                    </span>
-                  </div>
-
-                  <div className="space-y-2 text-sm mb-4">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">OPD Room:</span>
-                      <span className="font-medium">{doctor.opdRoom}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Current Patient:</span>
-                      <span className="font-medium text-blue-600">{doctor.currentPatientName || 'None'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Working Hours:</span>
-                      <span className="font-medium">{doctor.workingHours}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 pt-4 border-t border-gray-100">
-                    <button
-                      className="flex-1 px-3 py-1.5 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium shadow-sm"
-                      onClick={() => {
-                        setSelectedDoctorForQueue(doctor);
-                        setShowQueueModal(true);
-                      }}
-                    >
-                      View Queue
-                    </button>
-                    <button
-                      className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors shadow-sm"
-                      onClick={() => handleDoctorStatusToggle(doctor.id)}
-                      title="Deactivate Doctor"
-                    >
-                      <PowerSettingsNewIcon fontSize="small" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-black text-slate-900  tracking-tight">{patient.patientName}</span>
+                        <span className="text-[10px] font-medium text-slate-500">UHID: {patient.patientId}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="max-w-[200px]">
+                        <p className="text-xs font-bold text-slate-600 truncate" title={(patient.tests || []).join(', ')}>
+                          {(patient.tests || []).join(', ') || 'General Panel'}
+                        </p>
+                        <p className="text-[9px] font-black text-blue-600  tracking-widest mt-0.5">
+                          {(patient.tests || []).length > 1 ? 'Multi-Parameter' : 'Specific Investigation'}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black  tracking-widest ${patient.status === 'Completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-amber-50 text-amber-700 border border-amber-100'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${patient.status === 'Completed' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                        {patient.status === 'Completed' ? 'Completed' : 'Processing'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {patient.status === 'Completed' ? (
+                        <div className="flex items-center gap-2">
+                          <CheckCircleIcon sx={{ fontSize: 14 }} className="text-emerald-500" />
+                          <span className="text-xs font-bold text-slate-700 italic">Normal Range</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <AccessTimeIcon sx={{ fontSize: 14 }} className="text-slate-300" />
+                          <span className="text-xs font-bold text-slate-400  tracking-widest">Pending</span>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        {patient.uploadedBy || (patient.status === 'Completed' ? 'Senior Lab Tech' : 'Pending Authorization')}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-start gap-2">
+                        <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-all border border-transparent hover:border-blue-100 shadow-sm hover:shadow-md" title="View Detailed Diagnostic Report" onClick={() => handleViewLabResult(patient)}>
+                          <VisibilityIcon sx={{ fontSize: 18 }} />
+                        </button>
+                        <button className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all border border-transparent hover:border-emerald-100 shadow-sm hover:shadow-md" title="Download Verified PDF Report">
+                          <PrintIcon sx={{ fontSize: 18 }} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {/* Pharmacy Tab */}
+      {activeTab === 'pharmacy' && (
+        <div className="space-y-6">
+          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">Pharmacy Queue</h3>
+              </div>
+              <div className="relative w-full sm:w-64">
+                <input type="text" placeholder="Search prescriptions..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 shadow-sm" value={pharmacySearch} onChange={(e) => setPharmacySearch(e.target.value)} />
+                <SearchIcon className="absolute left-3 top-2.5 text-gray-400 text-sm" fontSize="small" />
+              </div>
             </div>
           </div>
 
-          {/* Inactive Doctors */}
-          {inactiveDoctors.length > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
-              <div className="flex justify-between items-center mb-5">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800">Inactive Doctors</h3>
-                  <p className="text-gray-600 text-sm mt-1">Doctors currently not available for consultations</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {opdPatients.filter(p => p.status === 'Completed' && p.patientName.toLowerCase().includes(pharmacySearch.toLowerCase())).map(patient => (
+              <div key={patient.id} className="bg-white rounded-3xl border border-gray-200 shadow-sm hover:shadow-md transition-all overflow-hidden group">
+                <div className="p-6 border-b border-gray-100">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600"><MedicationIcon sx={{ fontSize: 28 }} /></div>
+                    <span className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-black tracking-[0.2em] border border-green-100">Ready</span>
+                  </div>
+                  <h4 className="text-xl font-black text-gray-900 tracking-tight">{patient.patientName}</h4>
+                  <p className="text-[10px] font-bold text-gray-400 tracking-widest mt-1">{patient.patientId}</p>
                 </div>
-                <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium">
-                  {inactiveDoctors.length} Inactive
-                </span>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {inactiveDoctors.map(doctor => (
-                  <div key={doctor.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center">
-                        <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mr-3">
-                          <MedicalServicesIcon className="text-gray-500" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-700">{doctor.name}</p>
-                          <p className="text-sm text-gray-500">{doctor.specialization}</p>
-                        </div>
-                      </div>
-                      <span className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs font-medium">
-                        Inactive
-                      </span>
+                <div className="p-6 space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black text-gray-400 tracking-widest">Prescribing Doctor</p>
+                      <p className="text-sm font-bold text-gray-800">{patient.doctor}</p>
                     </div>
-
-                    <div className="space-y-2 text-sm mb-4">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Department:</span>
-                        <span className="font-medium text-gray-700">{doctor.department}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">OPD Room:</span>
-                        <span className="font-medium text-gray-700">{doctor.opdRoom}</span>
-                      </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black text-gray-400 tracking-widest">Department</p>
+                      <p className="text-sm font-bold text-gray-800">{patient.department}</p>
                     </div>
+                  </div>
 
-                    <button
-                      className="w-full py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors font-medium flex items-center justify-center text-sm"
-                      onClick={() => handleDoctorStatusToggle(doctor.id)}
-                    >
-                      <CheckIcon className="mr-1" fontSize="small" /> Activate Doctor
+                  <div className="space-y-4">
+                    <p className="text-[10px] font-black text-gray-900 tracking-[0.2em]  mb-4 flex items-center gap-2">
+                      Medication Preview
+                    </p>
+
+                    {(patient.medicationList || [
+                      { name: 'Paracetamol 500mg', dosage: '1 Tab', duration: '5 Days', instruction: 'After Breakfast', frequency: { morning: true, afternoon: true, night: true } },
+                      { name: 'Amoxicillin 250mg', dosage: '1 Cap', duration: '7 Days', instruction: 'Before Food', frequency: { morning: true, afternoon: false, night: true } },
+                      { name: 'Cetirizine 10mg', dosage: '1 Tab', duration: '3 Days', instruction: 'After Food', frequency: { morning: false, afternoon: false, night: true } }
+                    ]).map((med, index) => (
+                      <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                        <div className="min-w-0">
+                          <p className="text-sm font-black text-gray-900 truncate tracking-tight">{med.name}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] font-bold text-blue-600 bg-white px-2 py-0.5 rounded border border-blue-50">{med.dosage || med.dose}</span>
+                            <span className="text-[10px] font-bold text-gray-400">{med.duration}</span>
+                            <span className="text-[10px] font-bold text-blue-600">{med.instruction}</span>
+                          </div>
+                        </div>
+                        <div className="flex gap-1 shrink-0 ml-2">
+                          {['M', 'A', 'N'].map((slot, idx) => {
+                            const active = idx === 0 ? (med.frequency?.morning || med.morning) :
+                              idx === 1 ? (med.frequency?.afternoon || med.afternoon) :
+                                (med.frequency?.night || med.night);
+                            return (
+                              <div key={slot} className={`w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-black border ${active ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-200 text-gray-300'}`}>
+                                {slot}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="pt-6 border-t border-gray-50 flex justify-end gap-3">
+                    <button className="w-12 h-12 border-2 border-gray-100 text-blue-700 rounded-2xl flex items-center justify-center group" title="View Prescription Details" onClick={() => {
+                      setSelectedPharmacyRecord({
+                        ...patient,
+                        prescriptions: [
+                          { name: 'Paracetamol 500mg', dose: '1-1-1', duration: '5 Days', instruction: 'After Breakfast', morning: true, afternoon: true, night: true },
+                          { name: 'Amoxicillin 250mg', dose: '1-0-1', duration: '7 Days', instruction: 'Before Food', morning: true, afternoon: false, night: true },
+                          { name: 'Cetirizine 10mg', dose: '0-0-1', duration: '10 Days', instruction: 'After Dinner', morning: false, afternoon: false, night: true }
+                        ]
+                      });
+                      setShowPharmacyModal(true);
+                    }}>
+                      <VisibilityIcon sx={{ fontSize: 22 }} />
                     </button>
                   </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* Referrals Tab */}
+      {activeTab === 'referrals' && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4">
+          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-black text-gray-900 tracking-tight">Patient Referral & Transfer</h3>
+            </div>
+            <div className="relative w-64">
+              <input type="text" placeholder="Search for referral..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 shadow-sm" value={patientQueueSearch} onChange={(e) => setPatientQueueSearch(e.target.value)} />
+              <SearchIcon className="absolute left-3 top-2.5 text-gray-400" fontSize="small" />
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Patient</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Doctor</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Queue</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {opdPatients.filter(p => p.status !== 'Exited' && p.patientName.toLowerCase().includes(patientQueueSearch.toLowerCase())).map(patient => (
+                  <tr key={patient.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-4 align-middle">
+                      <div>
+                        <p className="font-medium text-gray-900">{patient.patientName}</p>
+                        <p className="text-xs text-gray-500 mt-1">{patient.token} • {patient.age}y, {patient.gender}</p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 align-middle">
+                      <div>
+                        <p className="font-medium text-gray-900">{patient.doctor}</p>
+                        <p className="text-xs text-gray-500">{patient.department}</p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 align-middle">
+                      <div className="flex items-center">
+                        <span className="w-7 h-7 mr-2 rounded-full bg-yellow-100 text-yellow-800 flex items-center justify-center text-xs font-semibold shadow-sm">{patient.queuePosition || 1}</span>
+                        <span className="text-xs text-gray-600">{patient.waitingTime || 'Immediate'}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 align-middle">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium w-fit transition-all ${getStatusColor(patient.status)}`}>
+                        {patient.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 align-middle">
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => { setSelectedPatientForView(patient); setShowViewPatientModal(true); }} title="View Patient Details" className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded transition-colors">
+                          <VisibilityIcon fontSize="small" />
+                        </button>
+
+                        {patient.status === 'In Consultation' && (
+                          <button onClick={() => handleStartConsultation(patient)} title="View Consultation" className="w-8 h-8 flex items-center justify-center text-blue-600 hover:bg-blue-50 rounded transition-colors">
+                            <DescriptionIcon fontSize="small" />
+                          </button>
+                        )}
+
+                        <button onClick={() => handleCancelPatient(patient)} title="Cancel" className="w-8 h-8 flex items-center justify-center text-red-600 hover:bg-red-50 rounded transition-colors">
+                          <DeleteIcon fontSize="small" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {/* Reports Tab */}
+      {activeTab === 'reports' && (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">OPD Reports</h3>
+              </div>
+
+              <div className="relative w-full lg:w-72">
+                <input type="text" placeholder="Search patient, token, doctor..." className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm" value={reportsSearch} onChange={(e) => setReportsSearch(e.target.value)} />
+                <SearchIcon className="absolute left-3 top-3 text-gray-400" fontSize="small" />
+              </div>
+
+            </div>
+          </div>
+
+          {/* Reports Table */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+
+                {/* Table Header */}
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-5 py-4 text-left text-[11px] font-black tracking-widest text-gray-500 ">Report Info</th>
+                    <th className="px-5 py-4 text-left text-[11px] font-black tracking-widest text-gray-500 ">Patient Details</th>
+                    <th className="px-5 py-4 text-left text-[11px] font-black tracking-widest text-gray-500 ">Visit Details</th>
+                    <th className="px-5 py-4 text-left text-[11px] font-black tracking-widest text-gray-500 ">Doctor & Department</th>
+                    <th className="px-5 py-4 text-left text-[11px] font-black tracking-widest text-gray-500 ">Report Status</th>
+                    <th className="px-5 py-4 text-center text-[11px] font-black tracking-widest text-gray-500 ">Actions</th>
+                  </tr>
+                </thead>
+
+                {/* Table Body */}
+                <tbody className="divide-y divide-gray-100">
+
+                  {opdPatients.filter(patient => patient.patientName?.toLowerCase().includes(reportsSearch.toLowerCase()) || patient.patientId?.toLowerCase().includes(reportsSearch.toLowerCase()) || patient.token?.toLowerCase().includes(reportsSearch.toLowerCase()) || patient.doctor?.toLowerCase().includes(reportsSearch.toLowerCase())).map(patient => {
+
+                    return (
+                      <tr key={patient.id} className="hover:bg-gray-50 transition-all">
+                        {/* Report Info */}
+                        <td className="px-5 py-5">
+                          <div className="space-y-1">
+                            <p className="text-xs font-black text-gray-900"> {patient.status === 'Exited' ? `OPD_FINAL_${patient.token}` : `OPD_VISIT_${patient.token}`} </p>
+                            <p className="text-[10px] font-bold text-gray-400 tracking-widest">GENERATED REPORT</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="px-2 py-1 rounded-lg bg-gray-100 text-gray-700 text-[10px] font-bold">{patient.token}</span>
+                              <span className="px-2 py-1 rounded-lg bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-100">{patient.visitType || 'New'}</span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Patient Details */}
+                        <td className="px-5 py-5">
+                          <div className="space-y-1">
+                            <p className="text-sm font-bold text-gray-900"> {patient.patientName} </p>
+                            <p className="text-[11px] text-gray-500 font-medium"> {patient.patientId} </p>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              <span className="text-[10px] px-2 py-1 rounded-md bg-gray-100 text-gray-700 font-bold">{patient.age} Yrs</span>
+                              <span className="text-[10px] px-2 py-1 rounded-md bg-pink-50 text-pink-700 font-bold">{patient.gender}</span>
+                              <span className="text-[10px] px-2 py-1 rounded-md bg-red-50 text-red-700 font-bold">{patient.bloodGroup || 'N/A'}</span>
+                            </div>
+                          </div>
+                        </td>
+                        {/* Visit Details */}
+                        <td className="px-5 py-5">
+                          <div className="space-y-2">
+                            <div>
+                              <p className="text-[10px] font-black text-gray-400 tracking-widest">ARRIVAL TIME</p>
+                              <p className="text-xs font-semibold text-gray-800">{patient.arrivalTime || '--'}</p>
+                            </div>
+
+                            <div>
+                              <p className="text-[10px] font-black text-gray-400 tracking-widest">WAITING TIME</p>
+                              <p className="text-xs font-semibold text-gray-800">{patient.waitingTime || '--'}</p>
+                            </div>
+
+                            <div>
+                              <p className="text-[10px] font-black text-gray-400 tracking-widest">VISIT DATE</p>
+                              <p className="text-xs font-semibold text-gray-800">{patient.exitDate || new Date().toLocaleDateString()}</p>
+                            </div>
+
+                          </div>
+                        </td>
+
+                        {/* Doctor & Department */}
+                        <td className="px-5 py-5">
+                          <div className="space-y-2">
+                            <div>
+                              <p className="text-sm font-bold text-gray-900">{patient.doctor}</p>
+                              <p className="text-[11px] text-gray-500 font-medium">{patient.department}</p>
+                            </div>
+
+                            <div className="flex gap-2 flex-wrap">
+                              <span className="px-2 py-1 rounded-md bg-green-50 text-green-700 border border-green-100 text-[10px] font-bold">{patient.priority || 'Normal'}</span>
+                              <span className="px-2 py-1 rounded-md bg-yellow-50 text-yellow-700 border border-yellow-100 text-[10px] font-bold"> Queue #{patient.queuePosition || 1}</span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Status */}
+                        <td className="px-5 py-5">
+                          <div className="space-y-2">
+                            <span className={`inline-flex px-3 py-1 rounded-full text-[10px] font-black tracking-widest border ${patient.status === 'Exited' ? 'bg-purple-50 text-purple-700 border-purple-100' : patient.status === 'Completed' ? 'bg-green-50 text-green-700 border-green-100' : patient.status === 'In Consultation' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-yellow-50 text-yellow-700 border-yellow-100'}`}>
+                              {patient.status}
+                            </span>
+
+                            <div>
+                              <p className="text-[10px] text-gray-400 font-black tracking-widest">REPORT TYPE</p>
+                              <p className="text-xs font-semibold text-gray-700"> {patient.status === 'Exited' ? 'Final Visit Summary' : 'OPD Consultation Report'}</p>
+                            </div>
+
+                          </div>
+
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-5 py-5">
+                          <div className="flex items-center justify-center gap-2">
+
+                            <button onClick={() => { setSelectedPatientForView(patient); setShowViewPatientModal(true); }} className="w-10 h-10 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-100 transition-all flex items-center justify-center" title="View Complete Report">
+                              <VisibilityIcon sx={{ fontSize: 18 }} />
+                            </button>
+
+                            <button onClick={() => handlePrintPrescription(patient)} className="w-10 h-10 rounded-xl border border-blue-100 text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center" title="Print Prescription">
+                              <PrintIcon sx={{ fontSize: 18 }} />
+                            </button>
+
+                            <button onClick={() => handlePrintInvoice(patient)} className="w-10 h-10 rounded-xl border border-green-100 text-green-600 hover:bg-green-50 transition-all flex items-center justify-center" title="Print Invoice">
+                              <ReceiptLongIcon sx={{ fontSize: 18 }} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                </tbody>
+
+              </table>
+            </div>
+
+          </div>
+        </div>
+      )}
+      {/* Billing Tab */}
+      {activeTab === 'billing' && (
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+          <div className="p-5 border-b border-gray-200">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">OPD Billing</h3>
+              </div>
+              <div className="relative w-full sm:w-64">
+                <input type="text" placeholder="Search invoices..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500" value={billingSearch} onChange={(e) => setBillingSearch(e.target.value)} />
+                <SearchIcon className="absolute left-3 top-2.5 text-gray-400 text-sm" fontSize="small" />
               </div>
             </div>
-          )}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 ">Patient</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 ">Invoice No</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 ">Doctor / Dept</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 ">Total Amount</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 ">Payment Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 ">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {opdPatients.filter(p => p.status !== 'Exited' && p.patientName.toLowerCase().includes(billingSearch.toLowerCase())).map(patient => {
+                  const total = calculateTotalAmount(patient);
+                  const consult = doctors.find(d => d.id === patient.assignedDoctorId)?.consultationFee || 300;
+                  const testsTotal = calculateTestsFee(patient);
+                  const surgeryTotal = calculateSurgeryFee(patient);
+
+                  return (
+                    <tr key={patient.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-4">
+                        <p className="font-medium text-gray-900">{patient.patientName}</p>
+                        <p className="text-[10px] text-gray-500">{patient.patientId}</p>
+                      </td>
+                      <td className="px-4 py-4">INV-{patient.id.slice(-4)}</td>
+                      <td className="px-4 py-4">
+                        <p className="text-gray-800 font-medium">{patient.doctor}</p>
+                        <p className="text-xs text-gray-500">{patient.department}</p>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-gray-900 text-base">₹{total}.00</span>
+                          <span className="text-[9px] text-gray-500 leading-tight">Fee: ₹{consult} + Tests: ₹{testsTotal} {surgeryTotal > 0 ? `+ Surg: ₹${surgeryTotal}` : ''}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${patient.status === 'Completed' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-yellow-50 text-yellow-700 border border-yellow-200'}`}>{patient.status === 'Completed' ? 'Paid' : 'Pending'}</span>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3">
+                          <button onClick={() => { setSelectedPatientForView(patient); setShowViewPatientModal(true); }} className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 border border-gray-200 transition-all font-bold text-[10px] tracking-widest shadow-sm" title="View Detailed Bill & Record">
+                            <VisibilityIcon sx={{ fontSize: 14 }} /></button>
+                          <button onClick={() => handlePrintInvoice(patient)} className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 border border-blue-100 transition-all font-bold text-[10px] tracking-widest shadow-sm" title="Print Invoice">
+                            <PrintIcon sx={{ fontSize: 14 }} />
+                          </button>
+                          {patient.status !== 'Completed' ? (
+                            <button onClick={() => handleOpenPaymentModal(patient)} className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all font-black text-[10px] tracking-widest shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200" title="Process Payment"><PaymentsIcon sx={{ fontSize: 14 }} /></button>
+                          ) : (
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg border border-green-200 font-black text-[10px] tracking-widest cursor-default"><CheckCircleIcon sx={{ fontSize: 14 }} /></div>
+                          )}
+
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {/* Patient Exit Tab */}
+      {activeTab === 'exit' && (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">Patient Treatment Records</h3>
+                <p className="text-xs text-gray-500 mt-1">Review treatment details and manage final exit for all patients</p>
+              </div>
+              <div className="relative w-full lg:w-72">
+                <input type="text" placeholder="Search records..." className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm" value={exitSearch} onChange={(e) => setExitSearch(e.target.value)} />
+                <SearchIcon className="absolute left-3 top-2.5 text-gray-400 text-sm" fontSize="small" />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {opdPatients.filter(p => (p.status === 'Completed' || p.status === 'Exited') && p.patientName.toLowerCase().includes(exitSearch.toLowerCase())).map(patient => (
+              <div key={patient.id} className="bg-white rounded-3xl border border-gray-200 shadow-sm hover:shadow-md transition-all overflow-hidden group flex flex-col">
+                <div className="p-6 border-b border-gray-100 flex justify-between items-start">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={`w-2.5 h-2.5 rounded-full ${patient.status === 'Exited' ? 'bg-emerald-500' : 'bg-purple-500'}`}></div>
+                      <span className={`text-[10px] font-black tracking-widest ${patient.status === 'Exited' ? 'text-emerald-600' : 'text-purple-600'}`}> {patient.status === 'Exited' ? 'Visit Finalized' : 'Ready for Exit'}</span>
+                    </div>
+                    <h4 className="text-xl font-black text-gray-900 leading-tight">{patient.patientName}</h4>
+                    <p className="text-[10px] font-bold text-gray-400 tracking-widest mt-1">Token: {patient.token} • UHID: {patient.patientId}</p>
+                  </div>
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${patient.status === 'Exited' ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-50 text-gray-400'}`}>{patient.status === 'Exited' ? <CheckCircleIcon sx={{ fontSize: 28 }} /> : <PersonIcon sx={{ fontSize: 28 }} />}</div>
+                </div>
+
+                <div className="p-6 space-y-5 flex-1">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-black text-gray-400 tracking-widest mb-1">Consulting Doctor</p>
+                      <p className="text-sm font-bold text-gray-800">{patient.doctor || 'Not Assigned'}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-gray-400 tracking-widest mb-1">Billing Status</p>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${patient.status === 'Exited' || patient.status === 'Completed' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-yellow-50 text-yellow-700 border border-yellow-200'}`}> {patient.status === 'Exited' || patient.status === 'Completed' ? 'Paid' : 'Pending'} </span>
+                    </div>
+                  </div>
+
+                  {/* Treatment Summary Section */}
+                  <div className="bg-gray-50 rounded-2xl p-4 space-y-4">
+                    <div>
+                      <p className="text-[9px] font-black text-gray-400 tracking-[0.2em] mb-2 flex items-center gap-1">
+                        <MedicationIcon sx={{ fontSize: 12 }} /> Prescribed Medications
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {patient.medications && patient.medications.length > 0 ? (patient.medications.map((med, idx) => (<span key={idx} className="px-2 py-1 bg-white border border-gray-100 rounded-lg text-[9px] font-bold text-gray-700 shadow-sm">{med}</span>))) : (<span className="text-[10px] italic text-gray-400">No medication recorded</span>)}
+                        {patient.medications?.length > 3 && (
+                          <span className="text-[9px] font-bold text-blue-600 self-center">+{patient.medications.length - 3} more</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[9px] font-black text-gray-400 tracking-[0.2em] mb-2 flex items-center gap-1"><ScienceIcon sx={{ fontSize: 12 }} /> Diagnostic Tests </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {patient.tests && patient.tests.length > 0 ? (patient.tests.map((test, idx) => (<span key={idx} className="px-2 py-1 bg-white border border-gray-100 rounded-lg text-[9px] font-bold text-orange-700 shadow-sm">{test}</span>))) : (<span className="text-[10px] italic text-gray-400">No tests recommended</span>)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {patient.status === 'Exited' ? (
+                    <div className="pt-4 space-y-3">
+                      <div className="flex justify-between items-center text-[10px]">
+                        <span className="font-bold text-gray-400 tracking-widest">Exited On</span>
+                        <span className="font-black text-gray-900">{patient.exitDate} at {patient.exitTime}</span>
+                      </div>
+                      {patient.followUpRequired && (
+                        <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 flex items-center justify-between">
+                          <div className="flex items-center gap-2"><CalendarMonthIcon className="text-blue-600" sx={{ fontSize: 16 }} /> <span className="text-[10px] font-black text-blue-800 tracking-widest">Follow-up</span></div>
+                          <span className="text-[10px] font-black text-blue-900">{patient.followUpDate}</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="pt-6 flex justify-end gap-3 border-t border-gray-50 mt-auto">
+                      <button className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-black text-xs tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-100" onClick={() => { setSelectedExitPatient(patient); setShowExitModal(true); }}>
+                        <ExitToAppIcon sx={{ fontSize: 18 }} />Finalize Exit
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Manage Doctors Modal */}
-      <Modal
-        isOpen={showDoctorModal}
-        onClose={() => setShowDoctorModal(false)}
-        title="Manage Doctors"
-        size="lg"
-      >
-        <div className="space-y-6">
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
-            <h4 className="font-semibold text-gray-800 mb-4">Add New Doctor</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative" ref={docNameDropdownRef}>
-                <label className="form-label">Doctor Name *</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    className="form-input pr-10"
-                    placeholder="Search or enter doctor name"
-                    value={docNameSearchTerm}
-                    onChange={(e) => {
-                      setDocNameSearchTerm(e.target.value);
-                      setIsDocNameDropdownOpen(true);
-                      setDoctorForm({ ...doctorForm, name: e.target.value });
-                    }}
-                    onFocus={() => setIsDocNameDropdownOpen(true)}
-                  />
-                  <KeyboardArrowDownIcon
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors"
-                    onClick={() => setIsDocNameDropdownOpen(!isDocNameDropdownOpen)}
-                  />
+      {/* Consultation Modal - Read Only View */}
+      <Modal isOpen={showConsultationForm} onClose={() => setShowConsultationForm(false)} title={`Clinical Summary Profile - ${selectedPatient?.patientName || 'Record'}`} size="xl" footer={selectedPatient && (
+        <div className="flex justify-end gap-3 px-4 pb-2">
+          <button onClick={() => setShowConsultationForm(false)} className="px-6 py-2 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50 font-bold transition-colors text-sm tracking-widest"> Close </button>
+          <button onClick={handlePrintPrescription} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md flex items-center text-sm font-bold tracking-widest"> <PrintIcon className="mr-2" fontSize="small" /> Print Summary </button>
+        </div>
+      )}>
+        {selectedPatient && (
+          <div className="space-y-6 py-2 px-1">
+            {/* Clinical Identity Header Card */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm relative overflow-hidden">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-8 relative z-10">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-gray-400 tracking-widest">Patient Identity</p>
+                  <p className="text-xl font-black text-black">{selectedPatient.patientName}</p>
+                  <p className="text-[10px] font-bold text-blue-600">{selectedPatient.patientId || 'UHID-291088'}</p>
                 </div>
-                {isDocNameDropdownOpen && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
-                    {AVAILABLE_DOCTORS.filter(d =>
-                      d.name.toLowerCase().includes(docNameSearchTerm.toLowerCase()) ||
-                      d.department.toLowerCase().includes(docNameSearchTerm.toLowerCase())
-                    ).length > 0 ? (
-                      AVAILABLE_DOCTORS.filter(d =>
-                        d.name.toLowerCase().includes(docNameSearchTerm.toLowerCase()) ||
-                        d.department.toLowerCase().includes(docNameSearchTerm.toLowerCase())
-                      ).map(doc => (
-                        <div
-                          key={doc.name}
-                          className="p-3 hover:bg-blue-50 cursor-pointer border-b last:border-0 border-gray-100 transition-colors"
-                          onClick={() => handleSelectDocName(doc)}
-                        >
-                          <div className="font-bold text-gray-800 text-sm">{doc.name}</div>
-                          <div className="text-xs text-blue-600 font-medium">{doc.department} • {doc.specialization}</div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="p-4 text-center">
-                        <p className="text-sm text-gray-500 mb-2">No matching doctor found</p>
-                        <button
-                          type="button"
-                          className="text-xs text-blue-600 font-bold hover:underline"
-                          onClick={() => {
-                            setDoctorForm({ ...doctorForm, name: docNameSearchTerm });
-                            setIsDocNameDropdownOpen(false);
-                          }}
-                        >
-                          + Use custom name: "{docNameSearchTerm}"
-                        </button>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-gray-400 tracking-widest">Visit Identity</p>
+                  <p className="text-lg font-black text-black">Token: {selectedPatient.token}</p>
+                  <p className="text-[10px] font-bold text-gray-500">{new Date().toLocaleDateString('en-GB')}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-gray-400 tracking-widest">Attending Physician</p>
+                  <p className="text-lg font-black text-black">{selectedPatient.doctor}</p>
+                  <p className="text-[10px] font-bold text-blue-600">{selectedPatient.department}</p>
+                </div>
+                <div className="space-y-2 text-right">
+                  <p className="text-[10px] font-black text-gray-400 tracking-widest">Clinical Status</p>
+                  <span className={`inline-flex items-center px-4 py-1.5 rounded-lg text-[10px] font-black ${consultationForm.consultationStatus === 'Completed' ? 'border-blue-600 text-blue-600' : 'border-black text-black'}`}>
+                    {consultationForm.consultationStatus.toUpperCase()}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Information Architecture - Grid Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+              {/* Left Column: Vitals & Assessment */}
+              <div className="lg:col-span-1 space-y-6">
+                {/* Vital Signs Analysis */}
+                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="bg-white px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+                    <TimelineIcon sx={{ fontSize: 16 }} className="text-blue-600" />
+                    <h4 className="text-[10px] font-black text-black tracking-widest">Vital Signs Analysis</h4>
+                  </div>
+                  <div className="p-5 grid grid-cols-2 gap-4">
+                    {[
+                      { label: 'Blood Pressure', value: consultationForm.vitalSigns.bp || '120/80', unit: 'mmHg' },
+                      { label: 'Pulse Rate', value: consultationForm.vitalSigns.pulse || '72', unit: 'BPM' },
+                      { label: 'Temperature', value: consultationForm.vitalSigns.temperature || '98.6', unit: '°F' },
+                      { label: 'SpO2 Level', value: consultationForm.vitalSigns.spo2 || '98', unit: '%' },
+                      { label: 'Body Weight', value: consultationForm.vitalSigns.weight || '65', unit: 'kg' },
+                      { label: 'BMI', value: consultationForm.vitalSigns.bmi || '22.5', unit: 'kg/m²' },
+                    ].map((vital, idx) => (
+                      <div key={idx} className="p-3 bg-gray-50/50 rounded-xl border border-gray-100 shadow-inner">
+                        <p className="text-[8px] font-black text-gray-400 mb-1">{vital.label}</p>
+                        <p className="text-sm font-black text-black">{vital.value} <span className="text-[8px] font-bold text-gray-400">{vital.unit}</span></p>
                       </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Clinical History & Allergies */}
+                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="bg-white px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+                    <HistoryEduIcon sx={{ fontSize: 16 }} className="text-blue-600" />
+                    <h4 className="text-[10px] font-black text-black tracking-widest">Patient Background</h4>
+                  </div>
+                  <div className="p-5 space-y-5">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black text-gray-400 tracking-widest">Medical History</p>
+                      <p className="text-xs font-medium text-black leading-relaxed">
+                        {consultationForm.history || 'No significant past history recorded.'}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black text-blue-600 tracking-widest">Known Allergies</p>
+                      <p className="text-xs font-black text-black bg-blue-50 px-3 py-1.5 rounded border border-blue-100 block">
+                        {consultationForm.allergies || 'No Known Allergies (NKA)'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Middle/Right Column: Clinical assessment, Diagnosis, Medications */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Primary Assessment & Diagnosis */}
+                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="bg-white px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <AssessmentIcon sx={{ fontSize: 16 }} className="text-blue-600" />
+                      <h4 className="text-[10px] font-black text-black tracking-widest">Clinical Impression & Assessment</h4>
+                    </div>
+                    {consultationForm.diagnosisCode && (
+                      <span className="text-[9px] font-black text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">ICD: {consultationForm.diagnosisCode}</span>
                     )}
                   </div>
-                )}
-              </div>
-              <div>
-                <label className="form-label">Department *</label>
-                <select
-                  className="form-input"
-                  value={doctorForm.department}
-                  onChange={(e) => setDoctorForm({ ...doctorForm, department: e.target.value })}
-                >
-                  <option value="">Select Department</option>
-                  <option value="Cardiology">Cardiology</option>
-                  <option value="Orthopedics">Orthopedics</option>
-                  <option value="Neurology">Neurology</option>
-                  <option value="General Medicine">General Medicine</option>
-                  <option value="Pediatrics">Pediatrics</option>
-                  <option value="Dermatology">Dermatology</option>
-                </select>
-              </div>
-              <div>
-                <label className="form-label">Specialization</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="e.g., Cardiologist"
-                  value={doctorForm.specialization}
-                  onChange={(e) => setDoctorForm({ ...doctorForm, specialization: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="form-label">Qualification</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="e.g., MBBS, MD"
-                  value={doctorForm.qualification}
-                  onChange={(e) => setDoctorForm({ ...doctorForm, qualification: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="form-label">OPD Room</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="e.g., Room 101"
-                  value={doctorForm.opdRoom}
-                  onChange={(e) => setDoctorForm({ ...doctorForm, opdRoom: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="form-label">Email ID</label>
-                <input
-                  type="email"
-                  className="form-input"
-                  placeholder="doctor@hospital.com"
-                  value={doctorForm.email}
-                  onChange={(e) => setDoctorForm({ ...doctorForm, email: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="form-label">Contact Number</label>
-                <input
-                  type="tel"
-                  className="form-input"
-                  placeholder="+91 9876543210"
-                  value={doctorForm.contact}
-                  onChange={(e) => setDoctorForm({ ...doctorForm, contact: e.target.value })}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <label className="form-label">Status</label>
-                  <div className="mt-2">
-                    <label className="inline-flex items-center">
-                      <input
-                        type="checkbox"
-                        className="rounded border-gray-300 text-blue-600 mr-2"
-                        checked={doctorForm.isActive}
-                        onChange={(e) => setDoctorForm({ ...doctorForm, isActive: e.target.checked })}
-                      />
-                      <span>Active</span>
-                    </label>
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8 border-b border-gray-50">
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black text-gray-400 tracking-widest">Chief Complaints</p>
+                      <p className="text-sm font-bold text-black border-l-4 border-blue-600 pl-4 py-1 italic leading-relaxed">
+                        "{consultationForm.symptoms || 'Symptoms not specified.'}"
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black text-gray-400 tracking-widest">Primary Diagnosis</p>
+                      <p className="text-lg font-black text-blue-600 italic leading-tight">
+                        {consultationForm.diagnosis || 'Pending Diagnosis'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black text-gray-400 tracking-widest">Physical Examination & Observations</p>
+                      <p className="text-xs font-medium text-gray-700 leading-relaxed bg-gray-50/50 p-4 rounded-xl border border-gray-100">
+                        {consultationForm.examination || 'Detailed examination results not available.'}
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <button
-                  onClick={handleAddDoctor}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md flex items-center text-sm font-medium"
-                >
-                  <AddIcon className="mr-2" fontSize="small" /> Add Doctor
-                </button>
-              </div>
-            </div>
-          </div>
 
-          <div>
-            <h4 className="font-semibold text-gray-800 mb-4">Current Doctors ({doctors.length})</h4>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Doctor</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Department</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Queue</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {doctors.map(doctor => (
-                    <tr key={doctor.id}>
-                      <td className="px-4 py-3">
-                        <div>
-                          <p className="font-medium text-gray-900">{doctor.name}</p>
-                          <p className="text-xs text-blue-600 font-medium">{doctor.qualification}</p>
-                          <p className="text-[10px] text-gray-500">{doctor.email}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
-                          {doctor.department}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${doctor.isActive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                          {doctor.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`px-3 py-1 rounded text-xs font-medium ${doctor.queue > 0 ? 'bg-yellow-50 text-yellow-700' : 'bg-gray-50 text-gray-700'}`}>
-                          {doctor.queue} patients
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => handleDoctorStatusToggle(doctor.id)}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm ${doctor.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}
-                        >
-                          {doctor.isActive ? 'Deactivate' : 'Activate'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Consultation Modal */}
-      <Modal
-        isOpen={showConsultationForm}
-        onClose={() => setShowConsultationForm(false)}
-        title={`Consultation - ${selectedPatient?.patientName || 'Patient'}`}
-        size="xl"
-        footer={selectedPatient && (
-          <div className="flex justify-end gap-3">
-            <button
-              onClick={() => setShowConsultationForm(false)}
-              className="px-4 py-2 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50 transition-colors shadow-sm text-sm font-medium"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleCompleteConsultation}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow-md flex items-center text-sm font-medium"
-            >
-              <CheckCircleIcon className="mr-2" fontSize="small" /> Complete Consultation
-            </button>
-            <button
-              onClick={handlePrintPrescription}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md flex items-center text-sm font-medium"
-            >
-              <PrintIcon className="mr-2" fontSize="small" /> Print Prescription
-            </button>
-          </div>
-        )}
-      >
-        {selectedPatient && (
-          <div className="space-y-6">
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-sm text-gray-600">Patient</p>
-                  <p className="font-medium text-gray-900">{selectedPatient.patientName}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Token No</p>
-                  <p className="font-medium text-gray-900">{selectedPatient.token}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Doctor</p>
-                  <p className="font-medium text-gray-900">{selectedPatient.doctor}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Department</p>
-                  <p className="font-medium text-gray-900">{selectedPatient.department}</p>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-semibold text-gray-800 mb-3">Vital Signs</h4>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="form-label">Blood Pressure</label>
-                  <input
-                    type="text"
-                    placeholder="120/80"
-                    className="form-input"
-                    value={consultationForm.vitalSigns.bp}
-                    onChange={(e) => setConsultationForm({
-                      ...consultationForm,
-                      vitalSigns: { ...consultationForm.vitalSigns, bp: e.target.value }
-                    })}
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Pulse (BPM)</label>
-                  <input
-                    type="number"
-                    placeholder="72"
-                    className="form-input"
-                    value={consultationForm.vitalSigns.pulse}
-                    onChange={(e) => setConsultationForm({
-                      ...consultationForm,
-                      vitalSigns: { ...consultationForm.vitalSigns, pulse: e.target.value }
-                    })}
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Temperature (°F)</label>
-                  <input
-                    type="number"
-                    placeholder="98.6"
-                    step="0.1"
-                    className="form-input"
-                    value={consultationForm.vitalSigns.temperature}
-                    onChange={(e) => setConsultationForm({
-                      ...consultationForm,
-                      vitalSigns: { ...consultationForm.vitalSigns, temperature: e.target.value }
-                    })}
-                  />
-                </div>
-                <div>
-                  <label className="form-label">SpO2 (%)</label>
-                  <input
-                    type="number"
-                    placeholder="98"
-                    className="form-input"
-                    value={consultationForm.vitalSigns.spo2}
-                    onChange={(e) => setConsultationForm({
-                      ...consultationForm,
-                      vitalSigns: { ...consultationForm.vitalSigns, spo2: e.target.value }
-                    })}
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Weight (kg)</label>
-                  <input
-                    type="number"
-                    placeholder="65"
-                    className="form-input"
-                    value={consultationForm.vitalSigns.weight}
-                    onChange={(e) => setConsultationForm({
-                      ...consultationForm,
-                      vitalSigns: { ...consultationForm.vitalSigns, weight: e.target.value }
-                    })}
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Height (cm)</label>
-                  <input
-                    type="number"
-                    placeholder="170"
-                    className="form-input"
-                    value={consultationForm.vitalSigns.height}
-                    onChange={(e) => setConsultationForm({
-                      ...consultationForm,
-                      vitalSigns: { ...consultationForm.vitalSigns, height: e.target.value }
-                    })}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Clinical Assessment Section */}
-            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-              <div className="flex items-center gap-2 mb-4 text-blue-800 border-b pb-2">
-                <MedicalServicesIcon fontSize="small" />
-                <h4 className="font-bold uppercase tracking-wider text-sm">Clinical Assessment</h4>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="form-label">Medical History</label>
-                  <textarea
-                    className="form-input bg-gray-50/50"
-                    rows="3"
-                    placeholder="Past medical conditions, surgeries, chronic illnesses..."
-                    value={consultationForm.history}
-                    onChange={(e) => setConsultationForm({ ...consultationForm, history: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="form-label text-red-700 font-semibold">Known Allergies</label>
-                  <textarea
-                    className="form-input bg-gray-50/50"
-                    rows="3"
-                    placeholder="Drug allergies, food allergies, environmental..."
-                    value={consultationForm.allergies}
-                    onChange={(e) => setConsultationForm({ ...consultationForm, allergies: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Chief Complaints / Symptoms *</label>
-                  <textarea
-                    className="form-input"
-                    rows="3"
-                    placeholder="Presenting symptoms and duration..."
-                    value={consultationForm.symptoms}
-                    onChange={(e) => setConsultationForm({ ...consultationForm, symptoms: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Physical Examination</label>
-                  <textarea
-                    className="form-input bg-gray-50/50"
-                    rows="3"
-                    placeholder="General appearance, systemic examination findings..."
-                    value={consultationForm.examination}
-                    onChange={(e) => setConsultationForm({ ...consultationForm, examination: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Diagnosis & Treatment Section */}
-            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-              <div className="flex items-center gap-2 mb-4 text-green-800 border-b pb-2">
-                <TaskAltIcon fontSize="small" />
-                <h4 className="font-bold uppercase tracking-wider text-sm">Diagnosis & Treatment Plan</h4>
-              </div>
-              <div className="space-y-6">
-                <div>
-                  <label className="form-label">Final Diagnosis / Impression *</label>
-                  <input
-                    type="text"
-                    className="form-input font-semibold text-blue-900"
-                    placeholder="Primary diagnosis..."
-                    value={consultationForm.diagnosis}
-                    onChange={(e) => setConsultationForm({ ...consultationForm, diagnosis: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Prescription (Medications) *</label>
-                  <textarea
-                    className="form-input font-mono text-sm leading-relaxed"
-                    rows="5"
-                    placeholder="Rx:
-1. Drug Name - Dosage - Frequency - Duration
-2. ..."
-                    value={consultationForm.prescription}
-                    onChange={(e) => setConsultationForm({ ...consultationForm, prescription: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-3">
-                    <label className="form-label mb-0">Laboratory & Imaging Tests</label>
-                    <button
-                      type="button"
-                      onClick={addTestRow}
-                      className="flex items-center text-blue-600 hover:text-blue-700 text-sm font-bold bg-blue-50 px-3 py-1.5 rounded-lg transition-colors border border-blue-100"
-                    >
-                      <AddIcon className="mr-1" fontSize="small" /> Add Investigation
-                    </button>
+                {/* Prescribed Medications Table */}
+                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="bg-white px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+                    <MedicationIcon sx={{ fontSize: 16 }} className="text-blue-600" />
+                    <h4 className="text-[10px] font-black text-black tracking-widest">Prescribed Medications (Rx)</h4>
                   </div>
-                  <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
-                    <table className="w-full text-sm text-left border-collapse">
-                      <thead>
-                        <tr className="bg-gray-50 border-b">
-                          <th className="px-4 py-3 font-bold text-gray-700 w-16 text-center">#</th>
-                          <th className="px-4 py-3 font-bold text-gray-700">Test Description</th>
-                          <th className="px-4 py-3 font-bold text-gray-700">Required Samples</th>
-                          <th className="px-4 py-3 font-bold text-gray-700 w-20 text-center">Action</th>
+                  <div className="p-0 overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-100 border-collapse">
+                      <thead className="bg-gray-50/50">
+                        <tr>
+                          <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 tracking-widest">Medicine Detail</th>
+                          <th className="px-6 py-4 text-center text-[10px] font-black text-gray-400 tracking-widest">Route/Dosage</th>
+                          <th className="px-6 py-4 text-center text-[10px] font-black text-gray-400 tracking-widest">Frequency</th>
+                          <th className="px-6 py-4 text-right text-[10px] font-black text-gray-400 tracking-widest">Duration</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {consultationForm.testsRecommended.map((test, index) => (
-                          <tr key={index} className="hover:bg-blue-50/30 transition-colors">
-                            <td className="px-4 py-3 text-center">
-                              <span className="text-gray-400 font-mono">{test.id}</span>
+                      <tbody className="bg-white divide-y divide-gray-50">
+                        {(consultationForm.medications.length > 0 && consultationForm.medications[0].name ? consultationForm.medications : [
+                          { name: 'Tab. Amoxicillin', genericName: 'Amoxicillin 500mg', dosage: '1 Tablet', route: 'Oral', duration: '5 Days', afterFood: true, frequency: { morning: true, afternoon: true, night: true }, instructions: 'Complete course' }
+                        ]).map((med, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="px-6 py-4">
+                              <p className="text-sm font-black text-black">{med.name}</p>
+                              <p className="text-[10px] font-bold text-gray-400 italic leading-tight">{med.genericName || 'Generic Not Specified'}</p>
                             </td>
-                            <td className="px-4 py-3">
-                              {test.description === 'Other' ? (
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="text"
-                                    autoFocus
-                                    className="w-full p-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-blue-50/30 text-sm"
-                                    placeholder="Enter test name..."
-                                    value={test.customDescription}
-                                    onChange={(e) => updateTestRow(index, 'customDescription', e.target.value)}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => updateTestRow(index, 'description', '')}
-                                    className="text-gray-400 hover:text-gray-600 p-1"
-                                    title="Change selection"
-                                  >
-                                    <CloseIcon sx={{ fontSize: 16 }} />
-                                  </button>
-                                </div>
-                              ) : (
-                                <select
-                                  className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white transition-all text-sm"
-                                  value={test.description}
-                                  onChange={(e) => updateTestRow(index, 'description', e.target.value)}
-                                >
-                                  <option value="">-- Select Test --</option>
-                                  {TEST_OPTIONS.map(opt => (
-                                    <option key={opt} value={opt}>{opt}</option>
-                                  ))}
-                                </select>
-                              )}
+                            <td className="px-6 py-4 text-center">
+                              <p className="text-xs font-black text-blue-600">{med.route || 'Oral'}</p>
+                              <p className="text-[10px] font-bold text-gray-500">{med.dosage}</p>
                             </td>
-                            <td className="px-4 py-3">
-                              {test.samples === 'Other' ? (
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="text"
-                                    autoFocus
-                                    className="w-full p-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-blue-50/30 text-sm"
-                                    placeholder="Enter sample type..."
-                                    value={test.customSamples}
-                                    onChange={(e) => updateTestRow(index, 'customSamples', e.target.value)}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => updateTestRow(index, 'samples', '')}
-                                    className="text-gray-400 hover:text-gray-600 p-1"
-                                    title="Change selection"
-                                  >
-                                    <CloseIcon sx={{ fontSize: 16 }} />
-                                  </button>
-                                </div>
-                              ) : (
-                                <select
-                                  className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white transition-all text-sm"
-                                  value={test.samples}
-                                  onChange={(e) => updateTestRow(index, 'samples', e.target.value)}
-                                >
-                                  <option value="">-- Select Sample --</option>
-                                  {SAMPLE_OPTIONS.map(opt => (
-                                    <option key={opt} value={opt}>{opt}</option>
-                                  ))}
-                                </select>
-                              )}
+                            <td className="px-6 py-4 text-center">
+                              <div className="flex justify-center gap-1.5 mb-1.5">
+                                {['M', 'A', 'N'].map((slot, i) => {
+                                  const key = i === 0 ? 'morning' : i === 1 ? 'afternoon' : 'night';
+                                  const active = med.frequency?.[key];
+                                  return (
+                                    <span key={slot} className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-black ${active ? 'text-black' : 'text-blue-600'}`}>
+                                      {slot}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                              <span className="text-[8px] font-black text-gray-400 tracking-tighter">
+                                {med.beforeFood ? 'Before Food' : med.afterFood ? 'After Food' : 'As Directed'}
+                              </span>
                             </td>
-                            <td className="px-4 py-3 text-center">
-                              {index > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => removeTestRow(index)}
-                                  className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
-                                >
-                                  <DeleteIcon fontSize="small" />
-                                </button>
-                              )}
+                            <td className="px-6 py-4 text-right">
+                              <p className="text-xs font-black text-blue-600">{med.duration}</p>
+                              {med.instructions && <p className="text-[8px] font-bold text-gray-400 italic">"{med.instructions}"</p>}
                             </td>
                           </tr>
                         ))}
@@ -2373,44 +2757,77 @@ const OPDManagement = () => {
                   </div>
                 </div>
 
-              </div>
-            </div>
+                {/* Investigations Recommended Table */}
+                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="bg-white px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+                    <ScienceIcon sx={{ fontSize: 16 }} className="text-blue-600" />
+                    <h4 className="text-[10px] font-black text-black tracking-widest">Investigations & Lab Orders</h4>
+                  </div>
+                  <div className="p-0 overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-100 border-collapse">
+                      <thead className="bg-gray-50/50">
+                        <tr>
+                          <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 tracking-widest">Investigation</th>
+                          <th className="px-6 py-4 text-center text-[10px] font-black text-gray-400 tracking-widest">Status</th>
+                          <th className="px-6 py-4 text-right text-[10px] font-black text-gray-400 tracking-widest">Interpretation</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-50">
+                        {(consultationForm.testsRecommended.length > 0 && consultationForm.testsRecommended[0].description ? consultationForm.testsRecommended : [
+                          { description: 'Complete Blood Count (CBC)', samples: 'Blood', labStatus: 'Verified', resultValue: '14.2 g/dL' }
+                        ]).map((test, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="px-6 py-4">
+                              <p className="text-sm font-black text-black">{test.description}</p>
+                              <p className="text-[9px] font-bold text-gray-400 tracking-tighter">Ref Id: {test.id || 'LAB-2910'}</p>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className={`text-[9px] font-black px-3 py-1 ${test.labStatus === 'Verified' ? 'text-blue-600' : 'text-black'}`}>
+                                {test.labStatus?.toUpperCase() || 'ORDERED'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <p className="text-sm font-black text-black">{test.resultValue || 'Results Pending'}</p>
+                              <p className="text-[9px] font-bold text-gray-400">{test.verifiedBy || 'Awaiting Lab Signature'}</p>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
 
-            {/* Follow-up Section */}
-            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-              <div className="flex items-center gap-2 mb-4 text-orange-800 border-b pb-2">
-                <PendingActionsIcon fontSize="small" />
-                <h4 className="font-bold uppercase tracking-wider text-sm">Advice & Follow-up</h4>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2">
-                  <label className="form-label">Instructions for Patient</label>
-                  <textarea
-                    className="form-input bg-orange-50/10 border-orange-100 focus:border-orange-200 focus:ring-orange-100"
-                    rows="3"
-                    placeholder="Dietary advice, lifestyle changes, how to use medications..."
-                    value={consultationForm.instructions}
-                    onChange={(e) => setConsultationForm({ ...consultationForm, instructions: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Next Visit Date</label>
-                  <input
-                    type="date"
-                    className="form-input"
-                    value={consultationForm.nextVisitDate}
-                    onChange={(e) => setConsultationForm({ ...consultationForm, nextVisitDate: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Internal Remarks</label>
-                  <input
-                    type="text"
-                    className="form-input bg-gray-50/50"
-                    placeholder="Confidential notes for clinic staff..."
-                    value={consultationForm.remarks}
-                    onChange={(e) => setConsultationForm({ ...consultationForm, remarks: e.target.value })}
-                  />
+                {/* Advice & Clinical Follow-up */}
+                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm ">
+                  <div className="bg-white px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+                    <PendingActionsIcon sx={{ fontSize: 16 }} className="text-blue-600" />
+                    <h4 className="text-[10px] font-black text-black tracking-widest">Advice & Clinical Follow-up</h4>
+                  </div>
+                  <div className="p-6 space-y-6">
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black text-gray-400 tracking-widest">Clinical Advice & Instructions</p>
+                      <p className="text-sm font-medium text-black leading-relaxed">
+                        {consultationForm.instructions || 'Continue standard post-consultation care as directed by the primary physician.'}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
+                      <div className="p-4 bg-blue-50/30 rounded-xl border border-blue-100">
+                        <p className="text-[9px] font-black text-blue-600 tracking-widest mb-2">Next Scheduled Visit</p>
+                        <div className="flex items-center gap-3">
+                          <CalendarMonthIcon sx={{ fontSize: 20 }} className="text-blue-600" />
+                          <p className="text-lg font-black text-black">
+                            {consultationForm.followUpRequired
+                              ? new Date(consultationForm.followUpDate || Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                              : '2026-06-19'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                        <p className="text-[9px] font-black text-gray-400 tracking-widest mb-2">Internal Case Remarks</p>
+                        <p className="text-xs font-bold text-gray-600">{consultationForm.remarks || 'No additional internal remarks recorded for this session.'}</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2418,46 +2835,19 @@ const OPDManagement = () => {
         )}
       </Modal>
 
-      <Modal
-        isOpen={showTokenModal}
-        onClose={() => setShowTokenModal(false)}
-        title={tokenStep === 'form' ? "Generate Patient Token" : "Token Generated Successfully"}
-        size="md"
-        footer={
-          tokenStep === 'form' ? (
-            <div className="flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowTokenModal(false)}
-                className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                form="opd-token-form"
-                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md transition-all flex items-center text-sm font-medium"
-              >
-                <ConfirmationNumberIcon className="mr-2" fontSize="small" /> Generate Token
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-col sm:flex-row justify-center gap-4 w-full max-w-sm mx-auto">
-              <button
-                onClick={handlePrintSlip}
-                className="flex-1 py-3 bg-gray-900 text-white font-medium rounded-xl hover:bg-gray-800 transition-all shadow-md flex items-center justify-center text-sm"
-              >
-                <PrintIcon className="mr-2" fontSize="small" /> Print Record
-              </button>
-              <button
-                onClick={() => setShowTokenModal(false)}
-                className="flex-1 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-all shadow-md flex items-center justify-center text-sm"
-              >
-                Complete
-              </button>
-            </div>
-          )
-        }
+      <Modal isOpen={showTokenModal} onClose={() => setShowTokenModal(false)} title={tokenStep === 'form' ? "Generate Patient Token" : "Token Generated Successfully"} size="md" footer={
+        tokenStep === 'form' ? (
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={() => setShowTokenModal(false)} className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium" >Cancel </button>
+            <button type="submit" form="opd-token-form" className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md transition-all flex items-center text-sm font-medium">  <ConfirmationNumberIcon className="mr-2" fontSize="small" /> Generate Token </button>
+          </div>
+        ) : (
+          <div className="flex flex-row justify-center gap-3 w-full">
+            <button onClick={handlePrintSlip} className="flex-1 py-3 bg-gray-900 text-white font-black rounded-xl hover:bg-black transition-all shadow-md flex items-center justify-center text-[10px] tracking-widest uppercase"><PrintIcon className="mr-2" fontSize="small" /> Print Record </button>
+            <button onClick={() => setShowTokenModal(false)} className="flex-1 py-3 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-700 transition-all shadow-md flex items-center justify-center text-[10px] tracking-widest uppercase">Complete</button>
+          </div>
+        )
+      }
       >
         {tokenStep === 'form' ? (
           <form id="opd-token-form" onSubmit={handleTokenSubmit} className="space-y-6">
@@ -2467,24 +2857,523 @@ const OPDManagement = () => {
                   Patient Name <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    className="w-full p-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-gray-400"
-                    placeholder="Search or enter full name"
-                    value={patientSearchTerm}
-                    onChange={(e) => {
-                      setPatientSearchTerm(e.target.value);
-                      setIsPatientDropdownOpen(true);
-                      setTokenForm({ ...tokenForm, patientName: e.target.value });
-                    }}
-                    onFocus={() => setIsPatientDropdownOpen(true)}
-                  />
-                  <KeyboardArrowDownIcon
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors"
-                    onClick={() => setIsPatientDropdownOpen(!isPatientDropdownOpen)}
-                  />
+                  <input type="text" required className="w-full p-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-gray-400" placeholder="Search or enter full name" value={patientSearchTerm} onChange={(e) => { setPatientSearchTerm(e.target.value); setIsPatientDropdownOpen(true); setTokenForm({ ...tokenForm, patientName: e.target.value }); }} onFocus={() => setIsPatientDropdownOpen(true)} />
+                  <KeyboardArrowDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" onClick={() => setIsPatientDropdownOpen(!isPatientDropdownOpen)} />
                 </div>
+                {isPatientDropdownOpen && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                    {REGISTERED_PATIENTS.filter(p =>
+                      p.name.toLowerCase().includes(patientSearchTerm.toLowerCase()) ||
+                      p.phoneNo.includes(patientSearchTerm) ||
+                      p.id.toLowerCase().includes(patientSearchTerm.toLowerCase())
+                    ).length > 0 ? (
+                      REGISTERED_PATIENTS.filter(p =>
+                        p.name.toLowerCase().includes(patientSearchTerm.toLowerCase()) ||
+                        p.phoneNo.includes(patientSearchTerm) ||
+                        p.id.toLowerCase().includes(patientSearchTerm.toLowerCase())
+                      ).map(patient => (
+                        <div key={patient.id} className="p-3 hover:bg-blue-50 cursor-pointer border-b last:border-0 border-gray-100 transition-colors" onClick={() => handleSelectPatient(patient)}>
+                          <div className="font-bold text-gray-800 text-sm">{patient.name}</div>
+                          <div className="text-[10px] text-gray-500">{patient.id} • {patient.phoneNo}</div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-3 text-center text-gray-500 text-sm">
+                        No matching patient found
+                        <div className="mt-1">
+                          <button type="button" className="text-xs text-blue-600 font-bold hover:underline" onClick={() => { setTokenForm({ ...tokenForm, patientName: patientSearchTerm }); setIsPatientDropdownOpen(false); }}>+ Use "{patientSearchTerm}" as new </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="md:col-span-1">
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">UHID / Patient ID</label>
+                <input type="text" className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-gray-400" placeholder="Optional for new" value={tokenForm.patientId || tokenForm.uhid} onChange={(e) => setTokenForm({ ...tokenForm, uhid: e.target.value, patientId: e.target.value })} />
+              </div>
+
+              <div className="md:col-span-1">
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5"> Phone Number <span className="text-red-500">*</span> </label>
+                <input type="tel" required className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-gray-400" placeholder="10-digit number" value={tokenForm.phoneNo} onChange={(e) => setTokenForm({ ...tokenForm, phoneNo: e.target.value })} />
+              </div>
+
+              <div className="md:col-span-1">
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5"> Email Address </label>
+                <input type="email" className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-gray-400" placeholder="patient@email.com" value={tokenForm.email} onChange={(e) => setTokenForm({ ...tokenForm, email: e.target.value })} />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5"> Age <span className="text-red-500">*</span> </label>
+                <input type="number" required className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Years" value={tokenForm.age} onChange={(e) => setTokenForm({ ...tokenForm, age: e.target.value })} />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5"> Gender <span className="text-red-500">*</span> </label>
+                <select className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white" value={tokenForm.gender} onChange={(e) => setTokenForm({ ...tokenForm, gender: e.target.value })}>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5"> Blood Group </label>
+                <input type="text" className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="e.g., O+, B-" value={tokenForm.bloodGroup} onChange={(e) => setTokenForm({ ...tokenForm, bloodGroup: e.target.value })} />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5"> Visit Type </label>
+                <select className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white" value={tokenForm.visitType} onChange={(e) => setTokenForm({ ...tokenForm, visitType: e.target.value })}>
+                  <option value="New">New</option>
+                  <option value="Follow-up">Follow-up</option>
+                  <option value="Emergency">Emergency</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5"> Residential Address </label>
+                <input type="text" className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Street, Locality, City, State" value={tokenForm.address} onChange={(e) => setTokenForm({ ...tokenForm, address: e.target.value })} />
+              </div>
+
+              <div className="relative" ref={deptDropdownRef}>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5"> Department <span className="text-red-500">*</span> </label>
+                <div className="relative">
+                  <input type="text" placeholder="Search Department..." className="w-full p-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" value={deptSearchTerm} onChange={(e) => { setDeptSearchTerm(e.target.value); setIsDeptDropdownOpen(true); setTokenForm({ ...tokenForm, department: '', doctorId: '' }); }} onFocus={() => setIsDeptDropdownOpen(true)} />
+                  <KeyboardArrowDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" onClick={() => setIsDeptDropdownOpen(!isDeptDropdownOpen)} />
+                </div>
+                {isDeptDropdownOpen && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                    {filteredDepartments.length > 0 ? (
+                      filteredDepartments.map(dept => (
+                        <div key={dept} className="p-3 hover:bg-blue-50 cursor-pointer border-b last:border-0 border-gray-100 transition-colors text-sm" onClick={() => handleSelectDept(dept)}> {dept}</div>
+                      ))
+                    ) : (
+                      <div className="p-3 text-center text-gray-500 text-sm">No departments found</div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="relative" ref={docDropdownRef}>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5"> Doctor <span className="text-red-500">*</span></label>
+                <div className="relative">
+                  <input type="text" disabled={!tokenForm.department} placeholder={tokenForm.department ? "Search Doctor..." : "Select department first"} className={`w-full p-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none ${!tokenForm.department ? 'bg-gray-50 cursor-not-allowed' : ''}`} value={docSearchTerm} onChange={(e) => { setDocSearchTerm(e.target.value); setIsDocDropdownOpen(true); }} onFocus={() => tokenForm.department && setIsDocDropdownOpen(true)} />
+                  <KeyboardArrowDownIcon className={`absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 ${tokenForm.department ? 'cursor-pointer hover:text-gray-600' : 'cursor-not-allowed'} transition-colors`} onClick={() => tokenForm.department && setIsDocDropdownOpen(!isDocDropdownOpen)} />
+                </div>
+                {isDocDropdownOpen && tokenForm.department && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                    {filteredDoctorsForToken.length > 0 ? (
+                      filteredDoctorsForToken.map(doc => (
+                        <div key={doc.id} className="p-3 hover:bg-blue-50 cursor-pointer border-b last:border-0 border-gray-100 transition-colors text-sm" onClick={() => handleSelectDoc(doc)}>
+                          <div className="font-medium text-gray-800 text-sm">{doc.name}</div>
+                          <div className="text-[10px] text-gray-500">Queue: {doc.queue} patients</div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-3 text-center text-gray-500 text-sm">No active doctors found</div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5"> Appointment Type </label>
+                <select className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white" value={tokenForm.appointmentType} onChange={(e) => setTokenForm({ ...tokenForm, appointmentType: e.target.value })}>
+                  <option value="Walk-in">Walk-in</option>
+                  <option value="Online">Online</option>
+                  <option value="Tele-consultation">Tele-consultation</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-1">
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Priority Level</label>
+                <select className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white" value={tokenForm.priority} onChange={(e) => setTokenForm({ ...tokenForm, priority: e.target.value })}>
+                  <option value="Normal">Normal</option>
+                  <option value="Urgent">Urgent</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-1">
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5"> Referred By </label>
+                <input type="text" className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-gray-400" placeholder="Doctor or Clinic Name" value={tokenForm.referredBy} onChange={(e) => setTokenForm({ ...tokenForm, referredBy: e.target.value })} />
+              </div>
+            </div>
+          </form>
+        ) : (
+          <div className="py-2 flex flex-col items-center">
+            {/* Token Slip UI Card */}
+            <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 flex flex-col mx-auto transform transition-all duration-500 animate-in fade-in zoom-in slide-in-from-bottom-4">
+
+              {/* Header */}
+              <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 p-8 text-white text-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-10 transform translate-x-6 -translate-y-6 rotate-12">
+                  <ConfirmationNumberIcon sx={{ fontSize: 140 }} />
+                </div>
+                <div className="relative z-10">
+                  <h4 className="text-[10px] font-black tracking-[0.3em] text-blue-200 mb-3 drop-shadow-sm">OPD TOKEN SLIP</h4>
+                  <p className="text-6xl font-black mb-3 tracking-tighter drop-shadow-md">{generatedToken?.token}</p>
+                  <div className="inline-block px-3 py-1 bg-white/10 backdrop-blur-md rounded-full">
+                    <p className="text-[11px] font-bold text-blue-50 tracking-widest">{new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })} • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="p-8 bg-white relative">
+                <div className="flex justify-between items-start mb-8">
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-gray-400 tracking-[0.1em] font-black">Patient ID</p>
+                    <p className="font-mono text-xs text-blue-900 font-black bg-blue-50 px-2 py-0.5 rounded inline-block">{generatedToken?.patientId}</p>
+                    <div className="pt-2">
+                      <p className="text-[10px] text-gray-400 tracking-[0.1em] font-black mb-1">Full Name</p>
+                      <p className="font-black text-gray-900 text-xl leading-tight tracking-tight">{generatedToken?.patientName}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-[9px] font-black tracking-[0.1em] ${generatedToken?.priority === 'Urgent' ? 'bg-red-500 text-white shadow-sm ring-4 ring-red-50' : 'bg-green-500 text-white shadow-sm ring-4 ring-green-50'}`}> {generatedToken?.priority === 'Urgent' ? 'URGENT' : 'NORMAL'}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-y-6 gap-x-6 mb-8">
+                  <div>
+                    <p className="text-[9px] text-gray-400 tracking-[0.2em] font-black mb-1.5">Age / Gender</p>
+                    <p className="text-sm font-black text-gray-800">{generatedToken?.age}Y / {generatedToken?.gender}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-gray-400 tracking-[0.2em] font-black mb-1.5">Blood Group</p>
+                    <p className="text-sm font-black text-gray-800">{generatedToken?.bloodGroup}</p>
+                  </div>
+                  <div className="col-span-2 p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between group transition-all hover:bg-blue-50 hover:border-blue-100">
+                    <div>
+                      <p className="text-[9px] text-gray-400 tracking-[0.2em] font-black mb-1.5">Consulting Doctor</p>
+                      <p className="text-base font-black text-blue-800 tracking-tight">{generatedToken?.doctor}</p>
+                      <p className="text-[10px] font-bold text-blue-600 mt-0.5 tracking-widest">{generatedToken?.department}</p>
+                    </div>
+                    <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-blue-600 shadow-sm border border-gray-100 group-hover:scale-110 transition-transform"> <PersonIcon fontSize="small" /></div>
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t-2 border-dashed border-gray-200 text-center relative">
+                  <div className="absolute -left-10 -top-3 w-6 h-6 bg-gray-100 rounded-full"></div>
+                  <div className="absolute -right-10 -top-3 w-6 h-6 bg-gray-100 rounded-full"></div>
+
+                  <div className="inline-flex items-center justify-center space-x-2 text-green-600 mb-2"> <CheckCircleIcon sx={{ fontSize: 18 }} /> <span className="font-black text-[11px] tracking-[0.3em]">REGISTRATION CONFIRMED</span> </div>
+                  <div className="flex items-center justify-center space-x-3 text-gray-500 font-bold text-[10px]">
+                    <span className="flex items-center gap-1"><AccessTimeIcon sx={{ fontSize: 14 }} /> Est. Wait: {generatedToken?.waitingTime}</span>
+                    <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                    <span>No: {generatedToken?.queuePosition} in queue</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal isOpen={showViewPatientModal} onClose={() => setShowViewPatientModal(false)} title={`Comprehensive Medical Profile - ${selectedPatientForView?.patientName || 'Record'}`} size="xl" footer={<div className="flex justify-end gap-3 px-4 pb-2">
+        <button onClick={() => setShowViewPatientModal(false)} className="px-6 py-2 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50 font-bold transition-colors text-sm tracking-widest"> Close </button>
+      </div>}>
+        {selectedPatientForView && (
+          <div className="space-y-6 py-2 px-1">
+            {/* Clinical Identity Header */}
+            <div className="flex flex-col md:flex-row justify-between items-start border border-gray-200 rounded-xl p-6 shadow-sm gap-6 bg-white">
+              <div className="flex items-center gap-6">
+                <div className="w-16 h-16 bg-white border border-blue-600 rounded-2xl flex items-center justify-center text-blue-600 shadow-sm"> <PersonIcon sx={{ fontSize: 36 }} /></div>
+                <div>
+                  <h3 className="text-3xl font-black text-black tracking-tight leading-none mb-2"> {selectedPatientForView.patientName} </h3>
+                  <div className="flex items-center gap-4 text-xs font-bold tracking-wider text-gray-500">
+                    <span className="text-blue-600 border border-blue-100 px-2 py-0.5 rounded"> {selectedPatientForView.patientId || 'UHID-REG-291088'} </span>
+                    <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                    <span className="flex items-center gap-1.5">  <CalendarMonthIcon sx={{ fontSize: 14 }} className="text-gray-400" /> Visit Date: {new Date().toLocaleDateString('en-GB')} </span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-3">
+                <span className={`px-4 py-1.5 rounded-lg text-[10px] font-black ${selectedPatientForView.status === 'Waiting' ? 'border-gray-900 text-gray-900' : selectedPatientForView.status === 'In Consultation' ? 'border-blue-600 text-blue-600' : 'border-blue-900 text-blue-900'}`}> {selectedPatientForView.status.toUpperCase()} </span>
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-gray-100"> <ConfirmationNumberIcon sx={{ fontSize: 14 }} className="text-gray-400" />
+                  <p className="text-[11px] font-bold text-gray-500 tracking-widest"> Token: <span className="text-black font-black">{selectedPatientForView.token}</span> </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Information Architecture - Grid Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Column: Demographics & Vitals */}
+              <div className="lg:col-span-1 space-y-6">
+                {/* Demographic Card */}
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                  <div className="bg-white px-5 py-3 border-b border-gray-100 flex items-center gap-2"> <GroupsIcon sx={{ fontSize: 16 }} className="text-blue-600" />
+                    <h4 className="text-[10px] font-black text-black tracking-[0.2em]">Patient Demographics</h4>
+                  </div>
+                  <div className="p-5 grid grid-cols-2 gap-y-6 gap-x-4">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black text-gray-400 tracking-widest">Age / Gender</p>
+                      <p className="text-sm font-bold text-black">{selectedPatientForView.age}Y / {selectedPatientForView.gender}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black text-gray-400 tracking-widest">Blood Group</p>
+                      <p className="text-sm font-bold text-blue-600">{selectedPatientForView.bloodGroup || 'B+'}</p>
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                      <p className="text-[9px] font-black text-gray-400 tracking-widest">Contact Identity</p>
+                      <p className="text-sm font-bold text-black">{selectedPatientForView.phoneNo || '+91 99887 76655'}</p>
+                      <p className="text-xs text-gray-500 truncate">{selectedPatientForView.email || 'patient.record@hospital.com'}</p>
+                    </div>
+                    <div className="col-span-2 space-y-1 pt-2">
+                      <p className="text-[9px] font-black text-gray-400 tracking-widest">Permanent Address</p>
+                      <p className="text-xs font-medium text-gray-700 leading-relaxed border-l border-gray-200 pl-3">
+                        {selectedPatientForView.address || 'H.No 12, Sector 4, Green Valley Colony, Navi Mumbai - 400706'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Vital Signs Card */}
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                  <div className="bg-white px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+                    <TimelineIcon sx={{ fontSize: 16 }} className="text-blue-600" />
+                    <h4 className="text-[10px] font-black text-black tracking-[0.2em]">Vital Signs Analysis</h4>
+                  </div>
+                  <div className="p-5">
+                    {selectedPatientForView.vitals ? (
+                      <div className="grid grid-cols-2 gap-4">
+                        {[
+                          { label: 'Blood Pressure', value: selectedPatientForView.vitals.bp, unit: 'mmHg' },
+                          { label: 'Pulse Rate', value: selectedPatientForView.vitals.pulse, unit: 'BPM' },
+                          { label: 'Temperature', value: selectedPatientForView.vitals.temperature, unit: '°F' },
+                          { label: 'SpO2 Level', value: selectedPatientForView.vitals.spo2, unit: '%' }
+                        ].map((vital, idx) => (
+                          <div key={idx} className="p-3 bg-white rounded-xl border border-gray-100 flex flex-col items-center shadow-sm">
+                            <p className="text-[8px] font-black text-gray-400 mb-1">{vital.label}</p>
+                            <p className="text-sm font-black text-black">{vital.value} <span className="text-[8px] font-bold text-gray-400">{vital.unit}</span></p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-4 text-center">
+                        <p className="text-xs text-gray-400 italic">Vitals not recorded for this visit</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Middle Column: Clinical Assessment & Treatment */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Treatment Journey Header */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-8 h-8 bg-white border border-blue-100 rounded-lg flex items-center justify-center text-blue-600">
+                        <MedicalServicesIcon sx={{ fontSize: 18 }} />
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-gray-400 tracking-widest leading-none mb-1">Consulting Physician</p>
+                        <p className="text-sm font-black text-black">{selectedPatientForView.doctor}</p>
+                      </div>
+                    </div>
+                    <div className="pl-11">
+                      <span className="text-[10px] font-bold text-blue-600 border border-blue-50 px-2 py-0.5 rounded tracking-widest">{selectedPatientForView.department}</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-8 h-8 bg-white border border-gray-100 rounded-lg flex items-center justify-center text-black"><CalendarMonthIcon sx={{ fontSize: 18 }} />
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-gray-400 tracking-widest leading-none mb-1">Visit Type & Priority</p>
+                        <p className="text-sm font-black text-black">{selectedPatientForView.visitType || 'New'}</p>
+                      </div>
+                    </div>
+                    <div className="pl-11">
+                      <span className={`text-[10px] font-black px-3 py-0.5 rounded tracking-widest border ${selectedPatientForView.priority === 'Urgent' ? 'border-blue-600 text-blue-600' : 'border-gray-200 text-gray-500'}`}> {selectedPatientForView.priority} PRIORITY </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Diagnosis & Prescription Section */}
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                  <div className="bg-white px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <DescriptionIcon sx={{ fontSize: 16 }} className="text-blue-600" />
+                      <h4 className="text-[10px] font-black text-black tracking-[0.2em]">Clinical Impression & Rx</h4>
+                    </div>
+                    {selectedPatientForView.diagnosis && <TaskAltIcon sx={{ fontSize: 16 }} className="text-blue-600" />}
+                  </div>
+                  <div className="p-0">
+                    {selectedPatientForView.diagnosis ? (
+                      <div className="space-y-0">
+                        {/* Diagnosis Row */}
+                        <div className="px-6 py-5 border-b border-gray-100">
+                          <div className="flex items-start gap-4">
+                            <div className="w-8 h-8 bg-white border border-gray-100 rounded-lg flex items-center justify-center text-blue-600 mt-1"> <AssessmentIcon sx={{ fontSize: 16 }} /> </div>
+                            <div>
+                              <p className="text-[9px] font-black text-gray-400 tracking-widest mb-1">Primary Diagnosis</p>
+                              <p className="text-lg font-black text-black italic"> "{selectedPatientForView.diagnosis}" </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Medications Table */}
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-100 border-collapse">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 tracking-widest">Medicine Detail</th>
+                                <th className="px-6 py-4 text-center text-[10px] font-black text-gray-400 tracking-widest">Route/Dosage</th>
+                                <th className="px-6 py-4 text-center text-[10px] font-black text-gray-400 tracking-widest">Frequency (M-A-N)</th>
+                                <th className="px-6 py-4 text-right text-[10px] font-black text-gray-400 tracking-widest">Duration</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-50">
+                              {(selectedPatientForView.medicationList || [
+                                { name: 'Tab. Paracetamol', genericName: 'Paracetamol 650mg', dosage: '1 Tab', route: 'Oral', duration: '3 Days', instruction: 'After Food', frequency: { morning: true, afternoon: true, night: true } }
+                              ]).map((med, idx) => (
+                                <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
+                                  <td className="px-6 py-4">
+                                    <p className="text-sm font-black text-black">{med.name}</p>
+                                    <p className="text-[10px] font-bold text-gray-400 italic">{med.genericName || med.instruction || 'As directed'}</p>
+                                  </td>
+                                  <td className="px-6 py-4 text-center">
+                                    <p className="text-xs font-black text-blue-600">{med.route || 'Oral'}</p>
+                                    <p className="text-[10px] font-bold text-gray-500">{med.dosage}</p>
+                                  </td>
+                                  <td className="px-6 py-4 text-center">
+                                    <div className="flex justify-center gap-1.5">
+                                      {['M', 'A', 'N'].map((slot, i) => {
+                                        const active = i === 0 ? med.frequency?.morning : i === 1 ? med.frequency?.afternoon : med.frequency?.night;
+                                        return (
+                                          <span key={slot} className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-black ${active ? 'bg-black text-white' : 'bg-gray-100 text-gray-300'}`}>
+                                            {slot}
+                                          </span>
+                                        );
+                                      })}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 text-right">
+                                    <span className="text-xs font-black text-blue-600">{med.duration}</span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Advice Row */}
+                        <div className="px-6 py-4 bg-gray-50/30">
+                          <div className="flex items-center gap-3">
+                            <InfoIcon sx={{ fontSize: 16 }} className="text-blue-600" />
+                            <p className="text-xs text-gray-600 italic"> <span className="font-bold text-black text-[10px] mr-2 not-italic">Clinical Advice:</span> {selectedPatientForView.advice || 'Continue medications as prescribed. Review SOS.'} </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="py-12 text-center flex flex-col items-center bg-white">
+                        <PendingActionsIcon sx={{ fontSize: 40 }} className="text-gray-200 mb-2" />
+                        <p className="text-sm font-bold text-gray-400">Diagnosis Pending</p>
+                        <p className="text-xs text-gray-400 mt-1 tracking-widest">Consultation is currently in progress</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Investigations & Lab Details */}
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                  <div className="bg-white px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+                    <ScienceIcon sx={{ fontSize: 16 }} className="text-blue-600" />
+                    <h4 className="text-[10px] font-black text-black tracking-[0.2em]">Investigations & Diagnostics</h4>
+                  </div>
+                  <div className="p-0">
+                    {selectedPatientForView.tests && selectedPatientForView.tests.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-100 border-collapse">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 tracking-widest">Investigation Identity</th>
+                              <th className="px-6 py-4 text-center text-[10px] font-black text-gray-400 tracking-widest">Fulfillment</th>
+                              <th className="px-6 py-4 text-right text-[10px] font-black text-gray-400 tracking-widest">Interpretation</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-50">
+                            {selectedPatientForView.tests.map((test, idx) => (
+                              <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-7 h-7 bg-white border border-gray-100 rounded flex items-center justify-center text-blue-600"> <ScienceIcon sx={{ fontSize: 14 }} /> </div>
+                                    <p className="text-xs font-black text-black tracking-tight">{test}</p>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <CheckCircleIcon sx={{ fontSize: 14 }} className="text-blue-600" />
+                                    <span className="text-[9px] font-black text-blue-600 tracking-widest">Completed</span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <span className="text-[9px] font-black px-2 py-1 bg-white text-gray-400 rounded border border-gray-100 tracking-widest">Normal Range</span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="py-8 text-center bg-white">
+                        <p className="text-xs text-gray-400 italic">No lab tests recommended during this visit</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Financial Summary */}
+                <div className="rounded-xl p-6 text-black border border-gray-200 bg-white shadow-sm relative overflow-hidden">
+                  <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div className="space-y-1 text-center md:text-left">
+                      <p className="text-[10px] font-black text-gray-400 tracking-[0.3em]">Total Billing Amount</p>
+                      <p className="text-4xl font-black tracking-tight text-black">₹{calculateTotalAmount(selectedPatientForView)}.00</p>
+                    </div>
+                    <div className="flex flex-wrap justify-center md:justify-end gap-3">
+                      <div className="bg-gray-50 px-4 py-2 rounded-xl border border-gray-100 text-center min-w-[100px]">
+                        <p className="text-[8px] font-black text-gray-400 mb-1">Consultation</p>
+                        <p className="text-xs font-black text-black">₹{doctors.find(d => d.id === selectedPatientForView.assignedDoctorId)?.consultationFee || 300}</p>
+                      </div>
+                      <div className="bg-gray-50 px-4 py-2 rounded-xl border border-gray-100 text-center min-w-[100px]">
+                        <p className="text-[8px] font-black text-gray-400 mb-1">Lab Tests</p>
+                        <p className="text-xs font-black text-black">₹{calculateTestsFee(selectedPatientForView)}</p>
+                      </div>
+                      {calculateSurgeryFee(selectedPatientForView) > 0 && (
+                        <div className="bg-gray-50 px-4 py-2 rounded-xl border border-gray-100 text-center min-w-[100px]">
+                          <p className="text-[8px] font-black text-gray-400 mb-1">Procedures</p>
+                          <p className="text-xs font-black text-black">₹{calculateSurgeryFee(selectedPatientForView)}</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className={`px-4 py-2 rounded-lg font-black tracking-widest ${selectedPatientForView.status === 'Completed' ? 'border-blue-600 text-blue-600' : 'border-black text-black'}`}> {selectedPatientForView.status === 'Completed' ? 'Payment Received' : 'Pending Payment'} </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Transfer Patient Modal */}
+      <Modal isOpen={showTransferModal} onClose={() => { setShowTransferModal(false); setTransferPatient(null); setSelectedTransferDoctor(null); }} title="Transfer Patient" size="lg">
+        {transferPatient && (
+          <div>
+            {/* Patient Info Banner */}
+            <div className="mb-5 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center"> <SwapHorizIcon className="text-yellow-600" fontSize="small" /></div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Transferring: {transferPatient.patientName}</p>
+                  <p className="text-xs text-gray-500">Token: {transferPatient.token} • Currently with {transferPatient.doctor} ({transferPatient.department})</p>
+                </div>
+                
                 {isPatientDropdownOpen && (
                   <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
                     {(registeredPatients || []).filter(p =>
@@ -2526,665 +3415,62 @@ const OPDManagement = () => {
                   </div>
                 )}
               </div>
-
-              <div className="md:col-span-1">
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  Patient ID
-                </label>
-                <input
-                  type="text"
-                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-gray-400"
-                  placeholder="Optional for new"
-                  value={tokenForm.patientId}
-                  onChange={(e) => setTokenForm({ ...tokenForm, patientId: e.target.value })}
-                />
-              </div>
-
-              <div className="md:col-span-1">
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  Phone Number <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="tel"
-                  required
-                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-gray-400"
-                  placeholder="10-digit number"
-                  value={tokenForm.phoneNo}
-                  onChange={(e) => setTokenForm({ ...tokenForm, phoneNo: e.target.value })}
-                />
-              </div>
-
-              <div className="md:col-span-1">
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-gray-400"
-                  placeholder="patient@email.com"
-                  value={tokenForm.email}
-                  onChange={(e) => setTokenForm({ ...tokenForm, email: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  Age  <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  required
-                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="Years"
-                  value={tokenForm.age}
-                  onChange={(e) => setTokenForm({ ...tokenForm, age: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  Gender <span className="text-red-500">*</span>
-                </label>
-                <select
-                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                  value={tokenForm.gender}
-                  onChange={(e) => setTokenForm({ ...tokenForm, gender: e.target.value })}
-                >
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  Blood Group
-                </label>
-                <input
-                  type="text"
-                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                  placeholder="e.g., O+, B-"
-                  value={tokenForm.bloodGroup}
-                  onChange={(e) => setTokenForm({ ...tokenForm, bloodGroup: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Consultation Type</label>
-                <select
-                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white"
-                  value={tokenForm.type}
-                  onChange={(e) => setTokenForm({ ...tokenForm, type: e.target.value })}
-                >
-                  <option value="Regular">Regular</option>
-                  <option value="New Patient">New Patient</option>
-                  <option value="Follow-up">Follow-up</option>
-                  <option value="Emergency">Emergency</option>
-                </select>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Residential Address</label>
-                <input
-                  type="text"
-                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                  placeholder="Street, Locality, City, State"
-                  value={tokenForm.address}
-                  onChange={(e) => setTokenForm({ ...tokenForm, address: e.target.value })}
-                />
-              </div>
-
-              <div className="relative" ref={deptDropdownRef}>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  Department <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search Department..."
-                    className="w-full p-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    value={deptSearchTerm}
-                    onChange={(e) => {
-                      setDeptSearchTerm(e.target.value);
-                      setIsDeptDropdownOpen(true);
-                      setTokenForm({ ...tokenForm, department: '', doctorId: '' });
-                    }}
-                    onFocus={() => setIsDeptDropdownOpen(true)}
-                  />
-                  <KeyboardArrowDownIcon
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors"
-                    onClick={() => setIsDeptDropdownOpen(!isDeptDropdownOpen)}
-                  />
-                </div>
-                {isDeptDropdownOpen && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                    {filteredDepartments.length > 0 ? (
-                      filteredDepartments.map(dept => (
-                        <div
-                          key={dept}
-                          className="p-3 hover:bg-blue-50 cursor-pointer border-b last:border-0 border-gray-100 transition-colors text-sm"
-                          onClick={() => handleSelectDept(dept)}
-                        >
-                          {dept}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="p-3 text-center text-gray-500 text-sm">No departments found</div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="relative" ref={docDropdownRef}>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  Doctor <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    disabled={!tokenForm.department}
-                    placeholder={tokenForm.department ? "Search Doctor..." : "Select department first"}
-                    className={`w-full p-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none ${!tokenForm.department ? 'bg-gray-50 cursor-not-allowed' : ''}`}
-                    value={docSearchTerm}
-                    onChange={(e) => {
-                      setDocSearchTerm(e.target.value);
-                      setIsDocDropdownOpen(true);
-                    }}
-                    onFocus={() => tokenForm.department && setIsDocDropdownOpen(true)}
-                  />
-                  <KeyboardArrowDownIcon
-                    className={`absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 ${tokenForm.department ? 'cursor-pointer hover:text-gray-600' : 'cursor-not-allowed'} transition-colors`}
-                    onClick={() => tokenForm.department && setIsDocDropdownOpen(!isDocDropdownOpen)}
-                  />
-                </div>
-                {isDocDropdownOpen && tokenForm.department && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                    {filteredDoctorsForToken.length > 0 ? (
-                      filteredDoctorsForToken.map(doc => (
-                        <div
-                          key={doc.id}
-                          className="p-3 hover:bg-blue-50 cursor-pointer border-b last:border-0 border-gray-100 transition-colors text-sm"
-                          onClick={() => handleSelectDoc(doc)}
-                        >
-                          <div className="font-medium text-gray-800 text-sm">{doc.name}</div>
-                          <div className="text-[10px] text-gray-500">Queue: {doc.queue} patients</div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="p-3 text-center text-gray-500 text-sm">No active doctors found</div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Priority Level</label>
-                <select
-                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white"
-                  value={tokenForm.priority}
-                  onChange={(e) => setTokenForm({ ...tokenForm, priority: e.target.value })}
-                >
-                  <option value="Normal">Normal</option>
-                  <option value="Urgent">Urgent</option>
-                </select>
-              </div>
-
-            </div>
-          </form>
-        ) : (
-          <div className="py-2 flex flex-col items-center">
-            {/* Token Slip UI Card */}
-            <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 flex flex-col mx-auto transform transition-all duration-500 animate-in fade-in zoom-in slide-in-from-bottom-4">
-
-              {/* Header */}
-              <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 p-8 text-white text-center relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10 transform translate-x-6 -translate-y-6 rotate-12">
-                  <ConfirmationNumberIcon sx={{ fontSize: 140 }} />
-                </div>
-                <div className="relative z-10">
-                  <h4 className="text-[10px] font-black tracking-[0.3em] text-blue-200 uppercase mb-3 drop-shadow-sm">OPD TOKEN SLIP</h4>
-                  <p className="text-6xl font-black mb-3 tracking-tighter drop-shadow-md">{generatedToken?.token}</p>
-                  <div className="inline-block px-3 py-1 bg-white/10 backdrop-blur-md rounded-full">
-                    <p className="text-[11px] font-bold text-blue-50 uppercase tracking-widest">
-                      {new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })} • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Body */}
-              <div className="p-8 bg-white relative">
-                <div className="flex justify-between items-start mb-8">
-                  <div className="space-y-1">
-                    <p className="text-[10px] text-gray-400 uppercase tracking-[0.1em] font-black">Patient ID</p>
-                    <p className="font-mono text-xs text-blue-900 font-black bg-blue-50 px-2 py-0.5 rounded inline-block">{generatedToken?.patientId}</p>
-                    <div className="pt-2">
-                      <p className="text-[10px] text-gray-400 uppercase tracking-[0.1em] font-black mb-1">Full Name</p>
-                      <p className="font-black text-gray-900 text-xl leading-tight tracking-tight">{generatedToken?.patientName}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-[9px] font-black tracking-[0.1em] ${generatedToken?.priority === 'Urgent' ? 'bg-red-500 text-white shadow-sm ring-4 ring-red-50' : 'bg-green-500 text-white shadow-sm ring-4 ring-green-50'}`}>
-                      {generatedToken?.priority === 'Urgent' ? 'URGENT' : 'NORMAL'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-y-6 gap-x-6 mb-8">
-                  <div>
-                    <p className="text-[9px] text-gray-400 uppercase tracking-[0.2em] font-black mb-1.5">Age / Gender</p>
-                    <p className="text-sm font-black text-gray-800">{generatedToken?.age}Y / {generatedToken?.gender}</p>
-                  </div>
-                  <div>
-                    <p className="text-[9px] text-gray-400 uppercase tracking-[0.2em] font-black mb-1.5">Blood Group</p>
-                    <p className="text-sm font-black text-gray-800">{generatedToken?.bloodGroup}</p>
-                  </div>
-                  <div className="col-span-2 p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between group transition-all hover:bg-blue-50 hover:border-blue-100">
-                    <div>
-                      <p className="text-[9px] text-gray-400 uppercase tracking-[0.2em] font-black mb-1.5">Consulting Doctor</p>
-                      <p className="text-base font-black text-blue-800 tracking-tight">{generatedToken?.doctor}</p>
-                      <p className="text-[10px] font-bold text-blue-600 mt-0.5 uppercase tracking-widest">{generatedToken?.department}</p>
-                    </div>
-                    <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-blue-600 shadow-sm border border-gray-100 group-hover:scale-110 transition-transform">
-                      <PersonIcon fontSize="small" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-6 border-t-2 border-dashed border-gray-200 text-center relative">
-                  <div className="absolute -left-10 -top-3 w-6 h-6 bg-gray-100 rounded-full"></div>
-                  <div className="absolute -right-10 -top-3 w-6 h-6 bg-gray-100 rounded-full"></div>
-
-                  <div className="inline-flex items-center justify-center space-x-2 text-green-600 mb-2">
-                    <CheckCircleIcon sx={{ fontSize: 18 }} />
-                    <span className="font-black text-[11px] uppercase tracking-[0.3em]">REGISTRATION CONFIRMED</span>
-                  </div>
-                  <div className="flex items-center justify-center space-x-3 text-gray-500 font-bold text-[10px]">
-                    <span className="flex items-center gap-1"><AccessTimeIcon sx={{ fontSize: 14 }} /> Est. Wait: {generatedToken?.waitingTime}</span>
-                    <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-                    <span>No: {generatedToken?.queuePosition + 1} in queue</span>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      <Modal
-        isOpen={showViewPatientModal}
-        onClose={() => setShowViewPatientModal(false)}
-        title="Patient Details"
-        size="md"
-        footer={
-          <div className="flex justify-end gap-3">
-            <button
-              onClick={() => {
-                setGeneratedToken(selectedPatientForView);
-                setTimeout(() => handlePrintSlip(), 100);
-              }}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors flex items-center gap-2"
-            >
-              <PrintIcon fontSize="small" /> Print Token
-            </button>
-            <button
-              onClick={() => setShowViewPatientModal(false)}
-              className="px-6 py-2 bg-blue-600 border border-blue-500 text-white rounded-lg hover:bg-blue-800 font-medium transition-colors"
-            >
-              Close Record
-            </button>
-          </div>
-        }
-      >
-        {selectedPatientForView && (
-          <div className="space-y-8 py-2">
-            {/* Clinical Identity Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start border-b border-gray-100 pb-8 gap-6">
-              <div className="flex items-center gap-6">
-                <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-400 border border-gray-200 shadow-sm">
-                  <PersonIcon sx={{ fontSize: 36 }} />
-                </div>
-                <div>
-                  <h3 className="text-3xl font-bold text-gray-900 tracking-tight leading-none mb-2">
-                    {selectedPatientForView.patientName}
-                  </h3>
-                  <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-wider text-gray-500">
-                    <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                      {selectedPatientForView.patientId || 'UHID-291088'}
-                    </span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1.5">
-                      <AccessTimeIcon sx={{ fontSize: 14 }} className="text-gray-400" />
-                      Reg: 12-Mar-2024
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-3">
-                <span className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-[0.2em] border-2 ${selectedPatientForView.status === 'Waiting' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
-                  selectedPatientForView.status === 'In Consultation' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-blue-50 text-blue-700 border-blue-200'
-                  }`}>
-                  {selectedPatientForView.status}
-                </span>
-                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
-                  Current Token: <span className="text-gray-900 font-black ml-1">{selectedPatientForView.token}</span>
-                </p>
-              </div>
-            </div>
-
-            {/* Information Architecture */}
-            <div className="space-y-10">
-
-              {/* Section 1: Demographic & Contact */}
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                <div className="bg-gray-50 px-5 py-3 border-b border-gray-200">
-                  <h4 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.25em]">Personal Information</h4>
-                </div>
-                <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-6">
-                  <div className="space-y-1.5">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Age / Gender</p>
-                    <p className="text-sm font-bold text-gray-800">{selectedPatientForView.age}Y / {selectedPatientForView.gender}</p>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Blood Group</p>
-                    <p className="text-sm font-bold text-gray-800">{selectedPatientForView.bloodGroup || 'B+'}</p>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Phone Number</p>
-                    <p className="text-sm font-bold text-gray-800">{selectedPatientForView.phoneNo || '+91 9988776655'}</p>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Email Identity</p>
-                    <p className="text-sm font-bold text-gray-800 truncate">
-                      {selectedPatientForView.email || `${selectedPatientForView.patientName?.toLowerCase().split(' ')[0]}.p@health.com`}
-                    </p>
-                  </div>
-                  <div className="col-span-2 md:col-span-4 space-y-1.5 pt-2">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Registered Residential Address</p>
-                    <p className="text-sm font-medium text-gray-700 leading-relaxed max-w-2xl">
-                      {selectedPatientForView.address || 'Suite 405, Green Valley Residency, Sector 12, Navi Mumbai, Maharashtra - 400706'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Section 2: Clinical Details */}
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                <div className="bg-gray-50 px-5 py-3 border-b border-gray-200">
-                  <h4 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.25em]">Consultation Details</h4>
-                </div>
-                <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-6">
-                  <div className="space-y-1.5">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Department</p>
-                    <p className="text-sm font-bold text-gray-800">{selectedPatientForView.department}</p>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Primary Doctor</p>
-                    <p className="text-sm font-bold text-blue-700 underline decoration-blue-200 underline-offset-4">{selectedPatientForView.doctor}</p>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Visit Category</p>
-                    <p className="text-sm font-bold text-gray-800">{selectedPatientForView.type || 'Standard Follow-up'}</p>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Priority status</p>
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-widest ${selectedPatientForView.priority === 'Urgent' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600'
-                      }`}>
-                      {selectedPatientForView.priority}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      <Modal
-        isOpen={showQueueModal}
-        onClose={() => {
-          setShowQueueModal(false);
-          setSelectedDoctorForQueue(null);
-        }}
-        title={selectedDoctorForQueue ? `Queue Status: ${selectedDoctorForQueue.name}` : "OPD Queue Status"}
-        size="lg"
-      >
-        <div className="space-y-4">
-          {doctors
-            .filter(doctor => doctor.isActive && (!selectedDoctorForQueue || doctor.id === selectedDoctorForQueue.id))
-            .map(doctor => {
-              const doctorPatients = opdPatients.filter(p => p.assignedDoctorId === doctor.id);
-              const waitingPatients = doctorPatients.filter(p => p.status === 'Waiting');
-              const inConsultationPatient = doctorPatients.find(p => p.status === 'In Consultation');
-
-              return (
-                <div key={doctor.id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-center mb-3">
-                    <div>
-                      <h4 className="font-medium text-gray-900">{doctor.name}</h4>
-                      <p className="text-sm text-gray-600">{doctor.department} • {doctor.opdRoom}</p>
-                    </div>
-                    <span className={`px-3 py-1 rounded text-sm ${doctor.queue > 5 ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
-                      {doctor.queue} in queue
-                    </span>
-                  </div>
-
-                  {inConsultationPatient && (
-                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="text-sm font-medium text-blue-800">Currently Consulting</p>
-                          <p className="font-medium">{inConsultationPatient.patientName}</p>
-                          <p className="text-sm text-gray-600">Token: {inConsultationPatient.token}</p>
-                        </div>
-                        <button
-                          className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center text-sm font-medium"
-                          onClick={() => {
-                            setShowQueueModal(false);
-                            handleStartConsultation(inConsultationPatient);
-                          }}
-                        >
-                          <VisibilityIcon className="mr-1" fontSize="small" /> View
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mb-3">
-                    <p className="font-medium mb-2">Waiting Queue ({waitingPatients.length}):</p>
-                    <div className="space-y-2">
-                      {waitingPatients
-                        .sort((a, b) => a.queuePosition - b.queuePosition)
-                        .map(patient => (
-                          <div key={patient.id} className="flex items-center justify-between bg-gray-50 p-3 rounded border">
-                            <div className="flex items-center">
-                              <span className="w-8 h-8 bg-yellow-100 text-yellow-800 rounded-full flex items-center justify-center mr-3 font-medium">
-                                #{patient.queuePosition + 1}
-                              </span>
-                              <div>
-                                <p className="font-medium">{patient.patientName}</p>
-                                <p className="text-sm text-gray-600">Token: {patient.token} • Wait: {patient.waitingTime}</p>
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm flex items-center text-sm font-medium"
-                                onClick={() => {
-                                  setShowQueueModal(false);
-                                  handleStartConsultation(patient);
-                                }}
-                              >
-                                <PlayArrowIcon className="mr-1" fontSize="small" /> Start
-                              </button>
-                              <button
-                                className="px-3 py-1.5 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors shadow-sm flex items-center text-sm font-medium"
-                                onClick={() => {
-                                  setShowQueueModal(false);
-                                  handleTransferPatient(patient);
-                                }}
-                              >
-                                <SwapHorizIcon fontSize="small" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-
-                    {waitingPatients.length === 0 && (
-                      <p className="text-gray-500 text-center py-3 bg-gray-50 rounded">No patients waiting</p>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-        </div>
-      </Modal>
-
-      {/* Transfer Patient Modal */}
-      <Modal
-        isOpen={showTransferModal}
-        onClose={() => {
-          setShowTransferModal(false);
-          setTransferPatient(null);
-          setSelectedTransferDoctor(null);
-        }}
-        title="Transfer Patient"
-        size="lg"
-      >
-        {transferPatient && (
-          <div>
-            {/* Patient Info Banner */}
-            <div className="mb-5 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
-                  <SwapHorizIcon className="text-yellow-600" fontSize="small" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-800">
-                    Transferring: {transferPatient.patientName}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Token: {transferPatient.token} • Currently with {transferPatient.doctor} ({transferPatient.department})
-                  </p>
-                </div>
-              </div>
             </div>
 
             {/* Section Title */}
-            <p className="text-sm font-semibold text-gray-700 mb-3">
-              Select a doctor to transfer to:
-            </p>
+            <p className="text-sm font-semibold text-gray-700 mb-3">Select a doctor to transfer to:</p>
 
             {/* Doctor Cards Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[340px] overflow-y-auto pr-1">
-              {doctors
-                .filter(d => d.isActive && d.id !== transferPatient.assignedDoctorId)
-                .map(doctor => {
-                  const isSelected = selectedTransferDoctor?.id === doctor.id;
-                  const queueCount = opdPatients.filter(
-                    p => p.assignedDoctorId === doctor.id && p.status === 'Waiting'
-                  ).length;
+              {doctors.filter(d => d.isActive && d.id !== transferPatient.assignedDoctorId).map(doctor => {
+                const isSelected = selectedTransferDoctor?.id === doctor.id;
+                const queueCount = opdPatients.filter(p => p.assignedDoctorId === doctor.id && p.status === 'Waiting').length;
 
-                  return (
-                    <div
-                      key={doctor.id}
-                      onClick={() => setSelectedTransferDoctor(doctor)}
-                      className={`relative cursor-pointer rounded-xl border-2 p-4 transition-all duration-200 hover:shadow-md ${isSelected
-                        ? 'border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
-                        }`}
-                    >
-                      {/* Selected Checkmark */}
-                      {isSelected && (
-                        <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
-                          <CheckIcon className="text-white" style={{ fontSize: 16 }} />
-                        </div>
-                      )}
+                return (
+                  <div key={doctor.id} onClick={() => setSelectedTransferDoctor(doctor)} className={`relative cursor-pointer rounded-xl border-2 p-4 transition-all duration-200 hover:shadow-md ${isSelected ? 'border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                    {/* Selected Checkmark */}
+                    {isSelected && (
+                      <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center"> <CheckIcon className="text-white" style={{ fontSize: 16 }} /> </div>
+                    )}
 
-                      {/* Doctor Name & Department */}
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold ${isSelected ? 'bg-blue-500' : 'bg-gray-400'
-                          }`}>
-                          {doctor.name.split(' ').pop()[0]}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-gray-900 text-sm truncate">{doctor.name}</p>
-                          <p className="text-xs text-gray-500">{doctor.department}</p>
-                        </div>
+                    {/* Doctor Name & Department */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold ${isSelected ? 'bg-blue-500' : 'bg-gray-400'}`}> {doctor.name.split(' ').pop()[0]} </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 text-sm truncate">{doctor.name}</p>
+                        <p className="text-xs text-gray-500">{doctor.department}</p>
                       </div>
-
-                      {/* Doctor Stats */}
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1 text-gray-500">
-                          <AccessTimeIcon style={{ fontSize: 14 }} />
-                          <span>{doctor.opdRoom}</span>
-                        </div>
-                        <span className={`px-2 py-0.5 rounded-full font-medium ${queueCount > 5
-                          ? 'bg-red-100 text-red-700'
-                          : queueCount > 2
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-green-100 text-green-700'
-                          }`}>
-                          {queueCount} in queue
-                        </span>
-                      </div>
-
-                      {/* Specialization */}
-                      <p className="text-xs text-gray-400 mt-2">
-                        {doctor.specialization} • {doctor.experience}
-                      </p>
                     </div>
-                  );
-                })}
+
+                    {/* Doctor Stats */}
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1 text-gray-500"> <AccessTimeIcon style={{ fontSize: 14 }} /> <span>{doctor.opdRoom}</span>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded-full font-medium ${queueCount > 5 ? 'bg-red-100 text-red-700' : queueCount > 2 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}> {queueCount} in queue </span>
+                    </div>
+
+                    {/* Specialization */}
+                    <p className="text-xs text-gray-400 mt-2">{doctor.specialization} • {doctor.experience}</p>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Action Buttons */}
             <div className="flex items-center justify-end gap-3 mt-5 pt-4 border-t border-gray-200">
-              <button
-                onClick={() => {
-                  setShowTransferModal(false);
-                  setTransferPatient(null);
-                  setSelectedTransferDoctor(null);
-                }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmTransfer}
-                disabled={!selectedTransferDoctor}
-                className={`px-5 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-2 ${selectedTransferDoctor
-                  ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  }`}
-              >
-                <SwapHorizIcon style={{ fontSize: 18 }} />
-                Confirm Transfer
-              </button>
+              <button onClick={() => { setShowTransferModal(false); setTransferPatient(null); setSelectedTransferDoctor(null); }} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">Cancel</button>
+              <button onClick={handleConfirmTransfer} disabled={!selectedTransferDoctor} className={`px-5 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-2 ${selectedTransferDoctor ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}><SwapHorizIcon style={{ fontSize: 18 }} /> Confirm Transfer </button>
             </div>
           </div>
         )}
       </Modal>
 
       {/* Deactivate Doctor Modal */}
-      <Modal
-        isOpen={showDeactivateModal}
-        onClose={() => {
-          setShowDeactivateModal(false);
-          setDoctorToDeactivate(null);
-          setPatientsToReassign([]);
-        }}
-        title="Deactivate Doctor"
-        size="md"
-      >
+      <Modal isOpen={showDeactivateModal} onClose={() => { setShowDeactivateModal(false); setDoctorToDeactivate(null); setPatientsToReassign([]); }} title="Deactivate Doctor" size="md">
         {doctorToDeactivate && (
           <div className="p-1">
             <div className="flex items-center gap-4 mb-6 p-4 bg-red-50 border border-red-100 rounded-xl">
-              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-600">
-                <WarningIcon fontSize="large" />
-              </div>
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-600"> <WarningIcon fontSize="large" /></div>
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Confirm Deactivation</h3>
                 <p className="text-sm text-red-600 font-medium">Dr. {doctorToDeactivate.name}</p>
@@ -3192,12 +3478,10 @@ const OPDManagement = () => {
             </div>
 
             <div className="space-y-4 mb-6">
-              <p className="text-gray-600 text-sm leading-relaxed">
-                This doctor has <span className="font-bold text-gray-900">{patientsToReassign.length} active patients</span> in their queue. Deactivating will automatically reassign these patients to other available doctors in the same department.
-              </p>
+              <p className="text-gray-600 text-sm leading-relaxed">This doctor has <span className="font-bold text-gray-900">{patientsToReassign.length} active patients</span> in their queue. Deactivating will automatically reassign these patients to other available doctors in the same department.</p>
 
               <div className="bg-gray-50 rounded-lg p-3 max-h-40 overflow-y-auto border border-gray-100">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Patients to be reassigned:</p>
+                <p className="text-xs font-bold text-gray-400 tracking-wider mb-2">Patients to be reassigned:</p>
                 <div className="space-y-2">
                   {patientsToReassign.map(patient => (
                     <div key={patient.id} className="flex justify-between items-center text-sm bg-white p-2 rounded border border-gray-100">
@@ -3208,6 +3492,625 @@ const OPDManagement = () => {
                 </div>
               </div>
             </div>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+              <button onClick={() => { setShowDeactivateModal(false); setDoctorToDeactivate(null); setPatientsToReassign([]); }} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">No, Keep Active</button>
+              <button onClick={handleConfirmDeactivation} className="px-6 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 shadow-md transition-all flex items-center gap-2"> <PowerSettingsNewIcon style={{ fontSize: 18 }} /> Confirm & Reassign </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal isOpen={showLabResultModal} onClose={() => setShowLabResultModal(false)} title="Clinical Investigation Report" size="lg" footer={selectedLabRecord && (
+        <div className="flex justify-end gap-3 px-4 pb-2">
+          <button className="px-6 py-2 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50 font-bold transition-colors text-sm tracking-widest" onClick={() => setShowLabResultModal(false)}> Close </button>
+        </div>
+      )}
+      >
+        {selectedLabRecord && (
+          <div className="space-y-6 py-2 px-1">
+            {/* Header Identity Section */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm relative overflow-hidden">
+
+              <div className="flex flex-col md:flex-row justify-between items-start relative z-10 gap-6">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-blue-600 mb-2">
+                    <ScienceIcon sx={{ fontSize: 16 }} />
+                    <span className="text-[10px] font-black tracking-widest">Central Laboratory Services</span>
+                  </div>
+                  <h3 className="text-2xl font-black text-black tracking-tight leading-none ">{selectedLabRecord.patientName}</h3>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-bold text-blue-600 border border-blue-100 px-2 py-0.5 rounded">ID: {selectedLabRecord.patientId}</span>
+                    <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                    <span className="text-[10px] font-black text-gray-500 tracking-wider">{selectedLabRecord.age}Y / {selectedLabRecord.gender}</span>
+                  </div>
+                </div>
+                <div className="md:text-right space-y-3">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 text-blue-600 rounded-lg text-[10px] font-black ">
+                    <CheckCircleIcon sx={{ fontSize: 14 }} /> Report Verified
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-gray-400 tracking-widest">Date: <span className="text-black font-black">{selectedLabRecord.date}</span></p>
+                    <p className="text-[10px] font-black text-blue-600 tracking-widest italic">REF ID: {selectedLabRecord.reportId}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Investigation Table */}
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+              <div className="bg-white px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+                <ScienceIcon sx={{ fontSize: 16 }} className="text-blue-600" />
+                <h4 className="text-[10px] font-black text-black tracking-widest">Ordered Investigations</h4>
+              </div>
+              <div className="max-h-[280px] overflow-y-auto">
+                <table className="w-full text-left border-collapse table-fixed">
+                  <thead className="sticky top-0 z-20 bg-gray-50/50 border-b border-gray-100">
+                    <tr>
+                      <th className="w-2/3 px-6 py-4 text-[10px] font-black text-gray-400 tracking-widest">Investigation Identity & Details</th>
+                      <th className="w-1/3 px-6 py-4 text-[10px] font-black text-gray-400 tracking-widest text-right">Fulfillment Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50 bg-white">
+                    {(() => {
+                      const prescribed = (selectedLabRecord.prescribedTests || '').split(',').map(s => s.trim()).filter(Boolean);
+                      const performed = (selectedLabRecord.performedTests || '').split(',').map(s => s.trim()).filter(Boolean);
+                      const allTests = Array.from(new Set([...prescribed, ...performed]));
+
+                      if (allTests.length === 0) return (
+                        <tr>
+                          <td colSpan="2" className="px-6 py-12 text-center text-gray-400 italic text-sm font-medium">No investigations recorded for this order.</td>
+                        </tr>
+                      );
+
+                      return allTests.map((test, idx) => {
+                        const isPrescribed = prescribed.includes(test);
+                        const isPerformed = performed.includes(test);
+
+                        return (
+                          <tr key={idx} className="hover:bg-gray-50/50 transition-colors group">
+                            <td className="px-6 py-4">
+                              <div className="flex items-start gap-4">
+                                <div className="w-10 h-10 border border-gray-100 rounded-xl flex items-center justify-center text-blue-600 bg-white shadow-sm">
+                                  <ScienceIcon sx={{ fontSize: 18 }} />
+                                </div>
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-sm font-black text-black tracking-tight leading-none ">{test}</p>
+                                    <span className="text-[8px] font-black text-blue-600">
+                                      {test.length > 5 ? 'PANEL' : 'SPECIFIC'}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <p className="text-[9px] font-bold text-gray-400">{isPrescribed ? 'Physician Ordered' : 'Laboratory Add-on'}</p>
+                                    <span className="w-1 h-1 bg-gray-200 rounded-full"></span>
+                                    <p className="text-[9px] font-black text-blue-600">Code: {idx + 101}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex justify-end">
+                                {isPerformed ? (
+                                  <div className="inline-flex items-center gap-1.5 px-3 py-1 text-black">
+                                    <CheckCircleIcon sx={{ fontSize: 14 }} />
+                                    <span className="text-[10px] font-black">Completed</span>
+                                  </div>
+                                ) : (
+                                  <div className="inline-flex items-center gap-1.5 px-3 py-1 text-gray-500">
+                                    <AccessTimeIcon sx={{ fontSize: 14 }} />
+                                    <span className="text-[10px] font-black tracking-widest">Pending</span>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Technical Validation & Notes */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="flex items-center gap-4 p-5 rounded-2xl border border-gray-200 bg-white shadow-sm">
+                <div className="w-12 h-12 border border-gray-100 rounded-xl flex items-center justify-center text-blue-600 bg-blue-50/30"> <ScienceIcon sx={{ fontSize: 20 }} /> </div>
+                <div className="space-y-1">
+                  <p className="text-[9px] font-black text-gray-400 tracking-widest">Validated & Signed By</p>
+                  <p className="text-sm font-black text-black">{selectedLabRecord.uploadedBy}</p>
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircleIcon sx={{ fontSize: 12 }} className="text-blue-600" />
+                    <span className="text-[9px] font-black text-blue-600 tracking-widest">Digital Signature Verified</span>
+                  </div>
+                </div>
+              </div>
+              <div className="p-5 rounded-2xl border border-gray-200 bg-gray-50/50 relative overflow-hidden shadow-sm flex items-center">
+                <div className="absolute top-0 right-0 w-8 h-8 flex items-center justify-center text-blue-600 opacity-20"> <InfoIcon sx={{ fontSize: 24 }} /> </div>
+                <div className="relative z-10 flex gap-3">
+                  <p className="text-[10px] font-bold text-gray-500 italic">
+                    Note: These results should be correlated with clinical findings by the consulting physician. Laboratory results are subject to biological variations.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Results Interpretation */}
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden border-t-4 border-t-blue-600">
+              <div className="bg-white px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+                <AssessmentIcon sx={{ fontSize: 16 }} className="text-blue-600" />
+                <h4 className="text-[10px] font-black text-black tracking-widest">Clinical Interpretation</h4>
+              </div>
+              <div className="p-8 bg-gray-50/30">
+                <p className="text-lg font-black text-black text-center leading-relaxed italic">
+                  "{selectedLabRecord.result}"
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Pharmacy Details Modal */}
+      <Modal isOpen={showPharmacyModal} onClose={() => setShowPharmacyModal(false)} title="Prescription Dispensing Record" size="lg" footer={selectedPharmacyRecord && (
+        <div className="flex justify-end gap-3 px-4 pb-2">
+          <button className="px-6 py-2 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50 font-bold transition-colors text-sm tracking-widest" onClick={() => setShowPharmacyModal(false)}> Close </button>
+          <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md flex items-center text-sm font-bold tracking-widest" onClick={() => { alert('Dispensing medications for ' + selectedPharmacyRecord.patientName); setShowPharmacyModal(false); }}> <CheckCircleIcon className="mr-2" fontSize="small" /> Confirm Dispense </button>
+        </div>
+      )}>
+        {selectedPharmacyRecord && (
+          <div className="space-y-6 py-2 px-1">
+            {/* Header Identity Section */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm relative overflow-hidden">
+              <div className="flex flex-col md:flex-row justify-between items-start relative z-10 gap-6">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-blue-600 mb-1">
+                    <MedicationIcon sx={{ fontSize: 16 }} />
+                    <span className="text-[10px] font-black tracking-widest uppercase">Pharmacy Services</span>
+                  </div>
+                  <h3 className="text-2xl font-black text-black tracking-tight leading-none ">{selectedPharmacyRecord.patientName}</h3>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-bold text-blue-600 border border-blue-100 px-2 py-0.5 rounded">ID: {selectedPharmacyRecord.patientId}</span>
+                    <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                    <span className="text-[10px] font-black text-gray-500 tracking-wider">{selectedPharmacyRecord.age}Y / {selectedPharmacyRecord.gender}</span>
+                  </div>
+                </div>
+                <div className="md:text-right space-y-3">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 text-blue-600 rounded-lg text-[10px] font-black ">
+                    <CheckCircleIcon sx={{ fontSize: 14 }} /> Ready to Dispense
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase">Prescribed By</p>
+                    <p className="text-sm font-black text-black leading-none">{selectedPharmacyRecord.doctor}</p>
+                    <p className="text-[10px] font-bold text-blue-600 tracking-widest">{selectedPharmacyRecord.department}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Inventory & Schedule */}
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+              <div className="bg-white px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MedicationIcon sx={{ fontSize: 16 }} className="text-blue-600" />
+                  <h4 className="text-[10px] font-black text-black tracking-widest uppercase">Medication Inventory</h4>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-orange-600"></span><span className="text-[9px] font-bold text-gray-500">Morning</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-500"></span><span className="text-[9px] font-bold text-gray-500">Afternoon</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-600"></span><span className="text-[9px] font-bold text-gray-500">Night</span></div>
+                </div>
+              </div>
+
+              <div className="p-4 space-y-4 max-h-[420px] overflow-y-auto">
+                {selectedPharmacyRecord.prescriptions.map((med, idx) => (
+                  <div key={idx} className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col lg:flex-row lg:items-center gap-6 hover:border-black transition-all shadow-sm">
+                    {/* Med Name & Duration */}
+                    <div className="flex-1 flex gap-4 items-center">
+                      <div className="w-9 h-9 border border-gray-200 bg-gray-50 rounded-lg flex items-center justify-center text-black font-black text-base">
+                        {idx + 1}
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-base font-black text-black leading-tight">{med.name}</p>
+                          <span className="text-[8px] font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded tracking-widest uppercase">
+                            {med.type || 'Medication'}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-bold text-gray-400 tracking-widest uppercase">Dosage:</span>
+                            <span className="text-[10px] font-black text-black">{med.dosage || 'As Directed'}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-bold text-gray-400 tracking-widest uppercase">Duration:</span>
+                            <span className="text-[10px] font-black text-blue-600 tracking-widest">{med.duration}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Schedule Side-by-Side - Reduced Size */}
+                    <div className="flex items-center gap-2">
+                      <div className={`w-11 h-12 rounded-lg flex flex-col items-center justify-center border transition-all ${med.morning ? 'border-orange-600 bg-orange-600 text-white shadow-md' : 'border-gray-100 bg-gray-50 text-gray-300'}`}>
+                        <span className="text-[7px] font-black tracking-tighter mb-0.5">MORN</span>
+                        <span className="text-base font-black leading-none">{med.morning ? '1' : '0'}</span>
+                      </div>
+                      <div className={`w-11 h-12 rounded-lg flex flex-col items-center justify-center border transition-all ${med.afternoon ? 'border-yellow-500 bg-yellow-500 text-white shadow-md' : 'border-gray-100 bg-gray-50 text-gray-300'}`}>
+                        <span className="text-[7px] font-black tracking-tighter mb-0.5">AFTN</span>
+                        <span className="text-base font-black leading-none">{med.afternoon ? '1' : '0'}</span>
+                      </div>
+                      <div className={`w-11 h-12 rounded-lg flex flex-col items-center justify-center border transition-all ${med.night ? 'border-indigo-600 bg-indigo-600 text-white shadow-md' : 'border-gray-100 bg-gray-50 text-gray-300'}`}>
+                        <span className="text-[7px] font-black tracking-tighter mb-0.5">NGHT</span>
+                        <span className="text-base font-black leading-none">{med.night ? '1' : '0'}</span>
+                      </div>
+                    </div>
+
+                    {/* Instructions Box */}
+                    <div className="lg:w-48 p-3 rounded-xl border border-gray-100 bg-gray-50/50 flex flex-col justify-center">
+                      <p className="text-[8px] font-black text-gray-400 tracking-widest mb-1 uppercase">Instructions</p>
+                      <p className="text-[10px] font-bold text-black leading-tight italic">"{med.instruction}"</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Queue Details / Modify Modal */}
+      <Modal
+        isOpen={showQueueDetailModal}
+        onClose={() => setShowQueueDetailModal(false)}
+        title="Manage Patient Queue Details"
+        size="lg"
+        footer={selectedQueuePatient && (
+          <div className="flex flex-col sm:flex-row gap-4 w-full">
+            <button className="flex-1 py-4 bg-gray-900 text-white rounded-2xl font-black text-xs tracking-[0.2em] hover:bg-black transition-all shadow-xl shadow-gray-200 flex items-center justify-center gap-3" onClick={() => { alert('Updating patient records...'); setShowQueueDetailModal(false); }}>Save All Changes
+            </button>
+            <button className="flex-1 py-4 border-2 border-red-100 text-red-600 rounded-2xl font-black text-xs tracking-[0.2em] hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-3 group" onClick={() => { setSelectedExitPatient(selectedQueuePatient); setShowExitModal(true); }}>  <ExitToAppIcon className="group-hover:translate-x-1 transition-transform" /> Complete & Exit Patient
+            </button>
+          </div>
+        )}
+      >
+        {selectedQueuePatient && (
+          <div className="space-y-8 py-2">
+            {/* Patient Identity Header */}
+            <div className="flex items-center gap-6 pb-6 border-b border-gray-100">
+              <div className="w-20 h-20 bg-blue-50 rounded-3xl flex items-center justify-center text-blue-600 shadow-inner"><PersonIcon sx={{ fontSize: 40 }} /> </div>
+              <div className="flex-1">
+                <h3 className="text-2xl font-black text-gray-900 leading-tight">{selectedQueuePatient.patientName}</h3>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                  <span className="text-xs font-bold text-gray-400 tracking-widest">UHID: {selectedQueuePatient.patientId}</span>
+                  <span className="text-xs font-bold text-gray-400 tracking-widest">•</span>
+                  <span className="text-xs font-bold text-blue-600 tracking-widest">Token: {selectedQueuePatient.token}</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black tracking-widest border-2 ${selectedQueuePatient.priority === 'Urgent' ? 'bg-red-50 border-red-200 text-red-600' : 'bg-emerald-50 border-emerald-200 text-emerald-600'}`}> {selectedQueuePatient.priority} Priority </span>
+              </div>
+            </div>
+
+            {/* Editable Fields Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Assigned Department</label>
+                <select className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl text-sm font-bold text-gray-800 focus:border-blue-600 focus:bg-white transition-all outline-none">
+                  <option>{selectedQueuePatient.department}</option>
+                  <option>Cardiology</option>
+                  <option>Orthopedics</option>
+                  <option>Neurology</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Consulting Doctor</label>
+                <select className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl text-sm font-bold text-gray-800 focus:border-blue-600 focus:bg-white transition-all outline-none">
+                  <option>{selectedQueuePatient.doctor}</option>
+                  {AVAILABLE_DOCTORS.map(doc => <option key={doc.name}>{doc.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Queue Priority</label>
+                <div className="flex gap-3">
+                  <button className={`flex-1 py-3 rounded-xl border-2 font-black text-[10px] tracking-widest transition-all ${selectedQueuePatient.priority === 'Normal' ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200'}`}>Normal</button>
+                  <button className={`flex-1 py-3 rounded-xl border-2 font-black text-[10px] tracking-widest transition-all ${selectedQueuePatient.priority === 'Urgent' ? 'bg-red-600 border-red-600 text-white shadow-lg shadow-red-100' : 'bg-white border-gray-100 text-gray-400 hover:border-red-200'}`}>Urgent</button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Current Status</label>
+                <div className="p-4 bg-blue-50 border-2 border-blue-100 rounded-2xl text-sm font-black text-blue-700 flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
+                  Waiting in Queue
+                </div>
+              </div>
+            </div>
+
+            {/* Vital Signs (Editable Mini Cards) */}
+            <div className="space-y-4">
+              <h4 className="text-[10px] font-black text-gray-900 tracking-[0.2em] mb-4">Patient Vital Signs</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { label: 'BP', value: '120/80', unit: 'mmHg' },
+                  { label: 'Pulse', value: '72', unit: 'bpm' },
+                  { label: 'Temp', value: '98.6', unit: '°F' },
+                  { label: 'SpO2', value: '98', unit: '%' }
+                ].map((vital, idx) => (
+                  <div key={idx} className="p-4 bg-white border-2 border-gray-50 rounded-2xl hover:border-blue-100 transition-colors">
+                    <p className="text-[8px] font-black text-gray-400 tracking-widest mb-1">{vital.label}</p>
+                    <input type="text" defaultValue={vital.value} className="w-full bg-transparent text-sm font-black text-gray-800 outline-none" />
+                    <p className="text-[8px] font-bold text-gray-400 mt-1">{vital.unit}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Patient Journey Stepper */}
+            <div className="bg-gray-50 rounded-3xl p-6 border border-gray-100">
+              <h4 className="text-[10px] font-black text-gray-900 tracking-[0.2em] mb-6">OPD Workflow Progress</h4>
+              <div className="flex items-center justify-between relative px-2">
+                <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-200 -translate-y-1/2 z-0"></div>
+                <div className="absolute top-1/2 left-0 w-1/3 h-1 bg-blue-600 -translate-y-1/2 z-0 transition-all duration-1000"></div>
+                {[
+                  { label: 'Reg', status: 'done' },
+                  { label: 'Consult', status: 'current' },
+                  { label: 'Lab/Diag', status: 'pending' },
+                  { label: 'Pharmacy', status: 'pending' },
+                  { label: 'Billing', status: 'pending' }
+                ].map((step, idx) => (
+                  <div key={idx} className="relative z-10 flex flex-col items-center">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border-4 transition-all duration-500 ${step.status === 'done' ? 'bg-blue-600 border-blue-100 text-white' : step.status === 'current' ? 'bg-white border-blue-600 text-blue-600' : 'bg-white border-gray-200 text-gray-400'}`}>
+                      {step.status === 'done' ? <CheckIcon sx={{ fontSize: 14 }} /> : <span className="text-[10px] font-black">{idx + 1}</span>}
+                    </div>
+                    <span className={`text-[8px] font-black tracking-widest mt-2 ${step.status === 'pending' ? 'text-gray-400' : 'text-gray-900'}`}>{step.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Patient Exit Modal */}
+      <Modal
+        isOpen={showExitModal}
+        onClose={() => setShowExitModal(false)}
+        title="Finalize Patient Exit"
+        size="lg"
+        footer={selectedExitPatient && (
+          <div className="flex flex-col sm:flex-row gap-4 w-full">
+            <button
+              className="flex-1 py-4 border-2 border-gray-100 text-gray-400 rounded-2xl font-black text-xs tracking-widest hover:border-gray-900 hover:text-gray-900 transition-all"
+              onClick={() => setShowExitModal(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className={`flex-1 py-4 rounded-2xl font-black text-xs tracking-widest transition-all shadow-xl flex items-center justify-center gap-2 ${exitForm.billingStatus === 'Paid' ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+              disabled={exitForm.billingStatus !== 'Paid'}
+              onClick={() => { handlePatientExit(selectedExitPatient); setShowExitModal(false); }}
+            >
+              <CheckCircleIcon sx={{ fontSize: 18 }} /> Complete & Exit
+            </button>
+          </div>
+        )}
+      >
+        {selectedExitPatient && (
+          <div className="space-y-6">
+            {/* Sticky Patient Identity Header */}
+            <div className="sticky -top-6 bg-white z-10 flex items-center gap-4 pb-4 border-b border-gray-100 -mx-6 px-6 pt-2">
+              <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 shadow-inner shrink-0">
+                <PersonIcon sx={{ fontSize: 32 }} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-gray-900 leading-tight">{selectedExitPatient.patientName}</h3>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded tracking-widest border border-blue-100 ">UHID: {selectedExitPatient.patientId}</span>
+                  <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                  <span className="text-[10px] font-black text-gray-400 tracking-widest ">Token: {selectedExitPatient.token}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Scrollable Content Area */}
+            <div className="space-y-6">
+              {/* Clinical Summary */}
+              <div className="bg-blue-50/30 rounded-3xl p-6 border border-blue-100 space-y-6">
+                <div className="flex items-center justify-between border-b border-blue-100 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-50"> <MedicalServicesIcon sx={{ fontSize: 20 }} /> </div>
+                    <div>
+                      <p className="text-[10px] font-black text-gray-400 tracking-widest">Consulting Doctor</p>
+                      <p className="text-sm font-black text-gray-900">{selectedExitPatient.doctor || 'Not Assigned'}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-gray-400 tracking-widest">Department</p>
+                    <p className="text-sm font-black text-blue-600 tracking-widest">{selectedExitPatient.department || 'OPD'}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Medications */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 mb-1"> <MedicationIcon className="text-emerald-500" sx={{ fontSize: 18 }} /> <h4 className="text-[10px] font-black text-gray-900 tracking-widest">Prescribed Medications</h4></div>
+                    <div className="space-y-2">
+                      {selectedExitPatient.medications && selectedExitPatient.medications.length > 0 ? (
+                        selectedExitPatient.medications.map((med, idx) => (
+                          <div key={idx} className="flex items-center justify-between bg-white/60 p-3 rounded-2xl border border-white shadow-sm backdrop-blur-sm">
+                            <span className="text-xs font-bold text-gray-800">{med}</span>
+                            <span className="text-[10px] font-black text-gray-400 ">1-0-1</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-4 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200 text-center">
+                          <p className="text-[10px] font-bold text-gray-400 italic">No Medications Recorded</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tests */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 mb-1"> <ScienceIcon className="text-orange-500" sx={{ fontSize: 18 }} /> <h4 className="text-[10px] font-black text-gray-900 tracking-widest">Diagnostic Investigations</h4></div>
+                    <div className="space-y-2">
+                      {selectedExitPatient.tests && selectedExitPatient.tests.length > 0 ? (
+                        selectedExitPatient.tests.map((test, idx) => (
+                          <div key={idx} className="flex items-center justify-between bg-white/60 p-3 rounded-2xl border border-white shadow-sm backdrop-blur-sm group">
+                            <div> <p className="text-xs font-bold text-gray-800">{test}</p> <p className="text-[9px] font-black text-orange-600 tracking-widest">Est. ₹{(200 + (idx * 150)).toFixed(2)}</p> </div>
+                            <button className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm" title="Download Requisition" onClick={() => alert(`Downloading Requisition for ${test}...`)}> <PrintIcon sx={{ fontSize: 14 }} /> </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-4 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200 text-center"> <p className="text-[10px] font-bold text-gray-400 italic">No Tests Recommended</p></div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Billing, Follow-up, Remarks */}
+              <div className="space-y-6 pb-4">
+                {/* Billing Status */}
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 tracking-widest block mb-2 ml-1">Billing & Payment Check</label>
+                  <div className={`p-4 rounded-2xl border-2 flex items-center justify-between transition-all ${exitForm.billingStatus === 'Paid' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-red-50 border-red-100 text-red-700'}`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${exitForm.billingStatus === 'Paid' ? 'bg-emerald-100' : 'bg-red-100'}`}> <PaymentsIcon sx={{ fontSize: 20 }} /> </div>
+                      <div> <p className="text-[10px] font-black tracking-widest opacity-60">Final Checkout Amount</p>
+                        <p className="font-bold text-sm"> {exitForm.billingStatus === 'Paid' ? 'Fully Paid' : 'Pending: ₹1,450.00'} </p> </div>
+                    </div>
+                    {exitForm.billingStatus !== 'Paid' && (
+                      <button className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-black tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-100" onClick={() => setExitForm({ ...exitForm, billingStatus: 'Paid' })} > Pay Now </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Follow-up Section */}
+                <div className="bg-gray-50 p-5 rounded-3xl border border-gray-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <label className="text-[10px] font-black text-gray-900 tracking-widest block">Follow-up Required?</label>
+                      <p className="text-[10px] text-gray-500 font-medium mt-0.5">Based on doctor's recommendation</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" className="sr-only peer" checked={exitForm.followUpRequired} onChange={(e) => setExitForm({ ...exitForm, followUpRequired: e.target.checked })} />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  {exitForm.followUpRequired && (
+                    <div className="space-y-2 mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Suggested Re-visit Date</label>
+                      <div className="relative">
+                        <input type="date" className="w-full p-4 bg-white border-2 border-gray-100 rounded-2xl text-sm font-bold text-gray-800 focus:border-blue-600 transition-all outline-none" value={exitForm.followUpDate} onChange={(e) => setExitForm({ ...exitForm, followUpDate: e.target.value })} /> <CalendarMonthIcon className="absolute right-4 top-4 text-gray-400" /> </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Remarks */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Exit Remarks / Notes</label>
+                  <textarea className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl text-sm font-bold text-gray-800 focus:border-blue-600 focus:bg-white transition-all outline-none min-h-[100px] resize-none" placeholder="Any final instructions for the patient or internal notes..." value={exitForm.remarks} onChange={(e) => setExitForm({ ...exitForm, remarks: e.target.value })} ></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Add the Payment Modal Component - Place this before the closing </div> of your main component */}
+      <Modal isOpen={showPaymentModal} onClose={() => !paymentProcessing && setShowPaymentModal(false)} title="Clinical Billing Gateway" size="lg" footer={selectedPaymentPatient && (
+        <div className="flex gap-4 w-full px-2">
+          <button onClick={() => setShowPaymentModal(false)} className="flex-1 px-8 py-4 border-2 border-gray-100 text-gray-400 rounded-2xl hover:border-gray-900 hover:text-gray-900 transition-all font-black text-[10px] tracking-[0.2em]"> Close </button>
+          <button onClick={handleProcessPaymentWithModal} disabled={paymentProcessing} className="flex-[2] px-8 py-4 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all font-black text-[10px] tracking-[0.2em] shadow-2xl shadow-gray-200 disabled:opacity-50 flex items-center justify-center gap-3"> {paymentProcessing ? (<div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>) : (<><CheckCircleIcon sx={{ fontSize: 18 }} /> Process Payment: ₹{calculatePaymentTotal()}</>)} </button>
+        </div>
+      )}
+      >
+        {selectedPaymentPatient && (
+          <div className="flex flex-col h-full overflow-hidden">
+            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-8">
+              {/* Patient Identity Section */}
+              <div className="pb-6 border-b border-gray-100">
+                <div className="flex flex-col md:flex-row justify-between gap-6">
+                  <div className="flex items-center gap-5">
+                    <div className="w-16 h-16 rounded-3xl border-2 border-gray-50 flex items-center justify-center text-gray-400 shadow-sm"> <PersonIcon sx={{ fontSize: 32 }} /> </div>
+                    <div>
+                      <h3 className="text-2xl font-black text-gray-900 tracking-tight">{paymentBillingData.patientName}</h3>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded tracking-widest border border-blue-100">{paymentBillingData.patientId}</span>
+                        <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                        <span className="text-[10px] font-black text-gray-400 tracking-widest">TOKEN: {paymentBillingData.token}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-1 gap-x-8 gap-y-1 text-left md:text-right">
+                    <p className="text-[9px] font-black text-gray-400 tracking-widest">Invoicing Physician</p>
+                    <p className="text-sm font-black text-gray-900">{paymentBillingData.doctor}</p>
+                    <p className="text-[9px] font-black text-gray-400 tracking-widest mt-2 md:mt-1">Billing Cycle</p>
+                    <p className="text-xs font-bold text-blue-600">{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Billing Items Container */}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-[10px] font-black text-gray-900 tracking-[0.3em]">Service Breakdown</h4>
+                    <p className="text-[10px] text-gray-400 font-bold mt-1 tracking-widest">Itemized Medical Charges</p>
+                  </div>
+                  <button onClick={addPaymentLabTest} className="flex items-center gap-2 px-4 py-2 border-2 border-gray-50 text-gray-400 rounded-xl text-[10px] font-black tracking-widest hover:border-blue-600 hover:text-blue-600 transition-all group"> <AddIcon sx={{ fontSize: 16 }} className="group-hover:rotate-90 transition-transform" /> Add Investigation </button>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Doctor Fee Card */}
+                  <div className="p-6 border-2 border-gray-50 rounded-3xl hover:border-gray-200 transition-all group">
+                    <div className="flex justify-between items-start">
+                      <div className="flex gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-white border border-gray-100 flex items-center justify-center text-gray-400"> <MedicalServicesIcon sx={{ fontSize: 20 }} /></div>
+                        <div>
+                          <p className="text-[9px] font-black text-gray-400 tracking-[0.2em] mb-1">Professional Service</p>
+                          <h5 className="text-sm font-black text-gray-900 tracking-wider">Consultation Fee (Dr. {paymentBillingData.doctor})</h5>
+                          <p className="text-[10px] text-gray-500 font-bold tracking-widest mt-1">OPD Registration & Assessment</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="relative">
+                          <span className="absolute -left-4 top-1/2 -translate-y-1/2 text-gray-300 font-black text-xs">₹</span>
+                          <input type="number" value={paymentBillingData.consultationFee} onChange={(e) => updatePaymentBillingData('consultationFee', e.target.value)} className="w-24 bg-transparent border-b-2 border-transparent focus:border-gray-900 text-xl font-black text-gray-900 text-right outline-none transition-all p-1" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Lab Test Cards */}
+                  {paymentBillingData.labTests.map((test, index) => (
+                    <div key={index} className="p-6 border-2 border-gray-50 rounded-3xl hover:border-blue-100 transition-all group animate-in fade-in slide-in-from-top-2">
+                      <div className="flex justify-between items-start">
+                        <div className="flex gap-4 flex-1">
+                          <div className="w-12 h-12 rounded-2xl bg-white border border-gray-100 flex items-center justify-center text-blue-400"><ScienceIcon sx={{ fontSize: 20 }} /> </div>
+                          <div className="flex-1">
+                            <p className="text-[9px] font-black text-blue-400 tracking-[0.2em] mb-1">Diagnostic Investigation</p>
+                            <input type="text" value={test.name} onChange={(e) => updatePaymentLabTest(index, 'name', e.target.value)} placeholder="Investigation Name..." className="w-full bg-transparent border-none p-0 text-sm font-black text-gray-900 tracking-wider focus:ring-0" />
+                            <p className="text-[10px] text-gray-400 font-bold tracking-widest mt-1">Laboratory Facility Charges</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-4">
+                          <div className="text-right">
+                            <div className="relative">
+                              <span className="absolute -left-4 top-1/2 -translate-y-1/2 text-gray-300 font-black text-xs">₹</span>
+                              <input type="number" value={test.fee} onChange={(e) => updatePaymentLabTest(index, 'fee', e.target.value)} className="w-24 bg-transparent border-b-2 border-transparent focus:border-blue-600 text-xl font-black text-gray-900 text-right outline-none transition-all p-1" />
+                            </div>
+                          </div>
+                          <button onClick={() => removePaymentLabTest(index)} className="p-2 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"><DeleteIcon sx={{ fontSize: 18 }} /></button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
               <button onClick={() => { setShowDeactivateModal(false); setDoctorToDeactivate(null); setPatientsToReassign([]); }} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">No, Keep Active</button>
@@ -3773,12 +4676,24 @@ const OPDManagement = () => {
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Exit Remarks / Notes</label>
                   <textarea className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl text-sm font-bold text-gray-800 focus:border-blue-600 focus:bg-white transition-all outline-none min-h-[100px] resize-none" placeholder="Any final instructions for the patient or internal notes..." value={exitForm.remarks} onChange={(e) => setExitForm({ ...exitForm, remarks: e.target.value })} ></textarea>
+              {/* Summary Section */}
+              <div className="pt-8 border-t-2 border-dashed border-gray-100 flex flex-col md:flex-row justify-between items-end md:items-center gap-6">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <p className="text-[10px] font-black text-gray-400 tracking-[0.3em]">Total Receivable Amount</p>
+                  </div>
+                  <p className="text-[10px] text-gray-500 font-bold italic tracking-wider">Net payable inclusive of all clinical service taxes</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-5xl font-black text-gray-900 tracking-tighter">₹{calculatePaymentTotal()}</span>
                 </div>
               </div>
             </div>
           </div>
         )}
       </Modal>
+
     </div>
   );
 };

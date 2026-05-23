@@ -4,12 +4,14 @@ import SearchBar from '../../../../components/common/SearchBar/SearchBar'
 import Button from '../../../../components/common/Button/Button'
 import Modal from '../../../../components/common/Modal/Modal'
 import LoadingSpinner from '../../../../components/common/LoadingSpinner/LoadingSpinner'
-
+import { apiFetch } from '../../../../services/apiClient'
 const QualityControl = () => {
   const [loading, setLoading] = useState(true)
   const [qcRuns, setQcRuns] = useState([])
   const [qcMaterials, setQcMaterials] = useState([])
   const [qcRules, setQcRules] = useState([])
+  const [qcStats, setQcStats] = useState(null)
+  const [workflowActions, setWorkflowActions] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [showNewRunModal, setShowNewRunModal] = useState(false)
   const [showMaterialModal, setShowMaterialModal] = useState(false)
@@ -30,194 +32,124 @@ const QualityControl = () => {
 
   const loadQCData = async () => {
     setLoading(true)
-    setTimeout(() => {
-      const qcRunsData = [
-        {
-          id: 'QC-2024-001',
-          test: 'CBC',
-          material: 'Hematology Control',
-          lotNumber: 'LOT-123',
-          date: '2024-01-15',
-          operator: 'Lab Tech Ravi',
-          status: 'passed',
-          value: '12.5',
-          target: '12.0',
-          sd: '0.5',
-          ruleViolations: 0,
-          chartData: []
-        },
-        {
-          id: 'QC-2024-002',
-          test: 'Glucose',
-          material: 'Chemistry Control Level 1',
-          lotNumber: 'LOT-456',
-          date: '2024-01-15',
-          operator: 'Lab Tech Priya',
-          status: 'warning',
-          value: '105',
-          target: '100',
-          sd: '5',
-          ruleViolations: 1,
-          chartData: []
-        },
-        {
-          id: 'QC-2024-003',
-          test: 'Creatinine',
-          material: 'Chemistry Control Level 2',
-          lotNumber: 'LOT-789',
-          date: '2024-01-14',
-          operator: 'Lab Tech Sanjay',
-          status: 'failed',
-          value: '2.5',
-          target: '1.8',
-          sd: '0.2',
-          ruleViolations: 2,
-          chartData: []
-        },
-        {
-          id: 'QC-2024-004',
-          test: 'ALT',
-          material: 'Liver Enzyme Control',
-          lotNumber: 'LOT-234',
-          date: '2024-01-14',
-          operator: 'Lab Tech Meena',
-          status: 'passed',
-          value: '35',
-          target: '30',
-          sd: '5',
-          ruleViolations: 0,
-          chartData: []
-        }
-      ]
+    try {
+      const response = await apiFetch('/api/v1/lab/quality-control', {
+        method: 'GET'
+      })
+      const data = await response.json().catch(() => ({}))
 
-      const qcMaterialsData = [
-        {
-          id: 'QCM-001',
-          name: 'Hematology Control',
-          type: 'Hematology',
-          manufacturer: 'Sysmex',
-          lotNumber: 'LOT-123',
-          expiryDate: '2024-06-30',
-          storage: '2-8°C',
-          quantity: 25,
-          status: 'active'
-        },
-        {
-          id: 'QCM-002',
-          name: 'Chemistry Control Level 1',
-          type: 'Chemistry',
-          manufacturer: 'Bio-Rad',
-          lotNumber: 'LOT-456',
-          expiryDate: '2024-05-15',
-          storage: '2-8°C',
-          quantity: 30,
-          status: 'active'
-        },
-        {
-          id: 'QCM-003',
-          name: 'Chemistry Control Level 2',
-          type: 'Chemistry',
-          manufacturer: 'Bio-Rad',
-          lotNumber: 'LOT-789',
-          expiryDate: '2024-05-15',
-          storage: '2-8°C',
-          quantity: 28,
-          status: 'active'
-        }
-      ]
+      if (!response.ok) {
+        throw new Error(data?.message || data?.detail || 'Failed to fetch QC dashboard data')
+      }
 
-      const qcRulesData = [
-        {
-          id: 'RULE-001',
-          name: '1-3s Rule',
-          description: 'One point beyond 3 SD from mean',
-          type: 'Westgard',
-          action: 'Reject run, investigate',
-          priority: 'high'
-        },
-        {
-          id: 'RULE-002',
-          name: '2-2s Rule',
-          description: 'Two consecutive points beyond 2 SD on same side',
-          type: 'Westgard',
-          action: 'Reject run, investigate',
-          priority: 'high'
-        },
-        {
-          id: 'RULE-003',
-          name: 'R-4s Rule',
-          description: 'Range of 4 SD between two points',
-          type: 'Westgard',
-          action: 'Reject run',
-          priority: 'high'
-        },
-        {
-          id: 'RULE-004',
-          name: '4-1s Rule',
-          description: 'Four consecutive points beyond 1 SD on same side',
-          type: 'Westgard',
-          action: 'Warning, check trend',
-          priority: 'medium'
-        }
-      ]
+      const mappedRuns = (data.runs || data.recent_runs || data.qcRuns || data.qc_runs || []).map(r => ({
+        id: r.qc_id || r.id || r.qc_run_id || r.run_id || '',
+        test: r.test || r.test_name || '',
+        material: r.qc_material || r.material || r.material_name || '',
+        lotNumber: r.lot_number || r.lotNumber || '',
+        date: r.date || r.created_at || '',
+        operator: r.operator || r.operator_name || '',
+        status: (r.status || 'passed').toLowerCase(),
+        value: r.observed_value !== undefined ? r.observed_value : r.value || '',
+        target: r.target || '',
+        sd: r.sd || r.standard_deviation || '',
+        ruleViolations: r.rule_violations || r.ruleViolations || 0,
+        chartData: r.chart_data || r.chartData || []
+      }))
 
-      setQcRuns(qcRunsData)
-      setQcMaterials(qcMaterialsData)
-      setQcRules(qcRulesData)
+      const mappedMaterials = (data.materials_inventory || data.materials || data.qcMaterials || data.qc_materials || []).map(m => ({
+        id: m.id || m.material_id || '',
+        name: m.name || m.material_name || '',
+        type: m.type || m.material_type || '',
+        manufacturer: m.manufacturer || '',
+        lotNumber: m.lot_number || m.lotNumber || '',
+        expiryDate: m.expiry_date || m.expiryDate || '',
+        storage: m.storage || m.storage_conditions || '',
+        quantity: m.quantity || 0,
+        status: m.status || 'active'
+      }))
+
+      const mappedRules = (data.rules || data.qcRules || data.qc_rules || []).map(rule => ({
+        id: rule.id || rule.rule_id || '',
+        name: rule.name || rule.rule_name || '',
+        description: rule.description || '',
+        type: rule.type || rule.rule_type || '',
+        action: rule.action || '',
+        priority: rule.priority || ''
+      }))
+
+      setQcRuns(mappedRuns)
+      setQcMaterials(mappedMaterials)
+      setQcRules(mappedRules)
+      setQcStats(data.stats || null)
+      setWorkflowActions(data.workflow_actions || [])
+    } catch (err) {
+      console.error('Failed to load QC dashboard:', err)
+      // On error, fallback to empty arrays so UI handles it gracefully
+      setQcRuns([])
+      setQcMaterials([])
+      setQcRules([])
+      setQcStats(null)
+      setWorkflowActions([])
+    } finally {
       setLoading(false)
-    }, 1000)
+    }
   }
 
   const handleSearch = (term) => {
     setSearchTerm(term)
   }
 
-  const handleNewQCRun = () => {
-    const qcId = `QC-${new Date().getFullYear()}-${(qcRuns.length + 1).toString().padStart(3, '0')}`
-    
-    // Calculate status based on value vs target
-    const value = parseFloat(newQCRun.value)
-    const target = 12.0 // In real app, this would come from material data
-    const sd = 0.5
-    
-    let status = 'passed'
-    let ruleViolations = 0
-    
-    if (Math.abs(value - target) > 3 * sd) {
-      status = 'failed'
-      ruleViolations = 1
-    } else if (Math.abs(value - target) > 2 * sd) {
-      status = 'warning'
-      ruleViolations = 1
+  const handleNewQCRun = async () => {
+    if (!newQCRun.test || !newQCRun.material || !newQCRun.lotNumber || !newQCRun.value) {
+      alert('Please fill in all required fields.')
+      return
     }
-    
-    const newRun = {
-      id: qcId,
-      test: newQCRun.test,
-      material: newQCRun.material,
-      lotNumber: newQCRun.lotNumber,
-      date: newQCRun.date || new Date().toISOString().split('T')[0],
-      operator: newQCRun.operator || 'Current User',
-      status: status,
-      value: newQCRun.value,
-      target: target.toString(),
-      sd: sd.toString(),
-      ruleViolations: ruleViolations,
-      chartData: []
+
+    try {
+      setLoading(true)
+      const payload = {
+        test: newQCRun.test,
+        qc_material: newQCRun.material,
+        lot_number: newQCRun.lotNumber,
+        observed_value: parseFloat(newQCRun.value),
+        operator: newQCRun.operator || 'Current User',
+        date: newQCRun.date || new Date().toISOString().split('T')[0]
+      }
+
+      const response = await apiFetch('/api/v1/lab/quality-control/run', {
+        method: 'POST',
+        body: payload
+      })
+      
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data?.message || data?.detail || 'Failed to record QC run')
+      }
+
+      setShowNewRunModal(false)
+      setNewQCRun({
+        test: '',
+        material: '',
+        lotNumber: '',
+        value: '',
+        operator: '',
+        date: ''
+      })
+
+      // Refresh the dashboard to update tables
+      await loadQCData()
+      const successMsg = data.message || 'QC Run recorded successfully!'
+      const details = data.qc_id ? `\nID: ${data.qc_id}\nStatus: ${data.status || 'UNKNOWN'}` : ''
+      alert(`${successMsg}${details}`)
+
+    } catch (err) {
+      console.error('Failed to record QC run:', err)
+      alert(err?.message || 'Failed to record QC run')
+    } finally {
+      setLoading(false)
     }
-    
-    setQcRuns([newRun, ...qcRuns])
-    setShowNewRunModal(false)
-    setNewQCRun({
-      test: '',
-      material: '',
-      lotNumber: '',
-      value: '',
-      operator: '',
-      date: ''
-    })
-    
-    alert(`QC Run ${qcId} recorded!\nStatus: ${status}`)
   }
 
   const handleApproveQCRun = (runId) => {
@@ -252,6 +184,28 @@ const QualityControl = () => {
     setShowRuleModal(false)
   }
 
+  const handleWorkflowAction = async (action) => {
+    try {
+      setLoading(true)
+      const response = await apiFetch(`/api/v1/lab/quality-control/workflow/${action}`, {
+        method: 'POST'
+      })
+      
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data?.message || data?.detail || `Failed to trigger ${action}`)
+      }
+
+      alert(`Workflow '${action}' triggered successfully!\n${data.message || ''}`)
+    } catch (err) {
+      console.error(`Failed to trigger workflow ${action}:`, err)
+      alert(err?.message || `Failed to trigger workflow ${action}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const filteredQCRuns = qcRuns.filter(run =>
     run.test.toLowerCase().includes(searchTerm.toLowerCase()) ||
     run.material.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -260,7 +214,6 @@ const QualityControl = () => {
 
   const testOptions = ['CBC', 'Glucose', 'Creatinine', 'ALT', 'AST', 'Bilirubin', 'Cholesterol', 'Triglycerides', 'Urea', 'Sodium', 'Potassium']
   const materialOptions = qcMaterials.map(m => m.name)
-
   if (loading) return <LoadingSpinner />
 
   return (
@@ -292,16 +245,16 @@ const QualityControl = () => {
 
 {/* QC Stats - Glass Morphism Design */}
 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-  {/* Today's QC Runs Card */}
+  {/* Total QC Runs Card */}
   <div className="relative bg-gradient-to-br from-white to-blue-50 p-5 rounded-2xl border border-blue-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
     <div className="absolute top-0 right-0 w-20 h-20 bg-blue-200 rounded-full -translate-y-8 translate-x-8 opacity-20"></div>
     <div className="absolute bottom-0 left-0 w-16 h-16 bg-blue-300 rounded-full translate-y-8 -translate-x-8 opacity-10"></div>
 
     <div className="relative flex items-center justify-between">
       <div>
-        <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Today's QC Runs</p>
+        <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Total QC Runs</p>
         <p className="text-2xl font-bold text-gray-900 mt-1">
-          {qcRuns.filter(r => r.date === new Date().toISOString().split('T')[0]).length}
+          {qcStats?.total_qc_runs ?? (qcStats ? ((qcStats.passed_runs || 0) + (qcStats.warning_runs || 0) + (qcStats.failed_runs || 0)) : qcRuns.length)}
         </p>
       </div>
       <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
@@ -309,7 +262,7 @@ const QualityControl = () => {
       </div>
     </div>
     <div className="relative mt-4 pt-3 border-t border-blue-100">
-      <p className="text-xs text-blue-700 font-medium">Quality control tests</p>
+      <p className="text-xs text-blue-700 font-medium">All quality control tests</p>
     </div>
   </div>
 
@@ -322,7 +275,7 @@ const QualityControl = () => {
       <div>
         <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Passed Runs</p>
         <p className="text-2xl font-bold text-gray-900 mt-1">
-          {qcRuns.filter(r => r.status === 'passed' || r.status === 'approved').length}
+          {qcStats?.passed_runs ?? qcRuns.filter(r => r.status === 'passed' || r.status === 'approved').length}
         </p>
       </div>
       <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
@@ -343,7 +296,7 @@ const QualityControl = () => {
       <div>
         <p className="text-xs font-semibold text-yellow-600 uppercase tracking-wider">Warning Runs</p>
         <p className="text-2xl font-bold text-gray-900 mt-1">
-          {qcRuns.filter(r => r.status === 'warning').length}
+          {qcStats?.warning_runs ?? qcRuns.filter(r => r.status === 'warning').length}
         </p>
       </div>
       <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-md">
@@ -364,7 +317,7 @@ const QualityControl = () => {
       <div>
         <p className="text-xs font-semibold text-red-600 uppercase tracking-wider">Failed Runs</p>
         <p className="text-2xl font-bold text-gray-900 mt-1">
-          {qcRuns.filter(r => r.status === 'failed' || r.status === 'rejected').length}
+          {qcStats?.failed_runs ?? qcRuns.filter(r => r.status === 'failed' || r.status === 'rejected').length}
         </p>
       </div>
       <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center shadow-md">
@@ -614,46 +567,71 @@ const QualityControl = () => {
       {/* QC Workflow Actions */}
       <div className="bg-white p-6 rounded border card-shadow">
         <h3 className="text-lg font-semibold mb-4">QC Workflow Actions</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 border rounded-lg hover:bg-blue-50 transition-colors">
-            <div className="flex items-center mb-3">
-              <div className="p-2 bg-blue-100 rounded-lg mr-3">
-                <i className="fas fa-chart-bar text-blue-600"></i>
-              </div>
-              <h4 className="font-semibold">Levey-Jennings Chart</h4>
-            </div>
-            <p className="text-sm text-gray-600">Generate QC charts for trend analysis</p>
-            <button className="mt-3 text-blue-600 hover:text-blue-800 text-sm">
-              View Charts →
-            </button>
+        {workflowActions && workflowActions.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {workflowActions.map(action => {
+              const actionDetails = {
+                'LEVEY_JENNINGS_CHART': {
+                  title: 'Levey-Jennings Chart',
+                  desc: 'Generate QC charts for trend analysis',
+                  icon: 'fas fa-chart-bar text-blue-600',
+                  bgBase: 'bg-blue-100',
+                  hoverBase: 'hover:bg-blue-50',
+                  textColor: 'text-blue-600 hover:text-blue-800',
+                  btnText: 'View Charts →'
+                },
+                'QC_COMPLIANCE_REPORT': {
+                  title: 'QC Compliance Report',
+                  desc: 'Generate compliance reports for audits',
+                  icon: 'fas fa-clipboard-check text-green-600',
+                  bgBase: 'bg-green-100',
+                  hoverBase: 'hover:bg-green-50',
+                  textColor: 'text-green-600 hover:text-green-800',
+                  btnText: 'Generate Report →'
+                },
+                'QC_ALERTS': {
+                  title: 'QC Alerts',
+                  desc: 'Configure alerts for QC violations',
+                  icon: 'fas fa-bell text-purple-600',
+                  bgBase: 'bg-purple-100',
+                  hoverBase: 'hover:bg-purple-50',
+                  textColor: 'text-purple-600 hover:text-purple-800',
+                  btnText: 'Configure Alerts →'
+                }
+              }
+
+              const details = actionDetails[action] || {
+                title: action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+                desc: 'Execute this workflow action',
+                icon: 'fas fa-cog text-gray-600',
+                bgBase: 'bg-gray-100',
+                hoverBase: 'hover:bg-gray-50',
+                textColor: 'text-gray-600 hover:text-gray-800',
+                btnText: 'Execute →'
+              }
+
+              return (
+                <div key={action} className={`p-4 border rounded-lg ${details.hoverBase} transition-colors`}>
+                  <div className="flex items-center mb-3">
+                    <div className={`p-2 ${details.bgBase} rounded-lg mr-3`}>
+                      <i className={details.icon}></i>
+                    </div>
+                    <h4 className="font-semibold">{details.title}</h4>
+                  </div>
+                  <p className="text-sm text-gray-600">{details.desc}</p>
+                  <button 
+                    className={`mt-3 ${details.textColor} text-sm`}
+                    onClick={() => handleWorkflowAction(action)}
+                  >
+                    {details.btnText}
+                  </button>
+                </div>
+              )
+            })}
           </div>
-          
-          <div className="p-4 border rounded-lg hover:bg-green-50 transition-colors">
-            <div className="flex items-center mb-3">
-              <div className="p-2 bg-green-100 rounded-lg mr-3">
-                <i className="fas fa-clipboard-check text-green-600"></i>
-              </div>
-              <h4 className="font-semibold">QC Compliance Report</h4>
-            </div>
-            <p className="text-sm text-gray-600">Generate compliance reports for audits</p>
-            <button className="mt-3 text-green-600 hover:text-green-800 text-sm">
-              Generate Report →
-            </button>
-          </div>
-          
-          <div className="p-4 border rounded-lg hover:bg-purple-50 transition-colors">
-            <div className="flex items-center mb-3">
-              <div className="p-2 bg-purple-100 rounded-lg mr-3">
-                <i className="fas fa-bell text-purple-600"></i>
-              </div>
-              <h4 className="font-semibold">QC Alerts</h4>
-            </div>
-            <p className="text-sm text-gray-600">Configure alerts for QC violations</p>
-            <button className="mt-3 text-purple-600 hover:text-purple-800 text-sm">
-              Configure Alerts →
-            </button>
-          </div>
-        </div>
+        ) : (
+          <p className="text-sm text-gray-500">No workflow actions available.</p>
+        )}
       </div>
     </div>
           

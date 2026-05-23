@@ -1,3 +1,4 @@
+// 
 import React, { useState, useEffect } from 'react'
 import LoadingSpinner from '../../../../components/common/LoadingSpinner/LoadingSpinner'
 import DataTable from '../../../../components/ui/Tables/DataTable'
@@ -15,11 +16,16 @@ const BillingFinance = () => {
   const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, month: '', value: 0 })
   const [newBill, setNewBill] = useState({
     patient: '',
+    doctorName: '',
+    admissionDate: '',
+    dischargeDate: '',
     services: [],
     amount: '',
     discount: '',
     paymentMethod: 'Cash',
-    notes: ''
+    notes: '',
+    treatments: [],
+    tests: []
   })
 
   // Data constants
@@ -168,11 +174,16 @@ const BillingFinance = () => {
     const bill = {
       id: `INV-${Math.floor(4000 + Math.random() * 9000)}`,
       patient: newBill.patient,
+      doctorName: newBill.doctorName,
+      admissionDate: newBill.admissionDate,
+      dischargeDate: newBill.dischargeDate,
       services: newBill.services,
       amount: parseInt(newBill.amount, 10),
       discount: parseInt(newBill.discount || 0, 10),
       paymentMethod: newBill.paymentMethod,
       notes: newBill.notes,
+      treatments: newBill.treatments || [],
+      tests: newBill.tests || [],
       status: 'Pending',
       date: new Date().toISOString().split('T')[0]
     }
@@ -228,11 +239,16 @@ const BillingFinance = () => {
   const resetForm = () => {
     setNewBill({
       patient: '',
+      doctorName: '',
+      admissionDate: '',
+      dischargeDate: '',
       services: [],
       amount: '',
       discount: '',
       paymentMethod: 'Cash',
-      notes: ''
+      notes: '',
+      treatments: [],
+      tests: []
     })
   }
 
@@ -961,11 +977,8 @@ const BillingFinance = () => {
             <i className="fas fa-search absolute left-3 top-3.5 text-gray-400"></i>
           </div>
           <div className="w-full lg:w-48 relative">
-            <select 
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all appearance-none pr-10"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
+            <select className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all appearance-none pr-10"
+              value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="">All Status</option>
               <option value="Paid">Paid</option>
               <option value="Pending">Pending</option>
@@ -990,9 +1003,7 @@ const BillingFinance = () => {
           columns={[
             { key: 'id', title: 'Invoice ID', sortable: true },
             { key: 'patient', title: 'Patient', sortable: true },
-            { 
-              key: 'services', 
-              title: 'Services',
+            { key: 'services', title: 'Services',
               render: (value) => (
                 <div className="flex flex-wrap gap-1">
                   {value.map(service => (
@@ -1003,23 +1014,10 @@ const BillingFinance = () => {
                 </div>
               )
             },
-            { 
-              key: 'amount', 
-              title: 'Amount', 
-              sortable: true,
-              render: (value) => <span className="font-semibold">₹{value}</span>
-            },
-            { 
-              key: 'discount', 
-              title: 'Discount', 
-              sortable: true,
-              render: (value) => `₹${value}`
-            },
+            { key: 'amount', title: 'Amount', sortable: true, render: (value) => <span className="font-semibold">₹{value}</span> },
+            { key: 'discount', title: 'Discount', sortable: true, render: (value) => `₹${value}` },
             { key: 'paymentMethod', title: 'Payment Method', sortable: true },
-            { 
-              key: 'status', 
-              title: 'Status', 
-              sortable: true,
+            { key: 'status', title: 'Status', sortable: true,
               render: (value) => (
                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
                   value === 'Paid' ? 'bg-green-100 text-green-800' :
@@ -1030,42 +1028,26 @@ const BillingFinance = () => {
                 </span>
               )
             },
-            {
-              key: 'actions',
-              title: 'Actions',
+            { key: 'actions', title: 'Actions',
               render: (_, row) => (
                 <div className="flex gap-2">
-                  <button 
-                    onClick={() => openModal('view', row)}
-                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-2 rounded-lg transition-all duration-200"
-                    title="View Bill"
-                  >
+                  <button className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-2 rounded-lg transition-all duration-200" title="View Bill" onClick={() => openModal('view', row)}>
                     <i className="fas fa-eye"></i>
                   </button>
-                  <button 
-                    onClick={() => openModal('edit', row)}
-                    className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition-all duration-200"
-                    title="Edit Bill"
-                  >
+                  <button className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition-all duration-200" title="Edit Bill" onClick={() => openModal('edit', row)}>
                     <i className="fas fa-edit"></i>
                   </button>
-                  <button 
+                  <button className="text-red-600 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-all duration-200" title="Delete Bill"
                     onClick={() => {
                       if (confirm('Are you sure you want to delete this bill?')) {
                         setBills(prev => prev.filter(b => b.id !== row.id))
                       }
-                    }}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-all duration-200"
-                    title="Delete Bill"
-                  >
+                    }}>
                     <i className="fas fa-trash"></i>
                   </button>
                   {row.status !== 'Paid' && (
-                    <button 
-                      onClick={() => openModal('payment', row)}
-                      className="text-green-600 hover:text-green-700 hover:bg-green-50 p-2 rounded-lg transition-all duration-200"
-                      title="Mark as Paid"
-                    >
+                    <button className="text-green-600 hover:text-green-700 hover:bg-green-50 p-2 rounded-lg transition-all duration-200"
+                      title="Mark as Paid" onClick={() => openModal('payment', row)}>
                       <i className="fas fa-check"></i>
                     </button>
                   )}
@@ -1211,8 +1193,7 @@ const BillingFinance = () => {
                       }, 250)
                     }} 
                     className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 p-2 rounded-lg transition-all duration-200"
-                    title="Download Invoice"
-                  >
+                    title="Download Invoice">
                     <i className="fas fa-download"></i>
                   </button>
                 </div>
@@ -1289,9 +1270,7 @@ const ViewBillModal = ({ isOpen, onClose, bill, onMarkAsPaid }) => (
           <label className="block text-sm font-medium text-gray-700 mb-2">Services</label>
           <div className="flex flex-wrap gap-2">
             {bill.services.map(service => (
-              <span key={service} className="bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded">
-                {service}
-              </span>
+              <span key={service} className="bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded">{service}</span>
             ))}
           </div>
         </div>
@@ -1305,17 +1284,13 @@ const ViewBillModal = ({ isOpen, onClose, bill, onMarkAsPaid }) => (
 
         <div className="flex justify-between gap-3 pt-4 border-t">
           {bill.status !== 'Paid' && (
-            <button
-              onClick={() => { onMarkAsPaid(bill.id); onClose(); }}
-              className="flex-1 bg-gradient-to-r from-green-600 to-green-500 text-white py-3 rounded-lg hover:shadow-lg transition-all duration-200 font-semibold flex items-center justify-center gap-2"
-            >
+            <button className="flex-1 bg-gradient-to-r from-green-600 to-green-500 text-white py-3 rounded-lg hover:shadow-lg transition-all duration-200 font-semibold flex items-center justify-center gap-2"
+              onClick={() => { onMarkAsPaid(bill.id); onClose(); }}>
               <i className="fas fa-check"></i>Mark as Paid
             </button>
           )}
-          <button
-            onClick={onClose}
-            className={`${bill.status !== 'Paid' ? 'flex-1' : 'w-full'} bg-gradient-to-r from-gray-300 to-gray-200 text-gray-800 py-3 rounded-lg hover:shadow-lg transition-all duration-200 font-semibold`}
-          >
+          <button className={`${bill.status !== 'Paid' ? 'flex-1' : 'w-full'} bg-gradient-to-r from-gray-300 to-gray-200 text-gray-800 py-3 rounded-lg hover:shadow-lg transition-all duration-200 font-semibold`}
+            onClick={onClose}>
             Close
           </button>
         </div>
@@ -1348,12 +1323,8 @@ const GenerateBillModal = ({ isOpen, onClose, onSubmit, formData, onInputChange,
         <div className="input-group">
           <label className="block text-sm font-medium text-gray-700 mb-1">Select Patient <span className="text-red-500">*</span></label>
           <div className="relative">
-            <select
-              required
-              value={formData.patient}
-              onChange={(e) => onInputChange('patient', e.target.value)}
-              className="w-full px-4 py-3 pl-11 pr-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all appearance-none bg-white cursor-pointer"
-            >
+            <select className="w-full px-4 py-3 pl-11 pr-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all appearance-none bg-white cursor-pointer"
+              required value={formData.patient} onChange={(e) => onInputChange('patient', e.target.value)} >
               <option value="">Select Patient</option>
               {['Ravi Kumar', 'Anita Sharma', 'Suresh Patel', 'Priya Singh', 'Rajesh Kumar', 'Meena Gupta'].map(patient => (
                 <option key={patient} value={patient}>{patient}</option>
@@ -1365,13 +1336,45 @@ const GenerateBillModal = ({ isOpen, onClose, onSubmit, formData, onInputChange,
         </div>
 
         <div className="input-group">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Doctor Name <span className="text-red-500">*</span></label>
+          <div className="relative">
+            <input
+              className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+              placeholder="Treating Doctor" type="text" required value={formData.doctorName} onChange={(e) => onInputChange('doctorName', e.target.value)}
+            />
+            <i className="fas fa-user-md absolute left-3 top-3.5 text-gray-400"></i>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="input-group">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Admission Date <span className="text-red-500">*</span></label>
+          <div className="relative">
+            <input className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+              type="date" value={formData.admissionDate} onChange={(e) => onInputChange('admissionDate', e.target.value)}
+            />
+            <i className="fas fa-calendar-alt absolute left-3 top-3.5 text-gray-400"></i>
+          </div>
+        </div>
+
+        <div className="input-group">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Discharge Date <span className="text-red-500">*</span></label>
+          <div className="relative">
+            <input className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+              type="date" required value={formData.dischargeDate} onChange={(e) => onInputChange('dischargeDate', e.target.value)}
+            />
+            <i className="fas fa-calendar-check absolute left-3 top-3.5 text-gray-400"></i>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="input-group">
           <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
           <div className="relative">
-            <select
-              value={formData.paymentMethod}
-              onChange={(e) => onInputChange('paymentMethod', e.target.value)}
-              className="w-full px-4 py-3 pl-11 pr-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all appearance-none bg-white cursor-pointer"
-            >
+            <select className="w-full px-4 py-3 pl-11 pr-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all appearance-none bg-white cursor-pointer"
+              value={formData.paymentMethod} onChange={(e) => onInputChange('paymentMethod', e.target.value)}>
               {['Cash', 'Card', 'UPI', 'Insurance', 'Bank Transfer'].map(method => (
                 <option key={method} value={method}>{method}</option>
               ))}
@@ -1386,16 +1389,12 @@ const GenerateBillModal = ({ isOpen, onClose, onSubmit, formData, onInputChange,
         <label className="block text-sm font-medium text-gray-700 mb-3">Services <span className="text-red-500">*</span></label>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {['Consultation', 'X-Ray', 'Blood Test', 'MRI Scan', 'CT Scan', 'Medication', 'Surgery', 'Lab Test'].map(service => (
-            <button
-              key={service}
-              type="button"
-              onClick={() => onServiceToggle(service)}
+            <button key={service} type="button" onClick={() => onServiceToggle(service)}
               className={`p-2 border-2 rounded-lg text-sm transition-all ${
                 formData.services.includes(service)
                   ? 'border-blue-500 bg-blue-50 text-blue-700'
                   : 'border-gray-300 text-gray-700 hover:border-blue-300'
-              }`}
-            >
+              }`}>
               {service}
             </button>
           ))}
@@ -1405,9 +1404,7 @@ const GenerateBillModal = ({ isOpen, onClose, onSubmit, formData, onInputChange,
             <p className="text-sm font-medium text-blue-800 mb-1">Selected Services:</p>
             <div className="flex flex-wrap gap-2">
               {formData.services.map(service => (
-                <span key={service} className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">
-                  {service}
-                </span>
+                <span key={service} className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">{service}</span>
               ))}
             </div>
           </div>
@@ -1418,14 +1415,8 @@ const GenerateBillModal = ({ isOpen, onClose, onSubmit, formData, onInputChange,
         <div className="input-group">
           <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₹) <span className="text-red-500">*</span></label>
           <div className="relative">
-            <input
-              type="number"
-              required
-              min="0"
-              value={formData.amount}
-              onChange={(e) => onInputChange('amount', e.target.value)}
-              className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-              placeholder="0"
+            <input className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+              placeholder="0" type="number" required min="0" value={formData.amount} onChange={(e) => onInputChange('amount', e.target.value)}
             />
             <i className="fas fa-rupee-sign absolute left-3 top-3.5 text-gray-400"></i>
           </div>
@@ -1434,13 +1425,8 @@ const GenerateBillModal = ({ isOpen, onClose, onSubmit, formData, onInputChange,
         <div className="input-group">
           <label className="block text-sm font-medium text-gray-700 mb-1">Discount (₹)</label>
           <div className="relative">
-            <input
-              type="number"
-              min="0"
-              value={formData.discount}
-              onChange={(e) => onInputChange('discount', e.target.value)}
-              className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-              placeholder="0"
+            <input className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+              placeholder="0" type="number" min="0" value={formData.discount} onChange={(e) => onInputChange('discount', e.target.value)}
             />
             <i className="fas fa-percent absolute left-3 top-3.5 text-gray-400"></i>
           </div>
@@ -1450,30 +1436,20 @@ const GenerateBillModal = ({ isOpen, onClose, onSubmit, formData, onInputChange,
       <div className="input-group">
         <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
         <div className="relative">
-          <textarea
-            rows="3"
-            value={formData.notes}
-            onChange={(e) => onInputChange('notes', e.target.value)}
-            className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-            placeholder="Additional notes..."
-            style={{ resize: 'vertical' }}
+          <textarea className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+            placeholder="Additional notes..." style={{ resize: 'vertical' }} rows="3" value={formData.notes} onChange={(e) => onInputChange('notes', e.target.value)}
           />
           <i className="fas fa-sticky-note absolute left-3 top-3.5 text-gray-400"></i>
         </div>
       </div>
 
       <div className="flex justify-end gap-3 pt-6 border-t">
-        <button
-          onClick={onClose}
-          className="px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-all duration-200 font-semibold"
-        >
+        <button className="px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-all duration-200 font-semibold"
+          onClick={onClose}>
           Cancel
         </button>
-        <button
-          onClick={onSubmit}
-          disabled={!formData.patient || formData.services.length === 0 || !formData.amount}
-          className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg hover:shadow-lg transition-all duration-200 font-semibold flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
+        <button className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg hover:shadow-lg transition-all duration-200 font-semibold flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={onSubmit} disabled={!formData.patient || !formData.doctorName || !formData.admissionDate || !formData.dischargeDate || formData.services.length === 0 || !formData.amount}>
           <i className="fas fa-file-invoice"></i> Generate Bill
         </button>
       </div>
@@ -1489,24 +1465,17 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, bill }) => (
           <i className="fas fa-check text-green-600 text-3xl"></i>
         </div>
         <h3 className="text-2xl font-bold text-gray-800 mb-3">Confirm Payment</h3>
-        <p className="text-gray-600 mb-6">
-          Mark invoice <span className="font-bold text-gray-900">{bill.id}</span> as paid?
-        </p>
+        <p className="text-gray-600 mb-6">Mark invoice <span className="font-bold text-gray-900">{bill.id}</span> as paid?</p>
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl mb-8 border border-blue-200">
           <div className="text-4xl font-bold text-blue-600 mb-2">₹{bill.amount - bill.discount}</div>
           <div className="text-sm text-gray-600 font-semibold">Net Amount</div>
         </div>
         <div className="flex justify-center gap-4">
-          <button 
-            onClick={onClose} 
-            className="px-8 py-3 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-all duration-200 font-semibold"
-          >
+          <button onClick={onClose} className="px-8 py-3 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-all duration-200 font-semibold">
             Cancel
           </button>
-          <button 
-            onClick={onConfirm} 
-            className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-lg hover:shadow-lg transition-all duration-200 font-semibold flex items-center gap-2"
-          >
+          <button className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-lg hover:shadow-lg transition-all duration-200 font-semibold flex items-center gap-2"
+            onClick={onConfirm}>
             <i className="fas fa-check"></i>Confirm Payment
           </button>
         </div>
@@ -1522,12 +1491,8 @@ const EditBillModal = ({ isOpen, onClose, onSubmit, formData, onInputChange, onS
         <div className="input-group">
           <label className="block text-sm font-medium text-gray-700 mb-1">Patient Name *</label>
           <div className="relative">
-            <input
-              type="text"
-              value={formData.patient}
-              onChange={(e) => onInputChange('patient', e.target.value)}
-              className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-              placeholder="Patient Name"
+            <input className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+              placeholder="Patient Name" type="text" value={formData.patient} onChange={(e) => onInputChange('patient', e.target.value)}
             />
             <i className="fas fa-user absolute left-3 top-3.5 text-gray-400"></i>
           </div>
@@ -1536,12 +1501,9 @@ const EditBillModal = ({ isOpen, onClose, onSubmit, formData, onInputChange, onS
         <div className="input-group">
           <label className="block text-sm font-medium text-gray-700 mb-1">Doctor Name</label>
           <div className="relative">
-            <input
-              type="text"
-              value={formData.doctorName}
+            <input className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+              placeholder="Treating Doctor" type="text" value={formData.doctorName}
               onChange={(e) => onInputChange('doctorName', e.target.value)}
-              className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-              placeholder="Treating Doctor"
             />
             <i className="fas fa-user-md absolute left-3 top-3.5 text-gray-400"></i>
           </div>
@@ -1552,11 +1514,8 @@ const EditBillModal = ({ isOpen, onClose, onSubmit, formData, onInputChange, onS
         <div className="input-group">
           <label className="block text-sm font-medium text-gray-700 mb-1">Admission Date</label>
           <div className="relative">
-            <input
-              type="date"
-              value={formData.admissionDate}
-              onChange={(e) => onInputChange('admissionDate', e.target.value)}
-              className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+            <input className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+              type="date" value={formData.admissionDate} onChange={(e) => onInputChange('admissionDate', e.target.value)}
             />
             <i className="fas fa-calendar-alt absolute left-3 top-3.5 text-gray-400"></i>
           </div>
@@ -1580,16 +1539,12 @@ const EditBillModal = ({ isOpen, onClose, onSubmit, formData, onInputChange, onS
         <label className="block text-sm font-medium text-gray-700 mb-3">Services *</label>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {services.map(service => (
-            <button
-              key={service}
-              type="button"
-              onClick={() => onServiceToggle(service)}
+            <button key={service} type="button" onClick={() => onServiceToggle(service)}
               className={`p-2 border-2 rounded-lg text-sm transition-all ${
                 formData.services.includes(service)
                   ? 'border-blue-500 bg-blue-50 text-blue-700'
                   : 'border-gray-300 text-gray-700 hover:border-blue-300'
-              }`}
-            >
+              }`}>
               {service}
             </button>
           ))}
@@ -1600,13 +1555,8 @@ const EditBillModal = ({ isOpen, onClose, onSubmit, formData, onInputChange, onS
         <div className="input-group">
           <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₹) *</label>
           <div className="relative">
-            <input
-              type="number"
-              min="0"
-              value={formData.amount}
-              onChange={(e) => onInputChange('amount', Number(e.target.value))}
-              className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-              placeholder="0"
+            <input className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+              type="number" min="0" placeholder="0" value={formData.amount} onChange={(e) => onInputChange('amount', Number(e.target.value))}
             />
             <i className="fas fa-rupee-sign absolute left-3 top-3.5 text-gray-400"></i>
           </div>
@@ -1615,13 +1565,9 @@ const EditBillModal = ({ isOpen, onClose, onSubmit, formData, onInputChange, onS
         <div className="input-group">
           <label className="block text-sm font-medium text-gray-700 mb-1">Discount (₹)</label>
           <div className="relative">
-            <input
-              type="number"
-              min="0"
-              value={formData.discount}
+            <input className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+              type="number" min="0" placeholder="0" value={formData.discount}
               onChange={(e) => onInputChange('discount', Number(e.target.value))}
-              className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-              placeholder="0"
             />
             <i className="fas fa-percent absolute left-3 top-3.5 text-gray-400"></i>
           </div>
@@ -1632,11 +1578,8 @@ const EditBillModal = ({ isOpen, onClose, onSubmit, formData, onInputChange, onS
         <div className="input-group">
           <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
           <div className="relative">
-            <select
-              value={formData.paymentMethod}
-              onChange={(e) => onInputChange('paymentMethod', e.target.value)}
-              className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all appearance-none"
-            >
+            <select className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all appearance-none"
+              value={formData.paymentMethod} onChange={(e) => onInputChange('paymentMethod', e.target.value)}>
               {paymentMethods.map(method => (
                 <option key={method} value={method}>{method}</option>
               ))}
@@ -1648,11 +1591,8 @@ const EditBillModal = ({ isOpen, onClose, onSubmit, formData, onInputChange, onS
         <div className="input-group">
           <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
           <div className="relative">
-            <select
-              value={formData.status}
-              onChange={(e) => onInputChange('status', e.target.value)}
-              className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all appearance-none"
-            >
+            <select className="w-full px-4 py-3 pl-11 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all appearance-none"
+              value={formData.status} onChange={(e) => onInputChange('status', e.target.value)}>
               <option value="Paid">Paid</option>
               <option value="Pending">Pending</option>
               <option value="Overdue">Overdue</option>
@@ -1663,16 +1603,12 @@ const EditBillModal = ({ isOpen, onClose, onSubmit, formData, onInputChange, onS
       </div>
 
       <div className="flex justify-end gap-3 pt-6 border-t">
-        <button
-          onClick={onClose}
-          className="px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-all duration-200 font-semibold"
-        >
+        <button className="px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-all duration-200 font-semibold"
+          onClick={onClose}>
           Cancel
         </button>
-        <button
-          onClick={onSubmit}
-          className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg hover:shadow-lg transition-all duration-200 font-semibold flex items-center gap-2"
-        >
+        <button className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg hover:shadow-lg transition-all duration-200 font-semibold flex items-center gap-2"
+          onClick={onSubmit}>
           <i className="fas fa-save"></i> Update Bill
         </button>
       </div>

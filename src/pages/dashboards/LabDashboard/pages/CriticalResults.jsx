@@ -6,6 +6,7 @@ import Button from '../../../../components/common/Button/Button'
 import Modal from '../../../../components/common/Modal/Modal'
 import LoadingSpinner from '../../../../components/common/LoadingSpinner/LoadingSpinner'
 import Toast from '../../../../components/common/Toast/Toast'
+import { apiFetch } from '../../../../services/apiClient'
 
 const CriticalResults = () => {
   const [loading, setLoading] = useState(true)
@@ -13,7 +14,16 @@ const CriticalResults = () => {
   const [filteredResults, setFilteredResults] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filters, setFilters] = useState({ alertLevel: 'all', status: 'all', department: 'all' })
-  const [stats, setStats] = useState({ pending: 0, notified: 0, total: 0 })
+  const [dashboardData, setDashboardData] = useState({
+    meta: { live_data: false, generated_at: "" },
+    summary: {
+      pending_notifications: { value: 0, subtitle: "" },
+      successfully_notified: { value: 0, subtitle: "" },
+      total_critical_alerts_24h: { value: 0, subtitle: "" }
+    },
+    urgent_banner: { show: false, pending_unacknowledged_count: 0, message: "", cta_label: "" },
+    compliance_advisory: { text: "", needs_action: false }
+  })
 
   // Modal States
   const [showNotifyModal, setShowNotifyModal] = useState(false)
@@ -21,135 +31,50 @@ const CriticalResults = () => {
   const [showShareModal, setShowShareModal] = useState(false)
   const [selectedResult, setSelectedResult] = useState(null)
   const [toast, setToast] = useState(null)
-  
+
   // Notification Form State
-  const [notifyForm, setNotifyForm] = useState({ 
-    contactPerson: '', 
-    method: 'Phone Call', 
-    notes: '', 
-    timeNotified: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+  const [notifyForm, setNotifyForm] = useState({
+    contactPerson: '',
+    method: 'Phone Call',
+    notes: '',
+    timeNotified: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   })
 
   useEffect(() => {
-    // Simulate API fetch with more clinical fields
-    const loadData = () => {
+    const loadData = async () => {
       setLoading(true)
-      setTimeout(() => {
-        const data = [
-          { 
-            id: 'TEST-2024-012', 
-            patient: 'Ravi Kumar', 
-            patientId: 'P-101', 
-            test: 'Creatinine', 
-            value: '4.2 mg/dL', 
-            alert: 'Critical High', 
-            time: '09:45 AM', 
-            notified: 'Yes', 
-            physician: 'Dr. Sharma', 
-            department: 'Nephrology', 
-            phone: '+91 98765 43210',
-            referenceRange: '0.7 - 1.3 mg/dL',
-            specimen: 'Serum',
-            collectedAt: '08:30 AM',
-            previousResult: '1.8 mg/dL (2024-01-10)',
-            verifiedBy: 'Dr. Anita (Pathologist)'
-          },
-          { 
-            id: 'TEST-2024-013', 
-            patient: 'Sunita Rao', 
-            patientId: 'P-105', 
-            test: 'Potassium', 
-            value: '6.5 mEq/L', 
-            alert: 'Critical High', 
-            time: '10:15 AM', 
-            notified: 'Pending', 
-            physician: 'Dr. Verma', 
-            department: 'Cardiology', 
-            phone: '+91 98765 43211',
-            referenceRange: '3.5 - 5.0 mEq/L',
-            specimen: 'Plasma',
-            collectedAt: '09:15 AM',
-            previousResult: '4.2 mEq/L (2024-01-12)',
-            verifiedBy: 'Dr. Anita (Pathologist)'
-          },
-          { 
-            id: 'TEST-2024-014', 
-            patient: 'Mohan Singh', 
-            patientId: 'P-108', 
-            test: 'Glucose', 
-            value: '40 mg/dL', 
-            alert: 'Critical Low', 
-            time: '10:30 AM', 
-            notified: 'Yes', 
-            physician: 'Dr. Gupta', 
-            department: 'Endocrinology', 
-            phone: '+91 98765 43212',
-            referenceRange: '70 - 100 mg/dL',
-            specimen: 'Fluoride Plasma',
-            collectedAt: '09:45 AM',
-            previousResult: '85 mg/dL (2024-01-05)',
-            verifiedBy: 'Dr. Anita (Pathologist)'
-          },
-          { 
-            id: 'TEST-2024-020', 
-            patient: 'Anjali Devi', 
-            patientId: 'P-112', 
-            test: 'Hemoglobin', 
-            value: '6.2 g/dL', 
-            alert: 'Critical Low', 
-            time: '11:15 AM', 
-            notified: 'Pending', 
-            physician: 'Dr. Reddy', 
-            department: 'Hematology', 
-            phone: '+91 98765 43213',
-            referenceRange: '12.0 - 15.5 g/dL',
-            specimen: 'Whole Blood (EDTA)',
-            collectedAt: '10:00 AM',
-            previousResult: '11.5 g/dL (2023-12-20)',
-            verifiedBy: 'Dr. Anita (Pathologist)'
-          },
-          { 
-            id: 'TEST-2024-021', 
-            patient: 'Vijay Kumar', 
-            patientId: 'P-115', 
-            test: 'Troponin I', 
-            value: '1.5 ng/mL', 
-            alert: 'Critical High', 
-            time: '12:00 PM', 
-            notified: 'Yes', 
-            physician: 'Dr. Khan', 
-            department: 'Emergency', 
-            phone: '+91 98765 43214',
-            referenceRange: '< 0.04 ng/mL',
-            specimen: 'Serum',
-            collectedAt: '11:15 AM',
-            previousResult: 'N/A',
-            verifiedBy: 'Dr. Anita (Pathologist)'
-          },
-          { 
-            id: 'TEST-2024-025', 
-            patient: 'Sanjay Dutt', 
-            patientId: 'P-120', 
-            test: 'WBC Count', 
-            value: '25,000 /µL', 
-            alert: 'Critical High', 
-            time: '01:30 PM', 
-            notified: 'Pending', 
-            physician: 'Dr. Joshi', 
-            department: 'Pathology', 
-            phone: '+91 98765 43215',
-            referenceRange: '4,500 - 11,000 /µL',
-            specimen: 'Whole Blood (EDTA)',
-            collectedAt: '12:45 PM',
-            previousResult: '8,500 /µL (2024-01-08)',
-            verifiedBy: 'Dr. Anita (Pathologist)'
-          },
-        ]
-        setCriticalResults(data)
-        setFilteredResults(data)
-        updateStats(data)
+      try {
+        const response = await apiFetch('/api/v1/lab/critical-results')
+        if (response.ok) {
+          const data = await response.json()
+          setCriticalResults(data.alerts || [])
+          setFilteredResults(data.alerts || [])
+          setDashboardData({
+            meta: data.meta || { live_data: false },
+            summary: data.summary || {
+              pending_notifications: { value: 0, subtitle: "Requires immediate action" },
+              successfully_notified: { value: 0, subtitle: "Compliance targets met" },
+              total_critical_alerts_24h: { value: 0, subtitle: "Updated just now" }
+            },
+            urgent_banner: data.urgent_banner || {
+              show: false,
+              pending_unacknowledged_count: 0,
+              message: "",
+              cta_label: "Start Notification Protocol"
+            },
+            compliance_advisory: data.compliance_advisory || {
+              text: "Hospital compliance advisory: maintain notification evidence and call log timestamps.",
+              needs_action: false
+            }
+          })
+        } else {
+          console.error('Failed to fetch critical results')
+        }
+      } catch (error) {
+        console.error('Error fetching critical results:', error)
+      } finally {
         setLoading(false)
-      }, 800)
+      }
     }
     loadData()
   }, [])
@@ -158,20 +83,12 @@ const CriticalResults = () => {
     applyFilters()
   }, [searchTerm, filters, criticalResults])
 
-  const updateStats = (data) => {
-    setStats({
-      pending: data.filter(r => r.notified === 'Pending').length,
-      notified: data.filter(r => r.notified === 'Yes').length,
-      total: data.length
-    })
-  }
-
   const applyFilters = () => {
     let result = criticalResults.filter(item => {
-      const matchesSearch = 
-        item.patient.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.test.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.id.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesSearch =
+        item.patient?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.test?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.id?.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesAlert = filters.alertLevel === 'all' || item.alert === filters.alertLevel
       const matchesStatus = filters.status === 'all' || item.notified === filters.status
       const matchesDept = filters.department === 'all' || item.department === filters.department
@@ -190,18 +107,47 @@ const CriticalResults = () => {
     setShowNotifyModal(true)
   }
 
-  const handleNotifySubmit = (e) => {
+  const handleNotifySubmit = async (e) => {
     e.preventDefault()
-    const updated = criticalResults.map(r => 
-      r.id === selectedResult.id ? { ...r, notified: 'Yes', notificationDetails: notifyForm } : r
-    )
-    setCriticalResults(updated)
-    updateStats(updated)
-    setShowNotifyModal(false)
-    setToast({
-      message: `Notification logged for ${selectedResult.patient}'s critical result.`,
-      type: 'success'
-    })
+
+    try {
+      const response = await apiFetch(`/api/v1/lab/critical-results/${selectedResult.id}/notify`, {
+        method: 'POST',
+        // Note: The FastAPI endpoint currently doesn't define a body parameter, 
+        // but we send this in case it gets added later to capture method/notes.
+        body: notifyForm
+      })
+
+      if (response.ok) {
+        const responseData = await response.json().catch(() => ({}))
+        const updated = criticalResults.map(r =>
+          r.id === selectedResult.id ? { ...r, notified: 'Yes', notificationDetails: notifyForm } : r
+        )
+        setCriticalResults(updated)
+        setDashboardData(prev => ({
+          ...prev,
+          summary: {
+            ...prev.summary,
+            pending_notifications: { ...prev.summary.pending_notifications, value: Math.max(0, prev.summary.pending_notifications.value - 1) },
+            successfully_notified: { ...prev.summary.successfully_notified, value: prev.summary.successfully_notified.value + 1 }
+          }
+        }))
+        setShowNotifyModal(false)
+        setToast({
+          message: responseData.message || `Notification logged for ${selectedResult.patient}'s critical result.`,
+          type: 'success'
+        })
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        setToast({
+          message: errorData.detail || 'Failed to log notification on the server.',
+          type: 'error'
+        })
+      }
+    } catch (error) {
+      console.error('Error logging notification:', error)
+      setToast({ message: 'A network error occurred while logging notification.', type: 'error' })
+    }
   }
 
   const handleRowClick = (result) => {
@@ -240,8 +186,9 @@ const CriticalResults = () => {
     setToast({ message: `Navigating to Access Logs for ${result.patient}...`, type: 'info' });
   };
   const columns = [
-    { key: 'id', title: 'Test ID', sortable: true,className: 'font-mono text-xs' },
-    { key: 'patient', title: 'Patient', sortable: true,
+    { key: 'id', title: 'Test ID', sortable: true, className: 'font-mono text-xs' },
+    {
+      key: 'patient', title: 'Patient', sortable: true,
       render: (value, row) => (
         <div className="flex flex-col">
           <span className="font-semibold text-gray-800">{value}</span>
@@ -250,23 +197,25 @@ const CriticalResults = () => {
       )
     },
     { key: 'test', title: 'Test Name', sortable: true },
-    { key: 'value', title: 'Value', sortable: true,
+    {
+      key: 'value', title: 'Value', sortable: true,
       render: (value) => (
         <span className="font-bold text-red-600">{value}</span>
       )
     },
-    { key: 'alert', title: 'Alert Level', sortable: true,
+    {
+      key: 'alert', title: 'Alert Level', sortable: true,
       render: (value) => (
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-          value === 'Critical High' 
-            ? 'bg-red-100 text-red-700 border-red-200' 
-            : 'bg-orange-100 text-orange-700 border-orange-200'
-        }`}>
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${value === 'Critical High'
+          ? 'bg-red-100 text-red-700 border-red-200'
+          : 'bg-orange-100 text-orange-700 border-orange-200'
+          }`}>
           {value.toUpperCase()}
         </span>
       )
     },
-    { key: 'physician', title: 'Physician', sortable: true,
+    {
+      key: 'physician', title: 'Physician', sortable: true,
       render: (value, row) => (
         <div className="flex flex-col">
           <span className="text-sm font-medium">{value}</span>
@@ -274,21 +223,22 @@ const CriticalResults = () => {
         </div>
       )
     },
-    { key: 'notified', title: 'Status', sortable: true,
+    {
+      key: 'notified', title: 'Status', sortable: true,
       render: (value) => (
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-          value === 'Yes' 
-            ? 'bg-green-100 text-green-700' 
-            : 'bg-amber-100 text-amber-700'
-        }`}>
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${value === 'Yes'
+          ? 'bg-green-100 text-green-700'
+          : 'bg-amber-100 text-amber-700'
+          }`}>
           {value === 'Yes' ? 'NOTIFIED' : 'PENDING'}
         </span>
       )
     },
-    { key: 'actions', title: 'Actions',className: 'text-center',
+    {
+      key: 'actions', title: 'Actions', className: 'text-center',
       render: (_, row) => (
         <div className="flex gap-2 justify-center">
-          <button onClick={(e) => { e.stopPropagation(); handleRowClick(row); }} 
+          <button onClick={(e) => { e.stopPropagation(); handleRowClick(row); }}
             className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
             title="View Details" >
             <i className="fas fa-eye text-xs"></i>
@@ -334,6 +284,11 @@ const CriticalResults = () => {
               <i className="fas fa-heartbeat text-red-600"></i>
             </div>
             Critical Results Management
+            {dashboardData.meta?.live_data && (
+               <span className="ml-3 px-2.5 py-1 bg-green-100 text-green-700 text-[10px] font-bold rounded-full uppercase flex items-center gap-1.5 shadow-sm border border-green-200">
+                 <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Live Data
+               </span>
+            )}
           </h2>
           <p className="text-sm text-gray-500 mt-1">Real-time monitoring of life-threatening laboratory alerts.</p>
         </div>
@@ -347,45 +302,71 @@ const CriticalResults = () => {
         </div>
       </div>
 
+      {/* Urgent Banner */}
+      {dashboardData.urgent_banner.show && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex justify-between items-center shadow-sm mt-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+              <i className="fas fa-exclamation-triangle text-red-600"></i>
+            </div>
+            <div>
+              <h3 className="font-semibold text-red-800">{dashboardData.urgent_banner.message || `You have ${dashboardData.urgent_banner.pending_unacknowledged_count} unacknowledged critical alerts.`}</h3>
+            </div>
+          </div>
+          <Button variant="danger" size="sm" onClick={() => {
+            const pendingAlert = criticalResults.find(r => r.notified !== 'Yes')
+            if (pendingAlert) {
+              handleNotifyInitiate(pendingAlert)
+            } else {
+              setToast({ message: 'No pending alerts found.', type: 'info' })
+            }
+          }}>
+            {dashboardData.urgent_banner.cta_label}
+          </Button>
+        </div>
+      )}
+
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
           <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform duration-500">
-             <i className="fas fa-clock text-8xl text-red-600"></i>
+            <i className="fas fa-clock text-8xl text-red-600"></i>
           </div>
           <div className="relative">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Awaiting Notification</p>
             <div className="flex items-baseline gap-2">
-              <h3 className="text-4xl font-bold text-red-600">{stats.pending}</h3>
+              <h3 className="text-4xl font-bold text-red-600">{dashboardData.summary.pending_notifications.value}</h3>
               <span className="text-xs text-red-500 font-medium bg-red-50 px-2 py-0.5 rounded-full">URGENT</span>
             </div>
             <div className="mt-4 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full bg-red-500 rounded-full" style={{ width: `${(stats.pending / stats.total) * 100}%` }}></div>
+              <div className="h-full bg-red-500 rounded-full" style={{ width: `${(dashboardData.summary.pending_notifications.value / Math.max(1, dashboardData.summary.total_critical_alerts_24h.value)) * 100}%` }}></div>
             </div>
+            <p className="mt-2 text-xs text-gray-500">{dashboardData.summary.pending_notifications.subtitle}</p>
           </div>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
           <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform duration-500">
-             <i className="fas fa-check-circle text-8xl text-green-600"></i>
+            <i className="fas fa-check-circle text-8xl text-green-600"></i>
           </div>
           <div className="relative">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Successfully Logged</p>
-            <h3 className="text-4xl font-bold text-green-600">{stats.notified}</h3>
+            <h3 className="text-4xl font-bold text-green-600">{dashboardData.summary.successfully_notified.value}</h3>
             <div className="mt-4 flex items-center text-[10px] text-green-600">
-              <i className="fas fa-shield-alt mr-1"></i> Compliance Score: {Math.round((stats.notified / stats.total) * 100) || 0}%
+              <i className="fas fa-shield-alt mr-1"></i> Compliance Score: {Math.round((dashboardData.summary.successfully_notified.value / Math.max(1, dashboardData.summary.total_critical_alerts_24h.value)) * 100) || 0}%
             </div>
+            <p className="mt-2 text-xs text-gray-500">{dashboardData.summary.successfully_notified.subtitle}</p>
           </div>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
           <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform duration-500">
-             <i className="fas fa-chart-line text-8xl text-blue-600"></i>
+            <i className="fas fa-chart-line text-8xl text-blue-600"></i>
           </div>
           <div className="relative">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Total Alerts (24h)</p>
-            <h3 className="text-4xl font-bold text-gray-800">{stats.total}</h3>
-            <p className="mt-4 text-[10px] text-gray-500">Last updated: {new Date().toLocaleTimeString()}</p>
+            <h3 className="text-4xl font-bold text-gray-800">{dashboardData.summary.total_critical_alerts_24h.value}</h3>
+            <p className="mt-4 text-[10px] text-gray-500">{dashboardData.summary.total_critical_alerts_24h.subtitle}</p>
           </div>
         </div>
       </div>
@@ -393,23 +374,23 @@ const CriticalResults = () => {
       {/* Filter Bar */}
       <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col lg:flex-row gap-4 items-center">
         <div className="flex-1 w-full lg:w-auto">
-          <SearchBar placeholder="Search by Patient, ID or Test..." onSearch={setSearchTerm} className="w-full"/>
+          <SearchBar placeholder="Search by Patient, ID or Test..." onSearch={setSearchTerm} className="w-full" />
         </div>
         <div className="flex flex-wrap gap-3 w-full lg:w-auto justify-end">
           <select className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 outline-none"
-            value={filters.alertLevel} onChange={(e) => setFilters({...filters, alertLevel: e.target.value})}>
+            value={filters.alertLevel} onChange={(e) => setFilters({ ...filters, alertLevel: e.target.value })}>
             <option value="all">All Levels</option>
             <option value="Critical High">Critical High</option>
             <option value="Critical Low">Critical Low</option>
           </select>
           <select className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 outline-none"
-            value={filters.status} onChange={(e) => setFilters({...filters, status: e.target.value})}>
+            value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
             <option value="all">All Status</option>
             <option value="Pending">Pending</option>
             <option value="Yes">Notified</option>
           </select>
           <select className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 outline-none"
-            value={filters.department} onChange={(e) => setFilters({...filters, department: e.target.value})} >
+            value={filters.department} onChange={(e) => setFilters({ ...filters, department: e.target.value })} >
             <option value="all">All Departments</option>
             <option value="Nephrology">Nephrology</option>
             <option value="Cardiology">Cardiology</option>
@@ -429,20 +410,19 @@ const CriticalResults = () => {
       </div>
 
       {/* Compliance Advisory */}
-      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+      <div className={`bg-gradient-to-br ${dashboardData.compliance_advisory.needs_action ? 'from-amber-500 to-orange-600' : 'from-blue-600 to-indigo-700'} rounded-2xl p-6 text-white shadow-lg relative overflow-hidden`}>
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
         <div className="flex flex-col md:flex-row items-center gap-6 relative z-10">
           <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center shrink-0 shadow-xl border border-white/30">
-            <i className="fas fa-shield-check text-2xl text-white"></i>
+            <i className={`fas ${dashboardData.compliance_advisory.needs_action ? 'fa-exclamation-triangle' : 'fa-shield-check'} text-2xl text-white`}></i>
           </div>
           <div className="flex-1 text-center md:text-left">
             <h4 className="text-xl font-bold mb-1">NABL & Hospital Compliance Standards</h4>
-            <p className="text-blue-100 text-sm leading-relaxed opacity-90">
-              Mandatory: All critical results must be communicated to the treating physician within <strong>30 minutes</strong>. 
-              Documentation must include the name of the recipient, time of call, and the person reporting.
+            <p className={`text-${dashboardData.compliance_advisory.needs_action ? 'orange' : 'blue'}-100 text-sm leading-relaxed opacity-90`}>
+              {dashboardData.compliance_advisory.text}
             </p>
           </div>
-          <button className="px-6 py-2.5 bg-white text-blue-700 rounded-xl font-bold text-sm hover:shadow-lg transition-all active:scale-95">
+          <button className={`px-6 py-2.5 bg-white ${dashboardData.compliance_advisory.needs_action ? 'text-orange-700' : 'text-blue-700'} rounded-xl font-bold text-sm hover:shadow-lg transition-all active:scale-95`}>
             View Protocol Policy
           </button>
         </div>
@@ -466,14 +446,14 @@ const CriticalResults = () => {
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Contacted Person</label>
               <input type="text" className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-100 outline-none transition"
-                value={notifyForm.contactPerson} onChange={(e) => setNotifyForm({...notifyForm, contactPerson: e.target.value})}
+                value={notifyForm.contactPerson} onChange={(e) => setNotifyForm({ ...notifyForm, contactPerson: e.target.value })}
                 required
               />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Notification Method</label>
               <select className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-100 outline-none transition"
-                value={notifyForm.method} onChange={(e) => setNotifyForm({...notifyForm, method: e.target.value})} >
+                value={notifyForm.method} onChange={(e) => setNotifyForm({ ...notifyForm, method: e.target.value })} >
                 <option>Phone Call</option>
                 <option>Hospital App</option>
                 <option>SMS Alert</option>
@@ -485,7 +465,7 @@ const CriticalResults = () => {
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">Time of Notification</label>
             <input type="time" className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-100 outline-none transition"
-              value={notifyForm.timeNotified} onChange={(e) => setNotifyForm({...notifyForm, timeNotified: e.target.value})}
+              value={notifyForm.timeNotified} onChange={(e) => setNotifyForm({ ...notifyForm, timeNotified: e.target.value })}
             />
           </div>
 
@@ -493,7 +473,7 @@ const CriticalResults = () => {
             <label className="block text-sm font-semibold text-gray-700 mb-1">Clinical Notes / Comments</label>
             <textarea rows="3" className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-100 outline-none transition resize-none"
               placeholder="Record any response or additional instructions from the physician..."
-              value={notifyForm.notes} onChange={(e) => setNotifyForm({...notifyForm, notes: e.target.value})} >
+              value={notifyForm.notes} onChange={(e) => setNotifyForm({ ...notifyForm, notes: e.target.value })} >
             </textarea>
           </div>
 
@@ -522,9 +502,8 @@ const CriticalResults = () => {
                   </div>
                 </div>
               </div>
-              <span className={`px-4 py-1.5 rounded-full text-xs font-bold ${
-                selectedResult.notified === 'Yes' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700 animate-pulse'
-              }`}>
+              <span className={`px-4 py-1.5 rounded-full text-xs font-bold ${selectedResult.notified === 'Yes' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700 animate-pulse'
+                }`}>
                 {selectedResult.notified === 'Yes' ? 'NOTIFIED' : 'PENDING NOTIFICATION'}
               </span>
             </div>
@@ -656,7 +635,7 @@ const CriticalResults = () => {
 
             <div className="space-y-4">
               <p className="text-sm text-gray-600">Select a secure sharing method to notify relevant parties:</p>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button onClick={() => handleShareSubmit('Email')}
                   className="p-4 border rounded-2xl text-left hover:bg-blue-50 hover:border-blue-200 transition-all group flex items-center gap-3">
@@ -692,9 +671,9 @@ const CriticalResults = () => {
                 </button>
 
                 <button onClick={() => {
-                    navigator.clipboard.writeText(`https://lab.hospital.com/results/${selectedResult.id}`)
-                    handleShareSubmit('Link')
-                  }}
+                  navigator.clipboard.writeText(`https://lab.hospital.com/results/${selectedResult.id}`)
+                  handleShareSubmit('Link')
+                }}
                   className="p-4 border rounded-2xl text-left hover:bg-orange-50 hover:border-orange-200 transition-all group flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center group-hover:scale-110 transition-transform">
                     <i className="fas fa-link text-orange-600 text-xl"></i>

@@ -1,35 +1,90 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
-import Modal from '../../../../components/common/Modal/Modal'; 
+import Modal from '../../../../components/common/Modal/Modal';
+import { apiFetch } from '../../../../services/apiClient';
+import { NURSE_BEDS, NURSE_UPDATE_BED } from '../../../../config/api';
 
 const BedManagement = () => {
   const [selectedWard, setSelectedWard] = useState('all');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [showAddBedModal, setShowAddBedModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingBedId, setEditingBedId] = useState(null);
   const [newBedData, setNewBedData] = useState({
-    number: '',
-    ward: 'general',
-    status: 'available'
+    bed_number: '',
+    bed_code: '',
+    ward_id: '',
+    status: 'AVAILABLE',
+    bed_type: 'STANDARD',
+    floor: '',
+    room_number: '',
+    bed_position: '',
+    has_oxygen: false,
+    has_suction: false,
+    has_cardiac_monitor: false,
+    has_ventilator: false,
+    has_iv_pole: false,
+    daily_rate: ''
   });
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
 
+  const [beds, setBeds] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchBeds = async () => {
+    setIsLoading(true);
+    try {
+      const response = await apiFetch(NURSE_BEDS);
+      if (response && response.ok) {
+        const data = await response.json();
+        const rawBeds = Array.isArray(data?.data) ? data.data : [];
+        const normalizedBeds = rawBeds.map(bed => ({
+          ...bed,
+          id: bed.id || bed.bed_id,
+          number: bed.bed_number || bed.number || 'Unknown',
+          status: (bed.status || bed.bed_status || 'available').toLowerCase(),
+          patient: bed.patient_name || bed.patient || null,
+          condition: bed.patient_condition || bed.condition || null,
+          doctor: bed.doctor_name || bed.doctor || null,
+          admitted: bed.admission_date ? new Date(bed.admission_date).toLocaleDateString() : bed.admitted || null,
+          ward: bed.ward || bed.department || 'general'
+        }));
+        setBeds(normalizedBeds);
+      } else {
+        setBeds([]);
+      }
+    } catch (error) {
+      console.error('Error fetching beds:', error);
+      setBeds([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // Initialize chart when component mounts
-    if (chartRef.current) {
+    fetchBeds();
+  }, []);
+
+  useEffect(() => {
+    if (chartRef.current && beds.length > 0) {
       const ctx = chartRef.current.getContext('2d');
       
-      // Destroy previous chart instance if exists
       if (chartInstance.current) {
         chartInstance.current.destroy();
       }
+
+      const occupiedCount = beds.filter(b => b.status === 'occupied').length;
+      const availableCount = beds.filter(b => b.status === 'available').length;
+      const cleaningCount = beds.filter(b => b.status === 'cleaning').length;
+      const reservedCount = beds.filter(b => b.status === 'reserved').length;
 
       chartInstance.current = new Chart(ctx, {
         type: 'doughnut',
         data: {
           labels: ['Occupied', 'Available', 'Cleaning/Maintenance', 'Reserved'],
           datasets: [{
-            data: [7, 3, 1, 1],
+            data: [occupiedCount, availableCount, cleaningCount, reservedCount],
             backgroundColor: [
               'rgb(239, 68, 68)',
               'rgb(34, 197, 94)',
@@ -50,28 +105,12 @@ const BedManagement = () => {
       });
     }
 
-    // Cleanup function
     return () => {
       if (chartInstance.current) {
         chartInstance.current.destroy();
       }
     };
-  }, []);
-
-  const beds = [
-    { id: 1, number: '101', status: 'available', patient: null, condition: null, doctor: null, admitted: null },
-    { id: 2, number: '102', status: 'occupied', patient: 'Patient 1', condition: 'Stable', doctor: 'Dr. Meena Rao', admitted: '2023-10-15' },
-    { id: 3, number: '103', status: 'occupied', patient: 'Patient 2', condition: 'Critical', doctor: 'Dr. Rajesh Kumar', admitted: '2023-10-16' },
-    { id: 4, number: '104', status: 'cleaning', patient: null, condition: null, doctor: null, admitted: null },
-    { id: 5, number: '105', status: 'available', patient: null, condition: null, doctor: null, admitted: null },
-    { id: 6, number: '106', status: 'occupied', patient: 'Patient 3', condition: 'Improving', doctor: 'Dr. Priya Sharma', admitted: '2023-10-14' },
-    { id: 7, number: '107', status: 'occupied', patient: 'Patient 4', condition: 'Stable', doctor: 'Dr. Meena Rao', admitted: '2023-10-17' },
-    { id: 8, number: '108', status: 'available', patient: null, condition: null, doctor: null, admitted: null },
-    { id: 9, number: '109', status: 'occupied', patient: 'Patient 5', condition: 'Critical', doctor: 'Dr. Rajesh Kumar', admitted: '2023-10-18' },
-    { id: 10, number: '110', status: 'cleaning', patient: null, condition: null, doctor: null, admitted: null },
-    { id: 11, number: '111', status: 'available', patient: null, condition: null, doctor: null, admitted: null },
-    { id: 12, number: '112', status: 'occupied', patient: 'Patient 6', condition: 'Stable', doctor: 'Dr. Priya Sharma', admitted: '2023-10-13' },
-  ];
+  }, [beds]);
 
   const wardFilters = [
     { id: 'all', name: 'All Wards' },
@@ -84,11 +123,12 @@ const BedManagement = () => {
   const filteredBeds = selectedWard === 'all' 
     ? beds 
     : beds.filter(bed => {
-        if (selectedWard === 'icu') return bed.number >= '101' && bed.number <= '104';
-        if (selectedWard === 'general') return bed.number >= '105' && bed.number <= '108';
-        if (selectedWard === 'pediatrics') return bed.number >= '109' && bed.number <= '110';
-        if (selectedWard === 'maternity') return bed.number >= '111' && bed.number <= '112';
-        return true;
+        const bedWard = (bed.ward || '').toLowerCase();
+        if (selectedWard === 'icu') return bedWard.includes('icu') || bedWard.includes('intensive');
+        if (selectedWard === 'general') return bedWard.includes('general');
+        if (selectedWard === 'pediatrics') return bedWard.includes('pediatric');
+        if (selectedWard === 'maternity') return bedWard.includes('maternity');
+        return bedWard === selectedWard;
       });
 
   const getStatusClass = (status) => {
@@ -111,29 +151,105 @@ const BedManagement = () => {
     }
   };
 
-  const handleAddBed = (e) => {
+  const handleAddBed = async (e) => {
     e.preventDefault();
-    // Here you would typically make an API call to add the bed
-    console.log('Adding new bed:', newBedData);
+    setIsLoading(true);
     
-    // Reset form and close modal
-    setNewBedData({
-      number: '',
-      ward: 'general',
-      status: 'available'
-    });
-    setShowAddBedModal(false);
-    
-    // Show success message (you can implement a notification system)
-    alert('Bed added successfully!');
+    try {
+      const payload = {
+        ...newBedData,
+        daily_rate: newBedData.daily_rate ? parseFloat(newBedData.daily_rate) : 0
+      };
+
+      const response = await apiFetch(isEditing ? NURSE_UPDATE_BED(editingBedId) : NURSE_BEDS, {
+        method: isEditing ? 'PATCH' : 'POST',
+        body: payload
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || errorData.message || `Failed to ${isEditing ? 'update' : 'add'} bed`);
+      }
+
+      setIsEditing(false);
+      setEditingBedId(null);
+
+      setNewBedData({
+        bed_number: '',
+        bed_code: '',
+        ward_id: '',
+        status: 'AVAILABLE',
+        bed_type: 'STANDARD',
+        floor: '',
+        room_number: '',
+        bed_position: '',
+        has_oxygen: false,
+        has_suction: false,
+        has_cardiac_monitor: false,
+        has_ventilator: false,
+        has_iv_pole: false,
+        daily_rate: ''
+      });
+      setShowAddBedModal(false);
+      fetchBeds();
+    } catch (error) {
+      console.error('Error adding bed:', error);
+      alert(error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setNewBedData(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }));
+  };
+
+  const handleEditClick = (bed) => {
+    setIsEditing(true);
+    setEditingBedId(bed.id);
+    setNewBedData({
+      bed_number: bed.bed_number || bed.number || '',
+      bed_code: bed.bed_code || '',
+      ward_id: bed.ward_id || bed.ward || '',
+      status: (bed.status || 'AVAILABLE').toUpperCase(),
+      bed_type: bed.bed_type || 'STANDARD',
+      floor: bed.floor || '',
+      room_number: bed.room_number || '',
+      bed_position: bed.bed_position || '',
+      has_oxygen: bed.has_oxygen || false,
+      has_suction: bed.has_suction || false,
+      has_cardiac_monitor: bed.has_cardiac_monitor || false,
+      has_ventilator: bed.has_ventilator || false,
+      has_iv_pole: bed.has_iv_pole || false,
+      daily_rate: bed.daily_rate || ''
+    });
+    setShowAddBedModal(true);
+  };
+
+  const handleAddNewClick = () => {
+    setIsEditing(false);
+    setEditingBedId(null);
+    setNewBedData({
+      bed_number: '',
+      bed_code: '',
+      ward_id: '',
+      status: 'AVAILABLE',
+      bed_type: 'STANDARD',
+      floor: '',
+      room_number: '',
+      bed_position: '',
+      has_oxygen: false,
+      has_suction: false,
+      has_cardiac_monitor: false,
+      has_ventilator: false,
+      has_iv_pole: false,
+      daily_rate: ''
+    });
+    setShowAddBedModal(true);
   };
 
   return (
@@ -150,7 +266,7 @@ const BedManagement = () => {
             <i className="fas fa-filter mr-1"></i>Filters
           </button>
           <button 
-            onClick={() => setShowAddBedModal(true)}
+            onClick={handleAddNewClick}
             className="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 flex items-center text-sm sm:text-base sm:px-4"
           >
             <i className="fas fa-plus mr-1 sm:mr-2"></i>
@@ -229,7 +345,12 @@ const BedManagement = () => {
         {filteredBeds.map(bed => (
           <div key={bed.id} className="bg-white border rounded p-3 sm:p-4 card-shadow">
             <div className="flex justify-between items-center mb-2">
-              <h3 className="font-semibold text-blue-700 text-sm sm:text-base">Bed {bed.number}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-blue-700 text-sm sm:text-base">Bed {bed.number}</h3>
+                <button onClick={() => handleEditClick(bed)} className="text-gray-400 hover:text-blue-600 transition-colors" title="Edit Bed Details">
+                  <i className="fas fa-edit"></i>
+                </button>
+              </div>
               <span className={`px-2 py-1 rounded-full text-xs ${getStatusClass(bed.status)}`}>
                 {getStatusText(bed.status)}
               </span>
@@ -343,56 +464,129 @@ const BedManagement = () => {
       <Modal
         isOpen={showAddBedModal}
         onClose={() => setShowAddBedModal(false)}
-        title="Add New Bed"
+        title={isEditing ? "Edit Bed Details" : "Add New Bed"}
         size="md"
       >
-        <form onSubmit={handleAddBed} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Bed Number
-            </label>
-            <input
-              type="text"
-              name="number"
-              value={newBedData.number}
-              onChange={handleInputChange}
-              className="w-full border rounded p-2"
-              placeholder="e.g., 113"
-              required
-            />
+        <form onSubmit={handleAddBed} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Bed Number
+              </label>
+              <input
+                type="text"
+                name="bed_number"
+                value={newBedData.bed_number}
+                onChange={handleInputChange}
+                className="w-full border rounded p-2"
+                placeholder="e.g., B-101"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Bed Code
+              </label>
+              <input
+                type="text"
+                name="bed_code"
+                value={newBedData.bed_code}
+                onChange={handleInputChange}
+                className="w-full border rounded p-2"
+                placeholder="e.g., BED-ICU-101"
+                required
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Ward
-            </label>
-            <select
-              name="ward"
-              value={newBedData.ward}
-              onChange={handleInputChange}
-              className="w-full border rounded p-2"
-            >
-              <option value="general">General Ward</option>
-              <option value="icu">ICU</option>
-              <option value="pediatrics">Pediatrics</option>
-              <option value="maternity">Maternity</option>
-            </select>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Ward ID (or Name)
+              </label>
+              <input
+                type="text"
+                name="ward_id"
+                value={newBedData.ward_id}
+                onChange={handleInputChange}
+                className="w-full border rounded p-2"
+                placeholder="UUID or Name"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Status
+              </label>
+              <select
+                name="status"
+                value={newBedData.status}
+                onChange={handleInputChange}
+                className="w-full border rounded p-2"
+              >
+                <option value="AVAILABLE">Available</option>
+                <option value="CLEANING">Cleaning/Maintenance</option>
+                <option value="RESERVED">Reserved</option>
+              </select>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Initial Status
-            </label>
-            <select
-              name="status"
-              value={newBedData.status}
-              onChange={handleInputChange}
-              className="w-full border rounded p-2"
-            >
-              <option value="available">Available</option>
-              <option value="cleaning">Cleaning/Maintenance</option>
-              <option value="reserved">Reserved</option>
-            </select>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Bed Type
+              </label>
+              <select
+                name="bed_type"
+                value={newBedData.bed_type}
+                onChange={handleInputChange}
+                className="w-full border rounded p-2"
+              >
+                <option value="STANDARD">Standard</option>
+                <option value="ICU">ICU</option>
+                <option value="PEDIATRIC">Pediatric</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Daily Rate</label>
+              <input type="number" name="daily_rate" value={newBedData.daily_rate} onChange={handleInputChange} className="w-full border rounded p-2" placeholder="e.g. 2500" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Floor</label>
+              <input type="text" name="floor" value={newBedData.floor} onChange={handleInputChange} className="w-full border rounded p-2" placeholder="1st Floor" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Room</label>
+              <input type="text" name="room_number" value={newBedData.room_number} onChange={handleInputChange} className="w-full border rounded p-2" placeholder="R-12" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Position</label>
+              <input type="text" name="bed_position" value={newBedData.bed_position} onChange={handleInputChange} className="w-full border rounded p-2" placeholder="Window Side" />
+            </div>
+          </div>
+
+          <div className="space-y-2 border-t pt-3">
+            <p className="text-sm font-medium text-gray-700">Equipments</p>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="has_oxygen" checked={newBedData.has_oxygen} onChange={handleInputChange} /> Oxygen
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="has_suction" checked={newBedData.has_suction} onChange={handleInputChange} /> Suction
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="has_cardiac_monitor" checked={newBedData.has_cardiac_monitor} onChange={handleInputChange} /> Cardiac Monitor
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="has_ventilator" checked={newBedData.has_ventilator} onChange={handleInputChange} /> Ventilator
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="has_iv_pole" checked={newBedData.has_iv_pole} onChange={handleInputChange} /> IV Pole
+              </label>
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 mt-6">

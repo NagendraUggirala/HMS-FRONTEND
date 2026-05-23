@@ -32,6 +32,12 @@ const DOCTOR_TREATMENT_PLANS_BASE_CANDIDATES = [
   '/api/v1/doctors',
 ]
 
+const DOCTOR_LAB_RESULTS_BASE_CANDIDATES = [
+  '/api/v1/doctor-sidebar',
+  '/api/v1/doctor/sidebar',
+  '/api/v1/doctor',
+]
+
 function normalizeApiData(payload) {
   return payload?.data ?? payload ?? {}
 }
@@ -126,6 +132,14 @@ function buildTreatmentPlanPaths({ planId, action = 'list', query = {} } = {}) {
   }).filter(Boolean)
 }
 
+function buildLabResultsPaths({ medicalRecordId, action = 'list', query = {} } = {}) {
+  return DOCTOR_LAB_RESULTS_BASE_CANDIDATES.map((base) => {
+    if (action === 'list') return withQuery(`${base}/lab-results`, query)
+    if (action === 'review') return `${base}/lab-results/${encodeURIComponent(medicalRecordId)}/review`
+    return ''
+  }).filter(Boolean)
+}
+
 export function doctorAppointmentErrorMessage(payload) {
   const detail = payload?.detail
   if (typeof detail === 'string') return detail
@@ -173,6 +187,32 @@ export function normalizeDoctorAppointmentDetails(payload) {
     notes: data?.notes || '',
     consultation_fee: data?.consultation_fee ?? '',
   }
+}
+
+export function normalizeLabResults(payload) {
+  const data = normalizeApiData(payload)
+  const rawResults = Array.isArray(data) ? data : (data?.items || [])
+
+  return rawResults.map((item) => ({
+    id: item?.medical_record_id || item?.id || '',
+    patient: item?.patient_name || item?.patient || 'Unknown',
+    patientId: item?.patient_ref || item?.patient_id || '',
+    age: item?.patient_age || item?.age || '',
+    gender: item?.patient_gender || item?.gender || '',
+    test: item?.test_name || item?.test || '',
+    testCode: item?.test_code || item?.code || '',
+    result: item?.test_result || item?.result || {},
+    referenceRange: item?.reference_range || {},
+    date: item?.test_date || item?.date || '',
+    time: item?.test_time || item?.time || '',
+    lab: item?.lab_name || item?.lab || '',
+    technician: item?.technician_name || item?.technician || '',
+    status: item?.status || 'Pending Review',
+    reviewedBy: item?.reviewed_by_name || item?.reviewed_by || '',
+    reviewDate: item?.review_date || '',
+    notes: item?.review_notes || item?.notes || '',
+    severity: item?.severity_assessment || item?.severity || 'normal'
+  }))
 }
 
 export function getDoctorAppointments(filters = {}) {
@@ -512,4 +552,266 @@ export function cleanupDoctorTreatmentPlanDates() {
       method: 'POST',
     }
   )
+}
+
+export function getDoctorLabResults(filters = {}) {
+  return doctorApiFetchWithFallback(buildLabResultsPaths({ action: 'list', query: filters }))
+    .then(normalizeLabResults)
+}
+
+export function reviewDoctorLabResult(medicalRecordId, body) {
+  return doctorApiFetchWithFallback(buildLabResultsPaths({ action: 'review', medicalRecordId }), {
+    method: 'PUT',
+    body,
+  })
+}
+
+// --- MESSAGING ---
+const MESSAGING_BASE = '/api/v1/doctor-sidebar'
+
+/**
+ * GET /api/v1/doctor-sidebar/messages
+ * Returns in-app notification messages (telemed & prescription).
+ */
+export async function getDoctorMessages({ limit = 100, unreadOnly = false } = {}) {
+  const path = withQuery(`${MESSAGING_BASE}/messages`, { limit, unread_only: unreadOnly })
+  const res = await doctorApiFetchWithFallback([path])
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to fetch messages'))
+  const json = await res.json().catch(() => [])
+  const list = Array.isArray(json) ? json : (json?.items || [])
+  return list.map((m) => ({
+    id: m.id || '',
+    source: m.source || '',
+    title: m.title || '',
+    body: m.body || '',
+    eventType: m.event_type || '',
+    readAt: m.read_at || null,
+    createdAt: m.created_at || '',
+    isRead: !!m.read_at,
+  }))
+}
+
+/**
+ * POST /api/v1/doctor-sidebar/messages
+ * Send an in-app notification to a recipient user.
+ */
+export async function sendDoctorMessage({ recipientUserId, title, body, eventType = 'NEW_MESSAGE' }) {
+  const path = `${MESSAGING_BASE}/messages`
+  const res = await doctorApiFetchWithFallback([path], {
+    method: 'POST',
+    body: { recipient_user_id: recipientUserId, title, body, event_type: eventType },
+  })
+  if (res.status === 201 || res.ok) {
+    return res.json().catch(() => null)
+  }
+  throw new Error(await res.text().catch(() => 'Failed to send message'))
+}
+
+/**
+ * POST /api/v1/doctor-sidebar/messages/read
+ * Mark a specific message as read.
+ */
+export async function markDoctorMessageRead({ source, messageId }) {
+  const path = `${MESSAGING_BASE}/messages/read`
+  const res = await doctorApiFetchWithFallback([path], {
+    method: 'POST',
+    body: { source, message_id: messageId },
+  })
+  if (res.status === 204 || res.ok) return true
+  throw new Error(await res.text().catch(() => 'Failed to mark as read'))
+}
+
+// --- INPATIENT VISITS ---
+const INPATIENT_VISITS_BASE = '/api/v1/doctor-sidebar'
+
+export function normalizeInpatientVisits(payload) {
+  const data = normalizeApiData(payload)
+  const rawList = Array.isArray(data) ? data : (data?.items || [])
+  return rawList.map((item) => ({
+    id: item?.admission_id || item?.id || '',
+    admissionId: item?.admission_id || '',
+    admissionNumber: item?.admission_number || '',
+    patientRef: item?.patient_ref || '',
+    name: item?.patient_name || 'Unknown',
+    admissionDate: item?.admission_date || '',
+    admissionType: item?.admission_type || '',
+    status: item?.status || 'Unknown',
+    ward: item?.ward || '',
+    room: item?.room_number || '',
+    bed: item?.bed_number || '',
+    condition: item?.chief_complaint || '',
+    isActive: item?.is_active ?? true,
+    // keep local-only fields with defaults
+    treatmentPlan: item?.treatment_plan || '',
+    medications: item?.medications || [],
+    notes: item?.notes || '',
+  }))
+}
+
+export async function getDoctorInpatientVisits(activeOnly = false) {
+  const path = withQuery(`${INPATIENT_VISITS_BASE}/inpatient-visits`, {
+    active_only: activeOnly,
+    limit: 100,
+  })
+  const res = await doctorApiFetchWithFallback([path])
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to fetch inpatient visits'))
+  const json = await res.json().catch(() => null)
+  return normalizeInpatientVisits(json)
+}
+
+export async function updateDoctorInpatientVitals(admissionId, vitalsBody) {
+  const path = `${INPATIENT_VISITS_BASE}/inpatient-visits/${encodeURIComponent(admissionId)}/vitals`
+  const res = await doctorApiFetchWithFallback([path], {
+    method: 'PUT',
+    body: vitalsBody,
+  })
+  // 204 No Content is a success with no body
+  if (res.status === 204 || res.ok) return true
+  throw new Error(await res.text().catch(() => 'Failed to update vitals'))
+}
+
+// --- DISCHARGE SUMMARY ---
+const DISCHARGE_SUMMARY_BASE = '/api/v1/patient-discharge-summary'
+
+export async function getAdmissionsReadyForDischarge(params = {}) {
+  const path = withQuery(`${DISCHARGE_SUMMARY_BASE}/admissions/ready-for-discharge`, params)
+  return doctorApiFetchWithFallback([path])
+}
+
+export async function getDischargeSummaryTemplate(admissionNumber) {
+  const path = `${DISCHARGE_SUMMARY_BASE}/admissions/${encodeURIComponent(admissionNumber)}/discharge-template`
+  return doctorApiFetchWithFallback([path])
+}
+
+export async function createDischargeSummary(body) {
+  return doctorApiFetchWithFallback([`${DISCHARGE_SUMMARY_BASE}/discharge-summaries`], {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' }
+  })
+}
+
+export async function getDischargeSummaryById(summaryId) {
+  return doctorApiFetchWithFallback([`${DISCHARGE_SUMMARY_BASE}/discharge-summaries/${encodeURIComponent(summaryId)}`])
+}
+
+export async function updateDischargeSummary(summaryId, body) {
+  return doctorApiFetchWithFallback([`${DISCHARGE_SUMMARY_BASE}/discharge-summaries/${encodeURIComponent(summaryId)}`], {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' }
+  })
+}
+
+export async function finalizeDischargeSummary(summaryId) {
+  return doctorApiFetchWithFallback([`${DISCHARGE_SUMMARY_BASE}/discharge-summaries/${encodeURIComponent(summaryId)}/finalize`], {
+    method: 'POST'
+  })
+}
+
+export async function getDischargeStatistics(params = {}) {
+  const path = withQuery(`${DISCHARGE_SUMMARY_BASE}/discharge-summaries/statistics`, params)
+  return doctorApiFetchWithFallback([path])
+}
+
+// --- REPORTS AND ANALYTICS ---
+const REPORTS_BASE = '/api/v1/doctor-management/reports'
+
+export async function getPracticeOverview(params = {}) {
+  const query = {
+    report_period: params.report_period || 'this_month',
+    custom_date_from: params.custom_date_from,
+    custom_date_to: params.custom_date_to,
+  }
+  const path = withQuery(`${REPORTS_BASE}/practice-overview`, query)
+  const res = await doctorApiFetchWithFallback([path])
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to fetch practice overview'))
+  return res.json()
+}
+
+export async function getPatientAnalytics(params = {}) {
+  const query = {
+    report_period: params.report_period || 'this_month',
+    custom_date_from: params.custom_date_from,
+    custom_date_to: params.custom_date_to,
+  }
+  const path = withQuery(`${REPORTS_BASE}/patient-analytics`, query)
+  const res = await doctorApiFetchWithFallback([path])
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to fetch patient analytics'))
+  return res.json()
+}
+
+export async function getAppointmentAnalytics(params = {}) {
+  const query = {
+    report_period: params.report_period || 'this_month',
+    custom_date_from: params.custom_date_from,
+    custom_date_to: params.custom_date_to,
+  }
+  const path = withQuery(`${REPORTS_BASE}/appointment-analytics`, query)
+  const res = await doctorApiFetchWithFallback([path])
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to fetch appointment analytics'))
+  return res.json()
+}
+
+export async function getClinicalOutcomes(params = {}) {
+  const query = {
+    report_period: params.report_period || 'this_month',
+    custom_date_from: params.custom_date_from,
+    custom_date_to: params.custom_date_to,
+  }
+  const path = withQuery(`${REPORTS_BASE}/clinical-outcomes`, query)
+  const res = await doctorApiFetchWithFallback([path])
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to fetch clinical outcomes'))
+  return res.json()
+}
+
+export async function getFinancialSummary(params = {}) {
+  const query = {
+    report_period: params.report_period || 'this_month',
+    custom_date_from: params.custom_date_from,
+    custom_date_to: params.custom_date_to,
+  }
+  const path = withQuery(`${REPORTS_BASE}/financial-summary`, query)
+  const res = await doctorApiFetchWithFallback([path])
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to fetch financial summary'))
+  return res.json()
+}
+
+export async function getPerformanceMetrics(params = {}) {
+  const query = {
+    report_period: params.report_period || 'this_month',
+    custom_date_from: params.custom_date_from,
+    custom_date_to: params.custom_date_to,
+  }
+  const path = withQuery(`${REPORTS_BASE}/performance-metrics`, query)
+  const res = await doctorApiFetchWithFallback([path])
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to fetch performance metrics'))
+  return res.json()
+}
+
+export async function getComparativeAnalysis(params = {}) {
+  const query = {
+    report_period: params.report_period || 'this_month',
+    custom_date_from: params.custom_date_from,
+    custom_date_to: params.custom_date_to,
+  }
+  const path = withQuery(`${REPORTS_BASE}/comparative-analysis`, query)
+  const res = await doctorApiFetchWithFallback([path])
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to fetch comparative analysis'))
+  return res.json()
+}
+
+export async function generateCustomReport(body) {
+  const res = await doctorApiFetchWithFallback([`${REPORTS_BASE}/generate-custom-report`], {
+    method: 'POST',
+    body,
+  })
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to generate custom report'))
+  return res.json()
+}
+
+export async function getExportOptions() {
+  const res = await doctorApiFetchWithFallback([`${REPORTS_BASE}/export-options`])
+  if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to fetch export options'))
+  return res.json()
 }

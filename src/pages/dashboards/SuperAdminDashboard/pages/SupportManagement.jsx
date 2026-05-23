@@ -31,10 +31,7 @@ const SupportManagement = () => {
   
   const [statusUpdateData, setStatusUpdateData] = useState({
     status: '',
-    resolution_notes: '',
-    assigned_to_user_id: '',
-    send_email: true,
-    additional_message: ''
+    resolution_notes: ''
   });
   
   // Error States
@@ -170,12 +167,14 @@ const SupportManagement = () => {
     try {
       const token = getAuthToken();
       
-      const query = new URLSearchParams({
+      const params = {
         skip: filters.skip,
-        limit: filters.limit,
-        status: filters.status || '',
-        hospital_id: filters.hospital_id || ''
-      });
+        limit: filters.limit
+      };
+      if (filters.status) params.status = filters.status;
+      if (filters.hospital_id) params.hospital_id = filters.hospital_id;
+
+      const query = new URLSearchParams(params);
 
       const headers = {
         "Content-Type": "application/json",
@@ -199,7 +198,8 @@ const SupportManagement = () => {
 
       const data = await res.json();
       
-      let ticketsData = data?.tickets || data?.data || [];
+      let ticketsData = Array.isArray(data) ? data : (data?.tickets || data?.data || []);
+      if (!Array.isArray(ticketsData)) ticketsData = [];
       
       // Log the first ticket to see its structure
       if (ticketsData.length > 0) {
@@ -866,8 +866,7 @@ const SupportManagement = () => {
       
       const payload = {
         status: statusUpdateData.status,
-        resolution_notes: statusUpdateData.resolution_notes,
-        assigned_to_user_id: statusUpdateData.assigned_to_user_id
+        resolution_notes: statusUpdateData.resolution_notes
       };
       
       const res = await fetch(`/api/v1/super-admin/support/tickets/${ticketId}/status`, {
@@ -885,56 +884,14 @@ const SupportManagement = () => {
         throw new Error(data.detail || "Failed to update status");
       }
       
-      // Send email notification if enabled
-      if (statusUpdateData.send_email) {
-        try {
-          const updatedTicket = data;
-          const hospital = hospitals.find(h => h.id === updatedTicket.hospital_id);
-          
-          const emailHTML = createStatusUpdateEmailHTML(
-            updatedTicket,
-            hospital,
-            selectedTicket.status, // old status
-            statusUpdateData.status, // new status
-            'System Administrator',
-            statusUpdateData.additional_message
-          );
-          
-          // Determine recipients
-          const recipients = [];
-          if (hospital?.email) recipients.push(hospital.email);
-          recipients.push('support@yourdomain.com');
-          
-          const uniqueRecipients = [...new Set(recipients)];
-          
-          const emailPromises = uniqueRecipients.map(recipient =>
-            sendEmailViaAPI(
-              recipient,
-              `[Ticket #${formatEqualNumericId(updatedTicket.id)}] Status Updated to ${statusUpdateData.status}`,
-              emailHTML
-            )
-          );
-          
-          await Promise.allSettled(emailPromises);
-          toast.success(`Status updated and email sent to ${uniqueRecipients.length} recipient(s)!`);
-          
-        } catch (emailError) {
-          console.error('Email sending failed:', emailError);
-          toast.warning('Status updated but email notification failed.');
-        }
-      } else {
-        toast.success("Status updated successfully!");
-      }
+      toast.success("Status updated successfully!");
       
       setShowEditModal(false);
       setSelectedTicket(null);
       setStatusErrors({});
       setStatusUpdateData({
         status: '',
-        resolution_notes: '',
-        assigned_to_user_id: '',
-        send_email: true,
-        additional_message: ''
+        resolution_notes: ''
       });
       
       fetchTickets();
@@ -1036,10 +993,10 @@ const SupportManagement = () => {
     return (
       pureNumericId.toLowerCase().includes(searchLower) ||
       equalFormattedId.toLowerCase().includes(searchLower) ||
-      ticket.id?.toLowerCase().includes(searchLower) ||
-      ticket.subject?.toLowerCase().includes(searchLower) ||
-      ticket.status?.toLowerCase().includes(searchLower) ||
-      getHospitalName(ticket.hospital_id)?.toLowerCase().includes(searchLower)
+      ticket.id?.toString().toLowerCase().includes(searchLower) ||
+      ticket.subject?.toString().toLowerCase().includes(searchLower) ||
+      ticket.status?.toString().toLowerCase().includes(searchLower) ||
+      getHospitalName(ticket.hospital_id)?.toString().toLowerCase().includes(searchLower)
     );
   });
 
@@ -1070,23 +1027,7 @@ const SupportManagement = () => {
     <div className="p-6 bg-gray-50 min-h-screen">
       <ToastContainer position="top-right" autoClose={5000} />
       
-      {/* Header with Buttons */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-gray-800">Support Management</h1>
-        
-         
-        </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Create Ticket
-        </button>
-      </div>
+
 
       {/* Status Banner - Shows when viewing closed tickets */}
       {showClosedOnly && (
@@ -1188,28 +1129,7 @@ const SupportManagement = () => {
         </div>
       </div>
 
-    {/* Priority Legend */}
-<div className="bg-white p-3 rounded-lg border border-gray-200 mb-6">
-  <div className="flex items-center gap-4 text-sm">
-    <span className="font-medium text-gray-700">Priority Order:</span>
-    <span className="flex items-center gap-1">
-      <span className="w-3 h-3 rounded-full bg-red-500"></span>
-      <span>URGENT</span>
-    </span>
-    <span className="flex items-center gap-1">
-      <span className="w-3 h-3 rounded-full bg-orange-500"></span>
-      <span>HIGH</span>
-    </span>
-    <span className="flex items-center gap-1">
-      <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-      <span>NORMAL</span>
-    </span>
-    <span className="flex items-center gap-1">
-      <span className="w-3 h-3 rounded-full bg-gray-500"></span>
-      <span>LOW</span>
-    </span>
-  </div>
-</div>
+
 
 {/* Header with Buttons on Right Side */}
 <div className="flex justify-between items-center mb-6">
@@ -1250,14 +1170,6 @@ const SupportManagement = () => {
                 ? "No closed tickets found" 
                 : "No support tickets found"}
             </p>
-            {!showClosedOnly && (
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="mt-4 text-blue-600 hover:text-blue-800"
-              >
-                Create your first ticket
-              </button>
-            )}
           </div>
         ) : (
           <>
@@ -1323,9 +1235,10 @@ const SupportManagement = () => {
                             setSelectedTicket(ticket);
                             setShowViewModal(true);
                           }}
-                          className="text-blue-600 hover:text-blue-900 mr-3"
+                          className="text-blue-600 hover:text-blue-900 mr-4"
+                          title="View Ticket"
                         >
-                          View
+                          <i className="fas fa-eye text-lg"></i>
                         </button>
                         {ticket.status !== 'CLOSED' && (
                           <button
@@ -1333,16 +1246,14 @@ const SupportManagement = () => {
                               setSelectedTicket(ticket);
                               setStatusUpdateData({
                                 status: ticket.status || '',
-                                resolution_notes: ticket.resolution_notes || '',
-                                assigned_to_user_id: ticket.assigned_to_user_id || '',
-                                send_email: true,
-                                additional_message: ''
+                                resolution_notes: ticket.resolution_notes || ''
                               });
                               setShowEditModal(true);
                             }}
                             className="text-green-600 hover:text-green-900"
+                            title="Update Status"
                           >
-                            Update Status
+                            <i className="fas fa-edit text-lg"></i>
                           </button>
                         )}
                       </td>
@@ -1694,17 +1605,6 @@ const SupportManagement = () => {
               </div>
               
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To (User ID)</label>
-                <input
-                  type="text"
-                  value={statusUpdateData.assigned_to_user_id}
-                  onChange={(e) => setStatusUpdateData({...statusUpdateData, assigned_to_user_id: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter user ID"
-                />
-              </div>
-              
-              <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Resolution Notes</label>
                 <textarea
                   value={statusUpdateData.resolution_notes}
@@ -1715,37 +1615,6 @@ const SupportManagement = () => {
                 />
                 {statusErrors.resolution_notes && (
                   <p className="mt-1 text-xs text-red-500">{statusErrors.resolution_notes}</p>
-                )}
-              </div>
-              
-              {/* Email Notification for Status Update */}
-              <div className="mb-4 p-3 bg-blue-50 rounded-md border border-blue-200">
-                <label className="flex items-center space-x-2 mb-3">
-                  <input
-                    type="checkbox"
-                    checked={statusUpdateData.send_email}
-                    onChange={(e) => setStatusUpdateData({...statusUpdateData, send_email: e.target.checked})}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Send email notification about this update</span>
-                </label>
-                
-                {statusUpdateData.send_email && (
-                  <div className="mt-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Additional Message for Email (Optional)
-                    </label>
-                    <textarea
-                      value={statusUpdateData.additional_message}
-                      onChange={(e) => setStatusUpdateData({...statusUpdateData, additional_message: e.target.value})}
-                      rows="2"
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Add any additional notes to include in the email..."
-                    />
-                    <p className="mt-1 text-xs text-gray-500">
-                      Notification will be sent to: Hospital email and Support team
-                    </p>
-                  </div>
                 )}
               </div>
               

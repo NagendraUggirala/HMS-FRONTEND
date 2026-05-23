@@ -114,12 +114,16 @@ const AppointmentScheduling = () => {
           department: item.department || item.department_name || 'General Medicine'
         }))
         setApiDoctors(mappedList)
+      const res = await apiFetch(DOCTOR_LIST)
+      const data = await res.json()
+      if (res.ok) {
+        const list = data.data?.doctors || data.data || data
+        setApiDoctors(Array.isArray(list) ? list : [])
       }
     } catch (e) {
       console.error('Error fetching doctors', e)
     }
   }
-
 
   // Apply search and filters
   useEffect(() => {

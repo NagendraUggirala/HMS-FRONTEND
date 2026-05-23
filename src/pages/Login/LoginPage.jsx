@@ -22,35 +22,6 @@ const LOGIN_KIND_OPTIONS = [
   { value: 'RECEPTIONIST', label: 'Receptionist (staff)', useStaffApi: true },
 ]
 
-const DEMO_ROLE_TO_LOGIN_KIND = {
-  SUPER_ADMIN: 'super_admin',
-  ADMIN: 'hospital_admin',
-  DOCTOR: 'DOCTOR',
-  NURSE: 'NURSE',
-  RECEPTIONIST: 'RECEPTIONIST',
-  LAB: 'LAB_TECH',
-  LAB_TECH: 'LAB_TECH',
-  PHARMACY: 'PHARMACIST',
-  PHARMACIST: 'PHARMACIST',
-}
-
-const DEMO_USERS = [
-  { email: 'admin@dcm.demo', password: 'admin123', role: 'ADMIN', name: 'Admin User' },
-  { email: 'doctor@dcm.demo', password: 'doc@1234', role: 'DOCTOR', name: 'Dr. Aparna' },
-  { email: 'nurse@dcm.demo', password: 'nurse123', role: 'NURSE', name: 'Nurse Staff' },
-  { email: 'reception@dcm.demo', password: 'reception123', role: 'RECEPTIONIST', name: 'Receptionist' },
-  { email: 'super@dcm.demo', password: 'sup123', role: 'SUPER_ADMIN', name: 'Super Admin' },
-  { email: 'lab@dcm.demo', password: 'lab123', role: 'LAB', name: 'Lab Technician' },
-  { email: 'patient@dcm.demo', password: 'patient123', role: 'PATIENT', name: 'Patient User' },
-  { email: 'pharmacy@dcm.demo', password: 'pharma123', role: 'PHARMACY', name: 'Pharmacy Staff' },
-  { email: 'telemedicine@dcm.demo', password: 'tele123', role: 'TELEMEDICINE', name: 'Telemedicine Staff' },
-  { email: 'doctor@seed.com', password: 'SeedUser123!', role: 'DOCTOR', name: 'Seed Doctor' },
-  { email: 'pharmacist@seed.com', password: 'SeedUser123!', role: 'PHARMACIST', name: 'Seed Pharmacist' },
-  { email: 'labtech@seed.com', password: 'SeedUser123!', role: 'LAB_TECH', name: 'Seed Lab Tech' },
-  { email: 'nurse@seed.com', password: 'SeedUser123!', role: 'NURSE', name: 'Seed Nurse' },
-  { email: 'receptionist@seed.com', password: 'SeedUser123!', role: 'RECEPTIONIST', name: 'Seed Receptionist' },
-]
-
 const LoginPage = () => {
   const [formData, setFormData] = useState({
     email: '',
@@ -95,46 +66,7 @@ const LoginPage = () => {
     }
   }
 
-  const tryDemoLogin = (email, password, selectedKind) => {
-    const demo = DEMO_USERS.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    )
-    if (!demo) return 'not_found'
-
-    const expectedKind = DEMO_ROLE_TO_LOGIN_KIND[demo.role]
-    if (expectedKind !== selectedKind) return 'wrong_kind'
-
-    const appRole = normalizeRoleForRoute({ roles: [demo.role], role: demo.role })
-    dispatch(
-      loginSuccess({
-        user: {
-          id: `demo-${demo.role.toLowerCase()}`,
-          name: demo.name,
-          email: demo.email,
-          role: appRole,
-          roles: [demo.role],
-        },
-        token: `demo-token-${Date.now()}`,
-        refreshToken: `demo-refresh-${Date.now()}`,
-        requiresPasswordChange: false,
-      })
-    )
-    toast.success(`Demo login successful (${demo.role})`)
-    navigateByAppRole(appRole, false)
-    return 'success'
-  }
-
-  const fillDemoCredentials = (demoUser) => {
-    const kind = DEMO_ROLE_TO_LOGIN_KIND[demoUser.role]
-    if (kind) setLoginKind(kind)
-    setFormData((prev) => ({
-      ...prev,
-      email: demoUser.email,
-      password: demoUser.password,
-      rememberMe: true,
-    }))
-    if (error) setError('')
-  }
+ 
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -173,25 +105,7 @@ const LoginPage = () => {
       const response = await res.json().catch(() => ({}))
       const msg = response.message || response?.detail?.message || `Request failed (${res.status})`
 
-      if (!res.ok) {
-        const demoOutcome = tryDemoLogin(email, password, loginKind)
-        if (demoOutcome === 'success') {
-          setLoading(false)
-          return
-        }
-        if (demoOutcome === 'wrong_kind') {
-          setError(LOGIN_KIND_MISMATCH_MESSAGE)
-          dispatch(loginFailure(LOGIN_KIND_MISMATCH_MESSAGE))
-          toast.error(LOGIN_KIND_MISMATCH_MESSAGE)
-          setLoading(false)
-          return
-        }
-        setError(msg)
-        dispatch(loginFailure(msg))
-        toast.error(msg)
-        setLoading(false)
-        return
-      }
+     
 
       const data = response.data ?? response
       const accessToken = data.access_token ?? data.token ?? data.accessToken
@@ -248,18 +162,7 @@ const LoginPage = () => {
       navigateByAppRole(userPayload.role, requiresPasswordChange)
     } catch (err) {
       console.error('Login failed:', err)
-      const demoOutcome = tryDemoLogin(email, password, loginKind)
-      if (demoOutcome === 'success') {
-        setLoading(false)
-        return
-      }
-      if (demoOutcome === 'wrong_kind') {
-        setError(LOGIN_KIND_MISMATCH_MESSAGE)
-        dispatch(loginFailure(LOGIN_KIND_MISMATCH_MESSAGE))
-        toast.error(LOGIN_KIND_MISMATCH_MESSAGE)
-        setLoading(false)
-        return
-      }
+     
       const fallback = err?.message || 'Network error. Is the API running at the configured base URL?'
       setError(fallback)
       dispatch(loginFailure(fallback))
@@ -442,23 +345,7 @@ const LoginPage = () => {
                     Use your real backend when the API is running; demo and seed shortcuts below fill the form for testing.
                   </p>
 
-                  <div className="mt-6 pt-5 border-t border-gray-200">
-                    <h3 className="text-sm font-medium text-gray-700 text-center mb-3">Demo Accounts (click to fill)</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {DEMO_USERS.map((user) => (
-                        <button
-                          key={`${user.role}-${user.email}`}
-                          type="button"
-                          onClick={() => fillDemoCredentials(user)}
-                          className="text-left p-2.5 rounded-lg border border-gray-200 bg-gray-50 hover:bg-blue-50 hover:border-blue-200 transition-colors"
-                        >
-                          <p className="text-xs font-semibold text-gray-900 truncate">{user.name}</p>
-                          <p className="text-[11px] text-gray-600 truncate">{user.email}</p>
-                          <p className="text-[11px] text-blue-700 font-medium">{user.role}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  
                 </form>
               </div>
 

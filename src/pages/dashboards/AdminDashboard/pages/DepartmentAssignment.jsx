@@ -61,11 +61,12 @@ const mapStaffOption = (item) => {
   const firstName = item?.first_name ?? item?.firstName ?? ''
   const lastName = item?.last_name ?? item?.lastName ?? ''
   const fullName = `${firstName} ${lastName}`.trim()
+  const role = item?.role ?? item?.user_role ?? (Array.isArray(item?.roles) ? item.roles[0] : '') ?? ''
   return {
     id: item?.id ?? item?.staff_id ?? item?.user_id ?? '',
     name: fullName || item?.name || item?.staff_name || 'Unnamed Staff',
-    role: item?.role ?? item?.user_role ?? '',
-    roleLabel: toDisplayRole(item?.role ?? item?.user_role),
+    role: role,
+    roleLabel: toDisplayRole(role),
     status: item?.is_active === false ? 'inactive' : 'active'
   }
 }
@@ -110,7 +111,7 @@ function rowFromDeptMember(departmentName, member, index) {
     member?.name ??
     `${firstName} ${lastName}`.trim()
   const staffName = fromNames || 'Unknown'
-  const role = member?.role ?? member?.user_role ?? ''
+  const role = member?.role ?? member?.user_role ?? (Array.isArray(member?.roles) ? member.roles[0] : '') ?? ''
   const assignedRaw =
     member?.assigned_date ??
     member?.assigned_at ??
@@ -665,7 +666,8 @@ const AssignDepartment = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+              }
             </tbody>
           </table>
         </div>

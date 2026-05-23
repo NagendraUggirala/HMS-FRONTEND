@@ -1,3 +1,4 @@
+// src/pages/dashboards/SuperAdminDashboard/pages/ProfileSettings.jsx
 import React, { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../../../../hooks/useAuth'
 import Button from '../../../../components/common/Button/Button'
@@ -120,7 +121,7 @@ const ProfileSettings = () => {
           }
 
           if (userData.profileImage || userData.avatar || userData.avatar_url) {
-            setImagePreview(userData.profileImage || userData.avatar || userData.avatar_url)
+            setImagePreview(getFullAvatarUrl(userData.profileImage || userData.avatar || userData.avatar_url))
           }
 
           // Extract and set security settings from API response
@@ -167,7 +168,7 @@ const ProfileSettings = () => {
           }
 
           if (profileData.profileImage || profileData.avatar || profileData.avatar_url) {
-            setImagePreview(profileData.profileImage || profileData.avatar || profileData.avatar_url)
+            setImagePreview(getFullAvatarUrl(profileData.profileImage || profileData.avatar || profileData.avatar_url))
           }
         }
       } catch (error) {

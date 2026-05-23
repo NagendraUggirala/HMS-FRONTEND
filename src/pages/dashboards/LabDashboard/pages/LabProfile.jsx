@@ -3,6 +3,87 @@ import React, { useState, useEffect } from "react";
 import Button from "../../../../components/common/Button/Button";
 import Modal from "../../../../components/common/Modal/Modal";
 import LoadingSpinner from "../../../../components/common/LoadingSpinner/LoadingSpinner";
+import { apiFetch } from "../../../../services/apiClient";
+
+const normalizeLabProfileResponse = (payload) => {
+  const source = payload.data ?? payload;
+
+  return {
+    labInfo: {
+      id: source.lab_information?.lab_id ?? "",
+      name: source.lab_information?.lab_name ?? "",
+      type: source.lab_information?.lab_type ?? "",
+      registrationNumber: source.lab_information?.registration_number ?? "",
+      establishedDate: source.lab_information?.established_date ?? "",
+      accreditation: source.lab_information?.accreditation ?? "",
+      accreditationNumber: source.lab_information?.accreditation_number ?? "",
+      accreditationValidUntil: source.lab_information?.accreditation_valid_until ?? "",
+    },
+    contactInfo: {
+      address: source.contact_information?.address ?? "",
+      city: source.contact_information?.city ?? "",
+      state: source.contact_information?.state ?? "",
+      pincode: source.contact_information?.pincode ?? "",
+      country: "India",
+      phone: source.contact_information?.phone ?? "",
+      emergencyPhone: source.contact_information?.emergency_phone ?? "",
+      email: source.contact_information?.email ?? "",
+      website: source.contact_information?.website ?? "",
+    },
+    operationalInfo: {
+      workingHours: source.operational_hours?.working_hours ?? "",
+      weekdays: source.operational_hours?.weekdays ?? "",
+      sunday: source.operational_hours?.sunday ?? "",
+      emergencyServices: source.operational_hours?.emergency ?? "",
+      homeCollection: source.operational_hours?.home_collection ?? "",
+      reportDelivery: source.operational_hours?.report_delivery ?? "",
+    },
+    personnel: {
+      director: "",
+      labManager: "",
+      qualityManager: "",
+      totalTechnicians: 0,
+      totalStaff: source.stats?.total_staff ?? 0,
+    },
+    facilities: {
+      totalArea: source.facilities?.total_area_sqft ? `${source.facilities.total_area_sqft} sq.ft.` : "",
+      departments: source.facilities?.departments ?? [],
+      specialties: source.facilities?.specialties ?? [],
+      equipmentCount: source.stats?.equipment ?? 0,
+      rooms: source.facilities?.rooms ?? [],
+    },
+    services: {
+      totalTests: source.stats?.total_tests ?? 0,
+      sampleTypes: source.services?.sample_types ?? [],
+      turnAroundTime: {
+        routine: source.services?.routine_tat ?? "",
+        urgent: source.services?.urgent_tat ?? "",
+        stat: source.services?.stat_tat ?? "",
+      },
+      branches: source.stats?.branches ?? 0,
+    },
+    userProfile: {
+      name: source.user_profile?.name ?? "",
+      email: source.user_profile?.email ?? "",
+      role: source.user_profile?.role ?? "",
+      department: source.user_profile?.department ?? "",
+      phone: source.user_profile?.phone ?? "",
+      joinedDate: source.user_profile?.joined ?? "",
+      lastLogin: source.user_profile?.last_login ?? "",
+      status: source.user_profile?.status ?? "",
+    },
+    settings: {
+      autoPrintReports: source.settings?.auto_print_reports ?? false,
+      emailNotifications: source.settings?.email_notifications ?? false,
+      smsNotifications: source.settings?.sms_notifications ?? false,
+      criticalResultAlert: false,
+      qcAlertThreshold: "2SD",
+      reportTemplate: source.settings?.report_template ?? "Standard",
+      language: "English",
+      timezone: "IST (UTC+5:30)",
+    },
+  };
+};
 
 const LabProfile = () => {
   const [loading, setLoading] = useState(true);
@@ -25,129 +106,197 @@ const LabProfile = () => {
 
   const loadLabData = async () => {
     setLoading(true);
-    setTimeout(() => {
-      const mockData = {
-        labInfo: {
-          id: "LEV-LAB-001",
-          name: "Levitica Healthcare",
-          type: "Advanced Diagnostic & Research Center",
-          registrationNumber: "LHC/RG/2026/088",
-          establishedDate: "2010-04-12",
-          accreditation: "NABL Accredited (ISO 15189:2022)",
-          accreditationNumber: "MC-202488",
-          accreditationValidUntil: "2028-04-11",
+
+    const mockData = {
+      labInfo: {
+        id: "LEV-LAB-001",
+        name: "Levitica Healthcare",
+        type: "Advanced Diagnostic & Research Center",
+        registrationNumber: "LHC/RG/2026/088",
+        establishedDate: "2010-04-12",
+        accreditation: "NABL Accredited (ISO 15189:2022)",
+        accreditationNumber: "MC-202488",
+        accreditationValidUntil: "2028-04-11",
+      },
+      contactInfo: {
+        address: "Levitica Towers, 4th Floor, Tech Park West",
+        city: "Mumbai",
+        state: "Maharashtra",
+        pincode: "400051",
+        country: "India",
+        phone: "+91 22 8888 7777",
+        emergencyPhone: "+91 9999 000 111",
+        email: "lab.support@levitica.com",
+        website: "www.levitica.com/diagnostics",
+      },
+      operationalInfo: {
+        workingHours: "24/7 Fully Operational",
+        weekdays: "Mon-Sat: 24 Hours",
+        sunday: "Sun: 8:00 AM - 8:00 PM (Emergency 24/7)",
+        emergencyServices: "STAT Laboratory Services Available",
+        homeCollection: "Premium Home Sample Collection",
+        reportDelivery: "Digital Portal, WhatsApp, Email, Physical",
+      },
+      personnel: {
+        director: "Dr. Senior Consultant",
+        labManager: "Dr. Anita Rao",
+        qualityManager: "Mr. Vikram Singh",
+        totalTechnicians: 32,
+        totalStaff: 58,
+      },
+      facilities: {
+        totalArea: "12,500 sq.ft. (Modern Facility)",
+        departments: [
+          "Molecular Diagnostics",
+          "Genomics",
+          "Hematology & Coagulation",
+          "Biochemistry",
+          "Advanced Microbiology",
+          "Cytopathology",
+        ],
+        specialties: [
+          "Precision Medicine",
+          "Infectious Diseases",
+          "Rare Disease Screening",
+          "Onco-Pathology",
+        ],
+        equipmentCount: 142,
+        rooms: [
+          "Robotic Sample Processing",
+          "BSL-3 Testing Bay",
+          "Genomics Suite",
+          "Cryo-Storage",
+          "Client Experience Zone",
+        ],
+      },
+      services: {
+        totalTests: 1250,
+        sampleTypes: [
+          "Blood",
+          "Urine",
+          "Tissue Biopsy",
+          "CSF",
+          "Bone Marrow",
+          "Genetic Swabs",
+        ],
+        turnAroundTime: {
+          routine: "12-24 hours",
+          urgent: "2-4 hours",
+          stat: "45-90 minutes",
         },
-        contactInfo: {
-          address: "Levitica Towers, 4th Floor, Tech Park West",
-          city: "Mumbai",
-          state: "Maharashtra",
-          pincode: "400051",
-          country: "India",
-          phone: "+91 22 8888 7777",
-          emergencyPhone: "+91 9999 000 111",
-          email: "lab.support@levitica.com",
-          website: "www.levitica.com/diagnostics",
-        },
-        operationalInfo: {
-          workingHours: "24/7 Fully Operational",
-          weekdays: "Mon-Sat: 24 Hours",
-          sunday: "Sun: 8:00 AM - 8:00 PM (Emergency 24/7)",
-          emergencyServices: "STAT Laboratory Services Available",
-          homeCollection: "Premium Home Sample Collection",
-          reportDelivery: "Digital Portal, WhatsApp, Email, Physical",
-        },
-        personnel: {
-          director: "Dr. Senior Consultant",
-          labManager: "Dr. Anita Rao",
-          qualityManager: "Mr. Vikram Singh",
-          totalTechnicians: 32,
-          totalStaff: 58,
-        },
-        facilities: {
-          totalArea: "12,500 sq.ft. (Modern Facility)",
-          departments: [
-            "Molecular Diagnostics",
-            "Genomics",
-            "Hematology & Coagulation",
-            "Biochemistry",
-            "Advanced Microbiology",
-            "Cytopathology",
-          ],
-          specialties: [
-            "Precision Medicine",
-            "Infectious Diseases",
-            "Rare Disease Screening",
-            "Onco-Pathology",
-          ],
-          equipmentCount: 142,
-          rooms: [
-            "Robotic Sample Processing",
-            "BSL-3 Testing Bay",
-            "Genomics Suite",
-            "Cryo-Storage",
-            "Client Experience Zone",
-          ],
-        },
-        services: {
-          totalTests: 1250,
-          sampleTypes: [
-            "Blood",
-            "Urine",
-            "Tissue Biopsy",
-            "CSF",
-            "Bone Marrow",
-            "Genetic Swabs",
-          ],
-          turnAroundTime: {
-            routine: "12-24 hours",
-            urgent: "2-4 hours",
-            stat: "45-90 minutes",
-          },
-          branches: 12,
-        },
-        userProfile: {
-          name: "Dr. Senior Consultant",
-          email: "director@levitica.com",
-          role: "Laboratory Director",
-          department: "Executive Management",
-          phone: "+91 99887 76655",
-          joinedDate: "2010-04-12",
-          lastLogin: new Date().toLocaleString(),
-          status: "Active",
-        },
-        settings: {
-          autoPrintReports: false,
-          emailNotifications: true,
-          smsNotifications: true,
-          criticalResultAlert: true,
-          qcAlertThreshold: "2SD",
-          reportTemplate: "Standard",
-          language: "English",
-          timezone: "IST (UTC+5:30)",
-        },
+        branches: 12,
+      },
+      userProfile: {
+        name: "Dr. Senior Consultant",
+        email: "director@levitica.com",
+        role: "Laboratory Director",
+        department: "Executive Management",
+        phone: "+91 99887 76655",
+        joinedDate: "2010-04-12",
+        lastLogin: new Date().toLocaleString(),
+        status: "Active",
+      },
+      settings: {
+        autoPrintReports: false,
+        emailNotifications: true,
+        smsNotifications: true,
+        criticalResultAlert: true,
+        qcAlertThreshold: "2SD",
+        reportTemplate: "Standard",
+        language: "English",
+        timezone: "IST (UTC+5:30)",
+      },
+    };
+
+    try {
+      const res = await apiFetch("/api/v1/lab/profile");
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(
+          data?.detail?.message || data?.message || `Failed to fetch lab profile (${res.status})`
+        );
+      }
+
+      const apiPayload = data?.data ?? data;
+      const normalized = normalizeLabProfileResponse(apiPayload);
+      const mergedData = {
+        ...mockData,
+        ...normalized,
+        labInfo: { ...mockData.labInfo, ...normalized.labInfo },
+        contactInfo: { ...mockData.contactInfo, ...normalized.contactInfo },
+        operationalInfo: { ...mockData.operationalInfo, ...normalized.operationalInfo },
+        personnel: { ...mockData.personnel, ...normalized.personnel },
+        facilities: { ...mockData.facilities, ...normalized.facilities },
+        services: { ...mockData.services, ...normalized.services },
+        userProfile: { ...mockData.userProfile, ...normalized.userProfile },
+        settings: { ...mockData.settings, ...normalized.settings },
       };
 
+      setLabData(mergedData);
+      setEditForm({
+        ...mergedData.labInfo,
+        ...mergedData.contactInfo,
+        ...mergedData.operationalInfo,
+        ...mergedData.personnel,
+        ...mergedData.facilities,
+        ...mergedData.services,
+        ...mergedData.settings,
+      });
+      setSettings(mergedData.settings);
+    } catch (error) {
+      console.error("Failed to load lab profile:", error);
       setLabData(mockData);
       setEditForm(mockData.labInfo);
       setSettings(mockData.settings);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     setSaving(true);
-    setTimeout(() => {
+    try {
+      const payload = {
+        lab_name: editForm.name,
+        lab_type: editForm.type,
+        registration_number: editForm.registrationNumber,
+        established_date: editForm.establishedDate,
+        accreditation: editForm.accreditation,
+        accreditation_number: editForm.accreditationNumber,
+      };
+
+      const result = await runLabProfileAction("edit", payload);
+
       setLabData({
         ...labData,
-        labInfo: editForm,
+        labInfo: { ...labData.labInfo, ...editForm },
       });
-      setSaving(false);
       setShowEditModal(false);
-      alert("Lab profile updated successfully!");
-    }, 1500);
+      alert(result.message || "Lab profile updated successfully!");
+    } catch (error) {
+      console.error("Failed to save lab profile:", error);
+      alert(error.message || "Unable to save lab profile. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleChangePassword = () => {
+  const runLabProfileAction = async (action, payload) => {
+    const res = await apiFetch(`/api/v1/lab/profile/action/${encodeURIComponent(action)}`, {
+      method: "POST",
+      body: payload,
+    });
+    const result = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(result?.detail?.message || result?.message || `Failed to run action ${action} (${res.status})`);
+    }
+
+    return result;
+  };
+
+  const handleChangePassword = async () => {
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       alert("New passwords do not match!");
       return;
@@ -158,26 +307,70 @@ const LabProfile = () => {
       return;
     }
 
+    if (!passwordForm.currentPassword) {
+      alert("Please enter your current password!");
+      return;
+    }
+
     setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      const payload = {
+        old_password: passwordForm.currentPassword,
+        new_password: passwordForm.newPassword,
+      };
+
+      const res = await apiFetch("/api/v1/lab/profile/change-password", {
+        method: "POST",
+        body: payload,
+      });
+      
+      const result = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(
+          result?.detail?.message || result?.detail || result?.message || "Failed to change password"
+        );
+      }
+
       setShowPasswordModal(false);
       setPasswordForm({
         currentPassword: "",
         newPassword: "",
         confirmPassword: "",
       });
-      alert("Password changed successfully!");
-    }, 1500);
+      alert(result.message || "Password changed successfully!");
+    } catch (error) {
+      console.error("Failed to change password:", error);
+      alert(error.message || "Unable to change password. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleSaveSettings = () => {
+  const handleSaveSettings = async () => {
     setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      const payload = {
+        auto_print_reports: settings.autoPrintReports,
+        email_notifications: settings.emailNotifications,
+        sms_notifications: settings.smsNotifications,
+        report_template: settings.reportTemplate,
+      };
+
+      const result = await runLabProfileAction("configure-settings", payload);
+
+      setLabData({
+        ...labData,
+        settings: { ...labData.settings, ...settings },
+      });
       setShowSettingsModal(false);
-      alert("Settings updated successfully!");
-    }, 1500);
+      alert(result.message || "Settings updated successfully!");
+    } catch (error) {
+      console.error("Failed to save lab settings:", error);
+      alert(error.message || "Unable to save lab settings. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleExportData = (type) => {
@@ -404,8 +597,8 @@ const LabProfile = () => {
                   Departments
                 </span>
                 <div className="flex flex-wrap gap-1.5">
-                  {labData.facilities?.departments
-                    ?.slice(0, 4)
+                  {(labData.facilities?.departments || [])
+                    .slice(0, 4)
                     .map((dept, index) => (
                       <span key={index}
                         className="px-2 py-0.5 bg-teal-50 text-teal-700 text-[9px] font-bold rounded border border-teal-100" >
