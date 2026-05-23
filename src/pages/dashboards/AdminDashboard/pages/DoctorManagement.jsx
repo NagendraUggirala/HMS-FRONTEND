@@ -61,8 +61,7 @@ const DoctorManagement = () => {
     emergency_contact: '',
     shift_timing: '',
     joining_date: '',
-    address: '',
-    department_name: ''
+    address: ''
   })
 
   useEffect(() => {
@@ -151,9 +150,7 @@ const DoctorManagement = () => {
               emergency_contact: formData.emergency_contact,
               shift_timing: formData.shift_timing,
               joining_date: formData.joining_date,
-              address: formData.address,
-              department_name: formData.department_name,
-              department: formData.department_name
+              address: formData.address
             }
           : doctor
       )
@@ -180,7 +177,6 @@ const DoctorManagement = () => {
         shift_timing: formData.shift_timing?.trim() || '',
         joining_date: formData.joining_date,
         address: formData.address?.trim() || '',
-        department_name: formData.department_name?.trim() || '',
         doctor_specialization: 'General Physician'
       }
       
@@ -241,8 +237,7 @@ const DoctorManagement = () => {
       emergency_contact: doctor.emergency_contact || '',
       shift_timing: doctor.shift_timing || '',
       joining_date: doctor.joining_date || '',
-      address: doctor.address || '',
-      department_name: doctor.department_name || doctor.department || ''
+      address: doctor.address || ''
     })
     setDepartmentSearchTerm('')
     setSpecializationSearchTerm('')
@@ -276,8 +271,7 @@ const DoctorManagement = () => {
       emergency_contact: '',
       shift_timing: '',
       joining_date: '',
-      address: '',
-      department_name: ''
+      address: ''
     })
     setDepartmentSearchTerm('')
     setSpecializationSearchTerm('')
@@ -295,7 +289,7 @@ const DoctorManagement = () => {
 
   // Form validation
   const validateForm = () => {
-    const requiredFields = ['first_name', 'last_name', 'email', 'phone', 'department_name']
+    const requiredFields = ['first_name', 'last_name', 'email', 'phone']
     for (let field of requiredFields) {
       if (!formData[field]) {
         alert(`Please fill in the ${field.replace('_', ' ')} field`)
@@ -309,11 +303,10 @@ const DoctorManagement = () => {
     const matchesSearch = !searchTerm || 
       doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       doctor.specialization.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesDepartment = !departmentFilter || doctor.department === departmentFilter
     const matchesStatus = !statusFilter || doctor.status === statusFilter
     const matchesConsultationType = !consultationTypeFilter || doctor.consultationType === consultationTypeFilter
     
-    return matchesSearch && matchesDepartment && matchesStatus && matchesConsultationType
+    return matchesSearch && matchesStatus && matchesConsultationType
   })
 
   // Departments and specializations data
@@ -490,51 +483,6 @@ const DoctorManagement = () => {
             className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
           />
         </div>
-        <div className="relative">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Department Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            required
-            value={departmentSearchTerm || formData.department_name}
-            onChange={(e) => {
-              setDepartmentSearchTerm(e.target.value)
-              setDepartmentDropdownOpen(true)
-              handleInputChange('department_name', e.target.value)
-            }}
-            onFocus={() => setDepartmentDropdownOpen(true)}
-            onBlur={() => setTimeout(() => setDepartmentDropdownOpen(false), 150)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-            placeholder="Type or select department"
-          />
-          {departmentDropdownOpen && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
-              {departments
-                .filter(dept => 
-                  !departmentSearchTerm || dept.toLowerCase().includes(departmentSearchTerm.toLowerCase())
-                )
-                .map(dept => (
-                  <div
-                    key={dept}
-                    onClick={() => {
-                      handleInputChange('department_name', dept)
-                      setDepartmentSearchTerm('')
-                      setDepartmentDropdownOpen(false)
-                    }}
-                    className="w-full text-left px-4 py-2.5 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
-                  >
-                    {dept}
-                  </div>
-                ))}
-              {departments.filter(dept => 
-                !departmentSearchTerm || dept.toLowerCase().includes(departmentSearchTerm.toLowerCase())
-              ).length === 0 && (
-                <div className="px-4 py-2.5 text-gray-500 text-sm">No departments found</div>
-              )}
-            </div>
-          )}
-        </div>
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Address
@@ -576,7 +524,7 @@ const DoctorManagement = () => {
       <div className="px-4 sm:px-6 lg:px-8 py-8">
         {/* Premium Search & Filter Bar */}
         <div className="backdrop-blur-xl bg-white/60 border border-gray-300 rounded-2xl p-5 sm:p-6 shadow-lg mb-8 hover:shadow-xl transition-all">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Search Input - Full Width on Mobile */}
             <div className="sm:col-span-2 lg:col-span-2">
               <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2  items-center gap-2">
@@ -590,26 +538,6 @@ const DoctorManagement = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-            </div>
-            {/* Department Filter */}
-            <div className="lg:col-span-1">
-              <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2  items-center gap-2">
-                <LocalHospital className="text-green-500" style={{fontSize: '20px'}} />
-                Dept
-              </label>
-              <div className="relative">
-                <select 
-                  className="w-full px-3 py-2.5 pr-8 bg-white/80 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 text-gray-900 transition-all duration-200 text-sm appearance-none cursor-pointer"
-                  value={departmentFilter}
-                  onChange={(e) => setDepartmentFilter(e.target.value)}
-                >
-                  <option value="">All</option>
-                  {departments.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
-                <ExpandMore className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 pointer-events-none" style={{fontSize: '20px'}} />
-              </div>
             </div>
             {/* Status Filter */}
             <div>
@@ -754,7 +682,7 @@ const DoctorManagement = () => {
           <button
             type="button"
             onClick={isAddMode ? handleAddDoctor : handleEditDoctor}
-            disabled={!formData.first_name || !formData.last_name || !formData.email || !formData.phone || !formData.department_name || submitLoading}
+            disabled={!formData.first_name || !formData.last_name || !formData.email || !formData.phone || submitLoading}
             className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 active:scale-95 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
           >
             {submitLoading ? (
@@ -842,7 +770,7 @@ const DoctorManagement = () => {
                   </p>
                   <p className="text-[#4361ee] font-bold text-sm flex items-center gap-2">
                     <LocalHospital style={{fontSize: '16px'}} />
-                    {currentDoctor.specialization || currentDoctor.department}
+                    {currentDoctor.specialization}
                   </p>
                 </div>
               </div>
@@ -850,17 +778,6 @@ const DoctorManagement = () => {
 
             {/* Info Cards Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-6 mb-8">
-              {/* Department */}
-              <div className="bg-white border border-blue-100 rounded-xl p-4 shadow-sm">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-8 h-8 bg-blue-100/70 rounded-lg flex items-center justify-center">
-                    <LocalHospital className="text-blue-600" style={{fontSize: '18px'}} />
-                  </div>
-                  <label className="text-[11px] font-bold text-blue-600 uppercase tracking-widest">Department</label>
-                </div>
-                <p className="text-base font-bold text-gray-900">{currentDoctor.department}</p>
-              </div>
-
               {/* Experience */}
               <div className="bg-white border border-blue-100 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center gap-3 mb-3">
