@@ -238,6 +238,9 @@ const PatientRecords = () => {
         const json = await fetchResponse.json();
         if (json.success) {
           setPatients(json.data.patients || []);
+          setTotalPatients(
+            json.data.total_patients || json.data.patients?.length || 0,
+          );
         }
       } else {
         throw new Error(data.message || "Failed to update patient records");
@@ -280,7 +283,7 @@ const PatientRecords = () => {
               Total Patients
             </p>
             <p className="text-2xl font-bold text-gray-800">
-              {loading ? "..." : filteredPatients.length}
+              {loading ? "..." : totalPatients}
             </p>
           </div>
         </div>
@@ -334,37 +337,11 @@ const PatientRecords = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th
-                    scope="col"
-                    className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
-                  >
-                    Patient ID
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
-                  >
-                    Name
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
-                  >
-                    Email
-                  </th>
-
-                  <th
-                    scope="col"
-                    className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
-                  >
-                    Created At
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider"
-                  >
-                    Action
-                  </th>
+                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Patient ID</th>
+                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
+                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
+                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Created At</th>
+                  <th scope="col" className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">

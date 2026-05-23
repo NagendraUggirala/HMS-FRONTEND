@@ -13,6 +13,12 @@ import {
   Groups as GroupsIcon, PendingActions as PendingActionsIcon, TaskAlt as TaskAltIcon,
   Delete as DeleteIcon
 } from '@mui/icons-material';
+import { apiFetch } from '../../../../services/apiClient';
+import {
+  DEPARTMENT_LIST,
+  DOCTOR_LIST,
+  RECEPTIONIST_PATIENT_SEARCH
+} from '../../../../config/api';
 
 
 const OPDManagement = () => {
@@ -53,7 +59,7 @@ const OPDManagement = () => {
     age: '',
     gender: 'Male',
     bloodGroup: '',
-    Type:'',
+    Type: '',
     address: '',
     department: '',
     doctorId: '',
@@ -69,7 +75,6 @@ const OPDManagement = () => {
   const [docSearchTerm, setDocSearchTerm] = useState('');
   const [isDocDropdownOpen, setIsDocDropdownOpen] = useState(false);
   const docDropdownRef = useRef(null);
-
   const [docNameSearchTerm, setDocNameSearchTerm] = useState('');
   const [isDocNameDropdownOpen, setIsDocNameDropdownOpen] = useState(false);
   const docNameDropdownRef = useRef(null);
@@ -78,13 +83,17 @@ const OPDManagement = () => {
   const [isPatientDropdownOpen, setIsPatientDropdownOpen] = useState(false);
   const patientDropdownRef = useRef(null);
 
-  const [patientQueueSearch, setPatientQueueSearch] = useState('');
-  const [doctorForm, setDoctorForm] = useState({
-    name: '',
-    department: '',
-    opdRoom: '',
-    specialization: '',
-    qualification: '',
+  {/* Add this state near your other state declarations */ }
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedPaymentPatient, setSelectedPaymentPatient] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [paymentBillingData, setPaymentBillingData] = useState({
+    token: '',
+    patientName: '',
+    patientId: '',
+    age: '',
+    gender: 'Male',
     email: '',
     contact: '',
     isActive: true
@@ -119,6 +128,21 @@ const OPDManagement = () => {
     loadOPDData();
   }, []);
 
+  // Update doctor queues when patients change
+  useEffect(() => {
+    if (opdPatients.length > 0) {
+      setDoctors(prevDoctors => prevDoctors.map(doctor => ({
+        ...doctor,
+        queue: opdPatients.filter(p =>
+          p.assignedDoctorId === doctor.id &&
+          ['Token Generated', 'Waiting', 'Vitals Completed', 'Lab Ordered'].includes(p.status)
+        ).length,
+        currentPatient: opdPatients.find(p => p.assignedDoctorId === doctor.id && p.status === 'In Consultation')?.token || null,
+        currentPatientName: opdPatients.find(p => p.assignedDoctorId === doctor.id && p.status === 'In Consultation')?.patientName || null
+      })));
+    }
+  }, [opdPatients]);
+
   // Click outside to close dropdowns
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -142,8 +166,6 @@ const OPDManagement = () => {
   }, []);
 
   const DEPARTMENTS = [...new Set(doctors.map(d => d.department))];
-  const TEST_OPTIONS = ['Blood Test', 'X-Ray', 'ECG', 'MRI', 'Ultrasound', 'CT Scan', 'Urine Test', 'Biopsy', 'Other'];
-  const SAMPLE_OPTIONS = ['None', 'Blood', 'Urine', 'Stool', 'Saliva', 'Tissue', 'Swab', 'Other'];
   const AVAILABLE_DOCTORS = [
     { name: 'Dr. Arun Varma', department: 'Cardiology', specialization: 'Senior Cardiologist', qualification: 'MBBS, MD (Cardiology)', email: 'arun.varma@hospital.com', contact: '+91 9998887771' },
     { name: 'Dr. Sarah Khan', department: 'Pediatrics', specialization: 'Pediatrician', qualification: 'MBBS, MD (Pediatrics)', email: 'sarah.khan@hospital.com', contact: '+91 9998887772' },
@@ -158,6 +180,29 @@ const OPDManagement = () => {
     { id: 'PAT-103', name: 'Anita Verma', phoneNo: '9123456789', email: 'anita@example.com', age: '45', gender: 'Female', bloodGroup: 'A-', address: 'Khar Road, Mumbai' },
     { id: 'PAT-104', name: 'Vikram Singh', phoneNo: '9822334455', email: 'vikram@example.com', age: '35', gender: 'Male', bloodGroup: 'AB+', address: 'Goregaon, Mumbai' }
   ];
+
+  const TEST_PRICES = {
+    'Blood Test': 250,
+    'CBC': 300,
+    'Lipid Profile': 500,
+    'Blood Sugar': 150,
+    'X-Ray': 600,
+    'ECG': 400,
+    'MRI': 3500,
+    'Ultrasound': 1200,
+    'CT Scan': 4500,
+    'Urine Test': 200,
+    'Biopsy': 1500,
+    'Other': 500
+  };
+
+  const SURGERY_PRICES = {
+    'Minor Surgery': 5000,
+    'Stitching': 1500,
+    'Cataract': 15000,
+    'Appendix': 25000,
+    'Dental Extraction': 2000
+  };
 
   const handleSelectDept = (dept) => {
     setTokenForm({
@@ -219,84 +264,74 @@ const OPDManagement = () => {
     d.name.toLowerCase().includes(docSearchTerm.toLowerCase())
   );
 
+  const calculateAge = (dobString) => {
+    if (!dobString) return '';
+    const dob = new Date(dobString);
+    const diffMs = Date.now() - dob.getTime();
+    const ageDate = new Date(diffMs);
+    return Math.abs(ageDate.getUTCFullYear() - 1970).toString();
+  };
+
+  const loadApiPatients = async (query = '') => {
+    try {
+      let url = RECEPTIONIST_PATIENT_SEARCH;
+      if (query) {
+        url += `?query=${encodeURIComponent(query)}`;
+      } else {
+        url += `?limit=100`;
+      }
+      const res = await apiFetch(url);
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const patientsList = data.data?.patients || data.data || [];
+        const formattedPatients = patientsList.map(patient => {
+          const age = patient.age || calculateAge(patient.date_of_birth) || '30';
+          return {
+            id: patient.patient_id || patient.patient_ref || patient.id || `PAT-${Math.floor(1000 + Math.random() * 9000)}`,
+            name: patient.name || `${patient.first_name || ''} ${patient.last_name || ''}`.trim() || 'Unknown Patient',
+            phoneNo: patient.phone || patient.phoneNo || 'Not specified',
+            email: patient.email || 'Not specified',
+            age: age.toString(),
+            gender: patient.gender ? (patient.gender.charAt(0).toUpperCase() + patient.gender.slice(1).toLowerCase()) : 'Male',
+            bloodGroup: patient.bloodGroup || patient.blood_group || 'O+',
+            address: patient.address || patient.residential_address || 'Not specified'
+          };
+        });
+        setRegisteredPatients(formattedPatients);
+      }
+    } catch (e) {
+      console.error('Error fetching patients:', e);
+    }
+  };
+
   const loadOPDData = async () => {
     setLoading(true);
-    setTimeout(() => {
-      const initialDoctors = [
-        {
-          id: 'D-001',
-          name: 'Dr. Meena Rao',
-          department: 'Cardiology',
-          opdRoom: 'Room 101',
-          specialization: 'Cardiologist',
-          qualification: 'MBBS, MD (Cardiology)',
-          email: 'meena.rao@health.com',
-          contact: '+91 9876543210',
-          isActive: true,
-          currentPatient: null,
-          queue: 0,
-          maxPatientsPerDay: 30,
-          consultationFee: 500,
-          workingHours: '9:00 AM - 5:00 PM',
-          rating: 4.8,
-          experience: '15 years'
-        },
-        {
-          id: 'D-002',
-          name: 'Dr. Sharma',
-          department: 'Orthopedics',
-          opdRoom: 'Room 102',
-          specialization: 'Orthopedic Surgeon',
-          qualification: 'MBBS, MS (Ortho)',
-          email: 'dr.sharma@health.com',
-          contact: '+91 9876543211',
-          isActive: true,
-          currentPatient: null,
-          queue: 0,
-          maxPatientsPerDay: 25,
-          consultationFee: 400,
-          workingHours: '10:00 AM - 6:00 PM',
-          rating: 4.5,
-          experience: '12 years'
-        },
-        {
-          id: 'D-003',
-          name: 'Dr. Menon',
-          department: 'Neurology',
-          opdRoom: 'Room 103',
-          specialization: 'Neurologist',
-          qualification: 'MBBS, MD, DM (Neurology)',
-          email: 'dr.menon@health.com',
-          contact: '+91 9876543212',
-          isActive: false,
-          currentPatient: null,
-          queue: 0,
-          maxPatientsPerDay: 20,
-          consultationFee: 600,
-          workingHours: '9:30 AM - 4:30 PM',
-          rating: 4.9,
-          experience: '18 years'
-        },
-        {
-          id: 'D-004',
-          name: 'Dr. Gupta',
-          department: 'General Medicine',
-          opdRoom: 'Room 104',
-          specialization: 'General Physician',
-          qualification: 'MBBS, MD (Medicine)',
-          email: 'dr.gupta@health.com',
-          contact: '+91 9876543213',
-          isActive: true,
-          currentPatient: null,
-          queue: 0,
-          maxPatientsPerDay: 40,
-          consultationFee: 300,
-          workingHours: '8:00 AM - 4:00 PM',
-          rating: 4.7,
-          experience: '10 years'
-        }
-      ];
+    try {
+      // 1. Fetch doctors from live API
+      const docRes = await apiFetch(DOCTOR_LIST);
+      const docData = await docRes.json().catch(() => ({}));
+      const doctorsList = docData.data?.doctors || docData.data || docData || [];
 
+      const mappedDoctors = Array.isArray(doctorsList) ? doctorsList.map(d => ({
+        id: d.id || d.doctor_id || `D-${Math.floor(100 + Math.random() * 900)}`,
+        name: d.name || `Dr. ${d.first_name || ''} ${d.last_name || ''}`.trim() || 'Dr. Unknown',
+        department: d.department || 'General Medicine',
+        opdRoom: d.opdRoom || d.room || d.opd_room || `Room ${Math.floor(101 + Math.random() * 20)}`,
+        specialization: d.specialization || d.doctor_specialization || 'General Physician',
+        qualification: d.qualification || 'MBBS',
+        email: d.email || 'doctor@health.com',
+        contact: d.phone || d.contact || '+91 9999999999',
+        isActive: d.status?.toLowerCase() === 'active' || d.isActive || true,
+        currentPatient: null,
+        queue: 0,
+        maxPatientsPerDay: d.maxPatientsPerDay || d.max_patients || 30,
+        consultationFee: d.consultationFee || d.consulting_fee || 300,
+        workingHours: d.workingHours || d.working_hours || '9:00 AM - 5:00 PM',
+        rating: d.rating || 4.5,
+        experience: d.experience ? `${d.experience} ${d.experienceUnit || 'years'}` : '10 years'
+      })) : [];
+
+      // 2. Populate patients with mapped live doctor info
       const initialPatients = [
         {
           id: 'OPD-001',
@@ -307,9 +342,9 @@ const OPDManagement = () => {
           token: 'T-101',
           waitingTime: '15 mins',
           status: 'Waiting',
-          assignedDoctorId: 'D-001',
-          doctor: 'Dr. Meena Rao',
-          department: 'Cardiology',
+          assignedDoctorId: mappedDoctors[0]?.id || 'D-001',
+          doctor: mappedDoctors[0]?.name || 'Dr. Meena Rao',
+          department: mappedDoctors[0]?.department || 'Cardiology',
           priority: 'Normal',
           queuePosition: 1,
           arrivalTime: '9:15 AM',
@@ -326,9 +361,9 @@ const OPDManagement = () => {
           token: 'T-102',
           waitingTime: '5 mins',
           status: 'In Consultation',
-          assignedDoctorId: 'D-001',
-          doctor: 'Dr. Meena Rao',
-          department: 'Cardiology',
+          assignedDoctorId: mappedDoctors[0]?.id || 'D-001',
+          doctor: mappedDoctors[0]?.name || 'Dr. Meena Rao',
+          department: mappedDoctors[0]?.department || 'Cardiology',
           priority: 'Normal',
           queuePosition: 0,
           arrivalTime: '9:00 AM',
@@ -364,17 +399,87 @@ const OPDManagement = () => {
           token: 'T-104',
           waitingTime: '0 mins',
           status: 'Completed',
-          assignedDoctorId: 'D-004',
-          doctor: 'Dr. Gupta',
-          department: 'General Medicine',
+          assignedDoctorId: mappedDoctors[3]?.id || mappedDoctors[0]?.id || 'D-004',
+          doctor: mappedDoctors[3]?.name || mappedDoctors[0]?.name || 'Dr. Gupta',
+          department: mappedDoctors[3]?.department || mappedDoctors[0]?.department || 'General Medicine',
           priority: 'Normal',
           queuePosition: 0,
           arrivalTime: '8:45 AM',
           bloodGroup: 'AB+',
           type: 'New Patient',
-          phoneNo: '+91 65432 10987'
+          visitType: 'New',
+          phoneNo: '+91 65432 10987',
+          tests: ['CBC', 'Blood Sugar', 'Widal Test', 'Dengue NS1'],
+          surgeries: ['Stitching'],
+          vitals: { bp: '110/70', pulse: '88', temperature: '102.4', spo2: '96', weight: '68', height: '172' },
+          diagnosis: 'Acute Viral Fever (Suspected Dengue)',
+          prescription: '1. Tab. Paracetamol 650mg - QID - 3 Days\n2. Syp. Caripill - 10ml - TDS - 5 Days\n3. ORS Liquids - 2 Liters daily',
+          medicationList: [
+            { name: 'Paracetamol 650mg', dosage: '1 Tab', duration: '3 Days', instruction: 'After Food', frequency: { morning: true, afternoon: true, night: true } },
+            { name: 'Caripill Syrup', dosage: '10ml', duration: '5 Days', instruction: 'After Food', frequency: { morning: true, afternoon: true, night: true } }
+          ],
+          medications: ['Paracetamol 650mg', 'Caripill Syrup'],
+          advice: 'Complete bed rest. Monitor platelet count daily. High fluid intake.',
+          history: 'No major past illness. Fever since 2 days.',
+          allergies: 'None known.'
+        },
+        {
+          id: 'OPD-004',
+          patientId: 'PAT-005',
+          patientName: 'Pooja Desai',
+          age: 40,
+          gender: 'Female',
+          token: 'T-105',
+          waitingTime: '0 mins',
+          status: 'Exited',
+          assignedDoctorId: 'D-002',
+          doctor: 'Dr. Sharma',
+          department: 'Orthopedics',
+          priority: 'Normal',
+          queuePosition: 1,
+          arrivalTime: '8:00 AM',
+          bloodGroup: 'B-',
+          type: 'Follow-up',
+          visitType: 'Follow-up',
+          phoneNo: '+91 98765 12345',
+          tests: ['X-Ray Left Ankle', 'Bone Density Test'],
+          vitals: { bp: '110/70', pulse: '75', temperature: '98.4', spo2: '99', weight: '60', height: '160' },
+          diagnosis: 'Grade 1 Ankle Sprain',
+          prescription: '1. Tab. Ibuprofen 400mg - BD - 3 Days\n2. Oint. Volini - Local Application\n3. Crepe Bandage Application',
+          medicationList: [
+            { name: 'Ibuprofen 400mg', dosage: '1 Tab', duration: '3 Days', instruction: 'After Meals', frequency: { morning: true, afternoon: false, night: true } },
+            { name: 'Volini Ointment', dosage: 'Apply', duration: '5 Days', instruction: 'Local Application', frequency: { morning: true, afternoon: false, night: true } }
+          ],
+          medications: ['Ibuprofen 400mg', 'Volini Ointment'],
+          advice: 'Rest for 2 days. Avoid heavy lifting. Keep ankle elevated.',
+          followUpRequired: true,
+          followUpDate: '21 May 2026'
+        },
+        {
+          id: 'OPD-005',
+          patientId: 'PAT-006',
+          patientName: 'Sanjay Dutt',
+          age: 52,
+          gender: 'Male',
+          token: 'E-101',
+          waitingTime: 'Immediate',
+          status: 'Waiting',
+          assignedDoctorId: 'D-004',
+          doctor: 'Dr. Gupta',
+          department: 'General Medicine',
+          priority: 'Urgent',
+          queuePosition: 0,
+          arrivalTime: '10:45 AM',
+          bloodGroup: 'O-',
+          visitType: 'Emergency',
+          phoneNo: '+91 99988 77766',
+          vitals: { bp: '90/60', pulse: '110', temperature: '98.6', spo2: '92', weight: '82', height: '180' }
         }
-      ];
+      ].map(p => ({
+        ...p,
+        waitingTime: calculateWaitingTime(p.queuePosition)
+      }));
+
 
       const doctorsWithQueue = initialDoctors.map(doctor => {
         const waitingPatients = initialPatients.filter(
@@ -394,18 +499,42 @@ const OPDManagement = () => {
 
       setDoctors(doctorsWithQueue);
       setOpdPatients(initialPatients);
+
+      // 3. Load initial patients for dropdown
+      await loadApiPatients('');
+    } catch (e) {
+      console.error('Error loading live OPD data:', e);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
-  const addTestRow = () => {
-    setConsultationForm(prev => ({
-      ...prev,
-      testsRecommended: [
-        ...prev.testsRecommended,
-        { id: prev.testsRecommended.length + 1, description: '', customDescription: '', samples: '', customSamples: '' }
-      ]
-    }));
+  {/* Add this function */ }
+  const handleOpenPaymentModal = (patient) => {
+    setSelectedPaymentPatient(patient);
+    setPaymentMethod('cash');
+    const doc = doctors.find(d => d.id === patient.assignedDoctorId);
+    // Add realistic dummy data if patient data is minimal
+    const dummyTests = patient.tests && patient.tests.length > 0
+      ? patient.tests.map(t => ({ name: t, fee: TEST_PRICES[t] || 450 }))
+      : [
+        { name: 'Complete Blood Count (CBC)', fee: 450 },
+        { name: 'Liver Function Test (LFT)', fee: 850 }
+      ];
+
+    setPaymentBillingData({
+      token: patient.token || 'TK-782',
+      patientName: patient.patientName || 'Aditya Sharma',
+      patientId: patient.patientId || 'UHID-2024-0012',
+      age: patient.age || '32',
+      gender: patient.gender || 'Male',
+      email: patient.email || 'aditya.sharma@example.com',
+      doctor: patient.doctor || doc?.name || 'Dr. Sameer Varma',
+      consultationFee: doc?.consultationFee || 500,
+      labTests: dummyTests
+    });
+
+    setShowPaymentModal(true);
   };
 
   const removeTestRow = (index) => {
@@ -2342,15 +2471,15 @@ const OPDManagement = () => {
                 </div>
                 {isPatientDropdownOpen && (
                   <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                    {REGISTERED_PATIENTS.filter(p =>
-                      p.name.toLowerCase().includes(patientSearchTerm.toLowerCase()) ||
-                      p.phoneNo.includes(patientSearchTerm) ||
-                      p.id.toLowerCase().includes(patientSearchTerm.toLowerCase())
+                    {(registeredPatients || []).filter(p =>
+                      (p.name || '').toLowerCase().includes((patientSearchTerm || '').toLowerCase()) ||
+                      (p.phoneNo || '').includes(patientSearchTerm) ||
+                      (p.id || '').toLowerCase().includes((patientSearchTerm || '').toLowerCase())
                     ).length > 0 ? (
-                      REGISTERED_PATIENTS.filter(p =>
-                        p.name.toLowerCase().includes(patientSearchTerm.toLowerCase()) ||
-                        p.phoneNo.includes(patientSearchTerm) ||
-                        p.id.toLowerCase().includes(patientSearchTerm.toLowerCase())
+                      (registeredPatients || []).filter(p =>
+                        (p.name || '').toLowerCase().includes((patientSearchTerm || '').toLowerCase()) ||
+                        (p.phoneNo || '').includes(patientSearchTerm) ||
+                        (p.id || '').toLowerCase().includes((patientSearchTerm || '').toLowerCase())
                       ).map(patient => (
                         <div
                           key={patient.id}
@@ -3065,23 +3194,527 @@ const OPDManagement = () => {
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
-              <button
-                onClick={() => {
-                  setShowDeactivateModal(false);
-                  setDoctorToDeactivate(null);
-                  setPatientsToReassign([]);
-                }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                No, Keep Active
-              </button>
-              <button
-                onClick={handleConfirmDeactivation}
-                className="px-6 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 shadow-md transition-all flex items-center gap-2"
-              >
-                <PowerSettingsNewIcon style={{ fontSize: 18 }} />
-                Confirm & Reassign
-              </button>
+              <button onClick={() => { setShowDeactivateModal(false); setDoctorToDeactivate(null); setPatientsToReassign([]); }} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">No, Keep Active</button>
+              <button onClick={handleConfirmDeactivation} className="px-6 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 shadow-md transition-all flex items-center gap-2"> <PowerSettingsNewIcon style={{ fontSize: 18 }} /> Confirm & Reassign </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal isOpen={showLabResultModal} onClose={() => setShowLabResultModal(false)} title="Clinical Investigation Report" size="lg" footer={selectedLabRecord && (
+        <div className="flex justify-end gap-3 px-4 pb-2">
+          <button className="px-6 py-2 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50 font-bold transition-colors text-sm tracking-widest" onClick={() => setShowLabResultModal(false)}> Close </button>
+        </div>
+      )}
+      >
+        {selectedLabRecord && (
+          <div className="space-y-6 py-2 px-1">
+            {/* Header Identity Section */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm relative overflow-hidden">
+
+              <div className="flex flex-col md:flex-row justify-between items-start relative z-10 gap-6">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-blue-600 mb-2">
+                    <ScienceIcon sx={{ fontSize: 16 }} />
+                    <span className="text-[10px] font-black tracking-widest">Central Laboratory Services</span>
+                  </div>
+                  <h3 className="text-2xl font-black text-black tracking-tight leading-none ">{selectedLabRecord.patientName}</h3>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-bold text-blue-600 border border-blue-100 px-2 py-0.5 rounded">ID: {selectedLabRecord.patientId}</span>
+                    <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                    <span className="text-[10px] font-black text-gray-500 tracking-wider">{selectedLabRecord.age}Y / {selectedLabRecord.gender}</span>
+                  </div>
+                </div>
+                <div className="md:text-right space-y-3">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 text-blue-600 rounded-lg text-[10px] font-black ">
+                    <CheckCircleIcon sx={{ fontSize: 14 }} /> Report Verified
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-gray-400 tracking-widest">Date: <span className="text-black font-black">{selectedLabRecord.date}</span></p>
+                    <p className="text-[10px] font-black text-blue-600 tracking-widest italic">REF ID: {selectedLabRecord.reportId}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Investigation Table */}
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+              <div className="bg-white px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+                <ScienceIcon sx={{ fontSize: 16 }} className="text-blue-600" />
+                <h4 className="text-[10px] font-black text-black tracking-widest">Ordered Investigations</h4>
+              </div>
+              <div className="max-h-[280px] overflow-y-auto">
+                <table className="w-full text-left border-collapse table-fixed">
+                  <thead className="sticky top-0 z-20 bg-gray-50/50 border-b border-gray-100">
+                    <tr>
+                      <th className="w-2/3 px-6 py-4 text-[10px] font-black text-gray-400 tracking-widest">Investigation Identity & Details</th>
+                      <th className="w-1/3 px-6 py-4 text-[10px] font-black text-gray-400 tracking-widest text-right">Fulfillment Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50 bg-white">
+                    {(() => {
+                      const prescribed = (selectedLabRecord.prescribedTests || '').split(',').map(s => s.trim()).filter(Boolean);
+                      const performed = (selectedLabRecord.performedTests || '').split(',').map(s => s.trim()).filter(Boolean);
+                      const allTests = Array.from(new Set([...prescribed, ...performed]));
+
+                      if (allTests.length === 0) return (
+                        <tr>
+                          <td colSpan="2" className="px-6 py-12 text-center text-gray-400 italic text-sm font-medium">No investigations recorded for this order.</td>
+                        </tr>
+                      );
+
+                      return allTests.map((test, idx) => {
+                        const isPrescribed = prescribed.includes(test);
+                        const isPerformed = performed.includes(test);
+
+                        return (
+                          <tr key={idx} className="hover:bg-gray-50/50 transition-colors group">
+                            <td className="px-6 py-4">
+                              <div className="flex items-start gap-4">
+                                <div className="w-10 h-10 border border-gray-100 rounded-xl flex items-center justify-center text-blue-600 bg-white shadow-sm">
+                                  <ScienceIcon sx={{ fontSize: 18 }} />
+                                </div>
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-sm font-black text-black tracking-tight leading-none ">{test}</p>
+                                    <span className="text-[8px] font-black text-blue-600">
+                                      {test.length > 5 ? 'PANEL' : 'SPECIFIC'}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <p className="text-[9px] font-bold text-gray-400">{isPrescribed ? 'Physician Ordered' : 'Laboratory Add-on'}</p>
+                                    <span className="w-1 h-1 bg-gray-200 rounded-full"></span>
+                                    <p className="text-[9px] font-black text-blue-600">Code: {idx + 101}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex justify-end">
+                                {isPerformed ? (
+                                  <div className="inline-flex items-center gap-1.5 px-3 py-1 text-black">
+                                    <CheckCircleIcon sx={{ fontSize: 14 }} />
+                                    <span className="text-[10px] font-black">Completed</span>
+                                  </div>
+                                ) : (
+                                  <div className="inline-flex items-center gap-1.5 px-3 py-1 text-gray-500">
+                                    <AccessTimeIcon sx={{ fontSize: 14 }} />
+                                    <span className="text-[10px] font-black tracking-widest">Pending</span>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Technical Validation & Notes */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="flex items-center gap-4 p-5 rounded-2xl border border-gray-200 bg-white shadow-sm">
+                <div className="w-12 h-12 border border-gray-100 rounded-xl flex items-center justify-center text-blue-600 bg-blue-50/30"> <ScienceIcon sx={{ fontSize: 20 }} /> </div>
+                <div className="space-y-1">
+                  <p className="text-[9px] font-black text-gray-400 tracking-widest">Validated & Signed By</p>
+                  <p className="text-sm font-black text-black">{selectedLabRecord.uploadedBy}</p>
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircleIcon sx={{ fontSize: 12 }} className="text-blue-600" />
+                    <span className="text-[9px] font-black text-blue-600 tracking-widest">Digital Signature Verified</span>
+                  </div>
+                </div>
+              </div>
+              <div className="p-5 rounded-2xl border border-gray-200 bg-gray-50/50 relative overflow-hidden shadow-sm flex items-center">
+                <div className="absolute top-0 right-0 w-8 h-8 flex items-center justify-center text-blue-600 opacity-20"> <InfoIcon sx={{ fontSize: 24 }} /> </div>
+                <div className="relative z-10 flex gap-3">
+                  <p className="text-[10px] font-bold text-gray-500 italic">
+                    Note: These results should be correlated with clinical findings by the consulting physician. Laboratory results are subject to biological variations.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Results Interpretation */}
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden border-t-4 border-t-blue-600">
+              <div className="bg-white px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+                <AssessmentIcon sx={{ fontSize: 16 }} className="text-blue-600" />
+                <h4 className="text-[10px] font-black text-black tracking-widest">Clinical Interpretation</h4>
+              </div>
+              <div className="p-8 bg-gray-50/30">
+                <p className="text-lg font-black text-black text-center leading-relaxed italic">
+                  "{selectedLabRecord.result}"
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Pharmacy Details Modal */}
+      <Modal isOpen={showPharmacyModal} onClose={() => setShowPharmacyModal(false)} title="Prescription Dispensing Record" size="lg" footer={selectedPharmacyRecord && (
+        <div className="flex justify-end gap-3 px-4 pb-2">
+          <button className="px-6 py-2 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50 font-bold transition-colors text-sm tracking-widest" onClick={() => setShowPharmacyModal(false)}> Close </button>
+          <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md flex items-center text-sm font-bold tracking-widest" onClick={() => { alert('Dispensing medications for ' + selectedPharmacyRecord.patientName); setShowPharmacyModal(false); }}> <CheckCircleIcon className="mr-2" fontSize="small" /> Confirm Dispense </button>
+        </div>
+      )}>
+        {selectedPharmacyRecord && (
+          <div className="space-y-6 py-2 px-1">
+            {/* Header Identity Section */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm relative overflow-hidden">
+              <div className="flex flex-col md:flex-row justify-between items-start relative z-10 gap-6">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-blue-600 mb-1">
+                    <MedicationIcon sx={{ fontSize: 16 }} />
+                    <span className="text-[10px] font-black tracking-widest uppercase">Pharmacy Services</span>
+                  </div>
+                  <h3 className="text-2xl font-black text-black tracking-tight leading-none ">{selectedPharmacyRecord.patientName}</h3>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-bold text-blue-600 border border-blue-100 px-2 py-0.5 rounded">ID: {selectedPharmacyRecord.patientId}</span>
+                    <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                    <span className="text-[10px] font-black text-gray-500 tracking-wider">{selectedPharmacyRecord.age}Y / {selectedPharmacyRecord.gender}</span>
+                  </div>
+                </div>
+                <div className="md:text-right space-y-3">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 text-blue-600 rounded-lg text-[10px] font-black ">
+                    <CheckCircleIcon sx={{ fontSize: 14 }} /> Ready to Dispense
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase">Prescribed By</p>
+                    <p className="text-sm font-black text-black leading-none">{selectedPharmacyRecord.doctor}</p>
+                    <p className="text-[10px] font-bold text-blue-600 tracking-widest">{selectedPharmacyRecord.department}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Inventory & Schedule */}
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+              <div className="bg-white px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MedicationIcon sx={{ fontSize: 16 }} className="text-blue-600" />
+                  <h4 className="text-[10px] font-black text-black tracking-widest uppercase">Medication Inventory</h4>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-orange-600"></span><span className="text-[9px] font-bold text-gray-500">Morning</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-500"></span><span className="text-[9px] font-bold text-gray-500">Afternoon</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-600"></span><span className="text-[9px] font-bold text-gray-500">Night</span></div>
+                </div>
+              </div>
+
+              <div className="p-4 space-y-4 max-h-[420px] overflow-y-auto">
+                {selectedPharmacyRecord.prescriptions.map((med, idx) => (
+                  <div key={idx} className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col lg:flex-row lg:items-center gap-6 hover:border-black transition-all shadow-sm">
+                    {/* Med Name & Duration */}
+                    <div className="flex-1 flex gap-4 items-center">
+                      <div className="w-9 h-9 border border-gray-200 bg-gray-50 rounded-lg flex items-center justify-center text-black font-black text-base">
+                        {idx + 1}
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-base font-black text-black leading-tight">{med.name}</p>
+                          <span className="text-[8px] font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded tracking-widest uppercase">
+                            {med.type || 'Medication'}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-bold text-gray-400 tracking-widest uppercase">Dosage:</span>
+                            <span className="text-[10px] font-black text-black">{med.dosage || 'As Directed'}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-bold text-gray-400 tracking-widest uppercase">Duration:</span>
+                            <span className="text-[10px] font-black text-blue-600 tracking-widest">{med.duration}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Schedule Side-by-Side - Reduced Size */}
+                    <div className="flex items-center gap-2">
+                      <div className={`w-11 h-12 rounded-lg flex flex-col items-center justify-center border transition-all ${med.morning ? 'border-orange-600 bg-orange-600 text-white shadow-md' : 'border-gray-100 bg-gray-50 text-gray-300'}`}>
+                        <span className="text-[7px] font-black tracking-tighter mb-0.5">MORN</span>
+                        <span className="text-base font-black leading-none">{med.morning ? '1' : '0'}</span>
+                      </div>
+                      <div className={`w-11 h-12 rounded-lg flex flex-col items-center justify-center border transition-all ${med.afternoon ? 'border-yellow-500 bg-yellow-500 text-white shadow-md' : 'border-gray-100 bg-gray-50 text-gray-300'}`}>
+                        <span className="text-[7px] font-black tracking-tighter mb-0.5">AFTN</span>
+                        <span className="text-base font-black leading-none">{med.afternoon ? '1' : '0'}</span>
+                      </div>
+                      <div className={`w-11 h-12 rounded-lg flex flex-col items-center justify-center border transition-all ${med.night ? 'border-indigo-600 bg-indigo-600 text-white shadow-md' : 'border-gray-100 bg-gray-50 text-gray-300'}`}>
+                        <span className="text-[7px] font-black tracking-tighter mb-0.5">NGHT</span>
+                        <span className="text-base font-black leading-none">{med.night ? '1' : '0'}</span>
+                      </div>
+                    </div>
+
+                    {/* Instructions Box */}
+                    <div className="lg:w-48 p-3 rounded-xl border border-gray-100 bg-gray-50/50 flex flex-col justify-center">
+                      <p className="text-[8px] font-black text-gray-400 tracking-widest mb-1 uppercase">Instructions</p>
+                      <p className="text-[10px] font-bold text-black leading-tight italic">"{med.instruction}"</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Queue Details / Modify Modal */}
+      <Modal
+        isOpen={showQueueDetailModal}
+        onClose={() => setShowQueueDetailModal(false)}
+        title="Manage Patient Queue Details"
+        size="lg"
+        footer={selectedQueuePatient && (
+          <div className="flex flex-col sm:flex-row gap-4 w-full">
+            <button className="flex-1 py-4 bg-gray-900 text-white rounded-2xl font-black text-xs tracking-[0.2em] hover:bg-black transition-all shadow-xl shadow-gray-200 flex items-center justify-center gap-3" onClick={() => { alert('Updating patient records...'); setShowQueueDetailModal(false); }}>Save All Changes
+            </button>
+            <button className="flex-1 py-4 border-2 border-red-100 text-red-600 rounded-2xl font-black text-xs tracking-[0.2em] hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-3 group" onClick={() => { setSelectedExitPatient(selectedQueuePatient); setShowExitModal(true); }}>  <ExitToAppIcon className="group-hover:translate-x-1 transition-transform" /> Complete & Exit Patient
+            </button>
+          </div>
+        )}
+      >
+        {selectedQueuePatient && (
+          <div className="space-y-8 py-2">
+            {/* Patient Identity Header */}
+            <div className="flex items-center gap-6 pb-6 border-b border-gray-100">
+              <div className="w-20 h-20 bg-blue-50 rounded-3xl flex items-center justify-center text-blue-600 shadow-inner"><PersonIcon sx={{ fontSize: 40 }} /> </div>
+              <div className="flex-1">
+                <h3 className="text-2xl font-black text-gray-900 leading-tight">{selectedQueuePatient.patientName}</h3>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                  <span className="text-xs font-bold text-gray-400 tracking-widest">UHID: {selectedQueuePatient.patientId}</span>
+                  <span className="text-xs font-bold text-gray-400 tracking-widest">•</span>
+                  <span className="text-xs font-bold text-blue-600 tracking-widest">Token: {selectedQueuePatient.token}</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black tracking-widest border-2 ${selectedQueuePatient.priority === 'Urgent' ? 'bg-red-50 border-red-200 text-red-600' : 'bg-emerald-50 border-emerald-200 text-emerald-600'}`}> {selectedQueuePatient.priority} Priority </span>
+              </div>
+            </div>
+
+            {/* Editable Fields Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Assigned Department</label>
+                <select className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl text-sm font-bold text-gray-800 focus:border-blue-600 focus:bg-white transition-all outline-none">
+                  <option>{selectedQueuePatient.department}</option>
+                  <option>Cardiology</option>
+                  <option>Orthopedics</option>
+                  <option>Neurology</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Consulting Doctor</label>
+                <select className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl text-sm font-bold text-gray-800 focus:border-blue-600 focus:bg-white transition-all outline-none">
+                  <option>{selectedQueuePatient.doctor}</option>
+                  {AVAILABLE_DOCTORS.map(doc => <option key={doc.name}>{doc.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Queue Priority</label>
+                <div className="flex gap-3">
+                  <button className={`flex-1 py-3 rounded-xl border-2 font-black text-[10px] tracking-widest transition-all ${selectedQueuePatient.priority === 'Normal' ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200'}`}>Normal</button>
+                  <button className={`flex-1 py-3 rounded-xl border-2 font-black text-[10px] tracking-widest transition-all ${selectedQueuePatient.priority === 'Urgent' ? 'bg-red-600 border-red-600 text-white shadow-lg shadow-red-100' : 'bg-white border-gray-100 text-gray-400 hover:border-red-200'}`}>Urgent</button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Current Status</label>
+                <div className="p-4 bg-blue-50 border-2 border-blue-100 rounded-2xl text-sm font-black text-blue-700 flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
+                  Waiting in Queue
+                </div>
+              </div>
+            </div>
+
+            {/* Vital Signs (Editable Mini Cards) */}
+            <div className="space-y-4">
+              <h4 className="text-[10px] font-black text-gray-900 tracking-[0.2em] mb-4">Patient Vital Signs</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { label: 'BP', value: '120/80', unit: 'mmHg' },
+                  { label: 'Pulse', value: '72', unit: 'bpm' },
+                  { label: 'Temp', value: '98.6', unit: '°F' },
+                  { label: 'SpO2', value: '98', unit: '%' }
+                ].map((vital, idx) => (
+                  <div key={idx} className="p-4 bg-white border-2 border-gray-50 rounded-2xl hover:border-blue-100 transition-colors">
+                    <p className="text-[8px] font-black text-gray-400 tracking-widest mb-1">{vital.label}</p>
+                    <input type="text" defaultValue={vital.value} className="w-full bg-transparent text-sm font-black text-gray-800 outline-none" />
+                    <p className="text-[8px] font-bold text-gray-400 mt-1">{vital.unit}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Patient Journey Stepper */}
+            <div className="bg-gray-50 rounded-3xl p-6 border border-gray-100">
+              <h4 className="text-[10px] font-black text-gray-900 tracking-[0.2em] mb-6">OPD Workflow Progress</h4>
+              <div className="flex items-center justify-between relative px-2">
+                <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-200 -translate-y-1/2 z-0"></div>
+                <div className="absolute top-1/2 left-0 w-1/3 h-1 bg-blue-600 -translate-y-1/2 z-0 transition-all duration-1000"></div>
+                {[
+                  { label: 'Reg', status: 'done' },
+                  { label: 'Consult', status: 'current' },
+                  { label: 'Lab/Diag', status: 'pending' },
+                  { label: 'Pharmacy', status: 'pending' },
+                  { label: 'Billing', status: 'pending' }
+                ].map((step, idx) => (
+                  <div key={idx} className="relative z-10 flex flex-col items-center">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border-4 transition-all duration-500 ${step.status === 'done' ? 'bg-blue-600 border-blue-100 text-white' : step.status === 'current' ? 'bg-white border-blue-600 text-blue-600' : 'bg-white border-gray-200 text-gray-400'}`}>
+                      {step.status === 'done' ? <CheckIcon sx={{ fontSize: 14 }} /> : <span className="text-[10px] font-black">{idx + 1}</span>}
+                    </div>
+                    <span className={`text-[8px] font-black tracking-widest mt-2 ${step.status === 'pending' ? 'text-gray-400' : 'text-gray-900'}`}>{step.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Patient Exit Modal */}
+      <Modal
+        isOpen={showExitModal}
+        onClose={() => setShowExitModal(false)}
+        title="Finalize Patient Exit"
+        size="lg"
+        footer={selectedExitPatient && (
+          <div className="flex flex-col sm:flex-row gap-4 w-full">
+            <button
+              className="flex-1 py-4 border-2 border-gray-100 text-gray-400 rounded-2xl font-black text-xs tracking-widest hover:border-gray-900 hover:text-gray-900 transition-all"
+              onClick={() => setShowExitModal(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className={`flex-1 py-4 rounded-2xl font-black text-xs tracking-widest transition-all shadow-xl flex items-center justify-center gap-2 ${exitForm.billingStatus === 'Paid' ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+              disabled={exitForm.billingStatus !== 'Paid'}
+              onClick={() => { handlePatientExit(selectedExitPatient); setShowExitModal(false); }}
+            >
+              <CheckCircleIcon sx={{ fontSize: 18 }} /> Complete & Exit
+            </button>
+          </div>
+        )}
+      >
+        {selectedExitPatient && (
+          <div className="space-y-6">
+            {/* Sticky Patient Identity Header */}
+            <div className="sticky -top-6 bg-white z-10 flex items-center gap-4 pb-4 border-b border-gray-100 -mx-6 px-6 pt-2">
+              <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 shadow-inner shrink-0">
+                <PersonIcon sx={{ fontSize: 32 }} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-gray-900 leading-tight">{selectedExitPatient.patientName}</h3>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded tracking-widest border border-blue-100 ">UHID: {selectedExitPatient.patientId}</span>
+                  <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                  <span className="text-[10px] font-black text-gray-400 tracking-widest ">Token: {selectedExitPatient.token}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Scrollable Content Area */}
+            <div className="space-y-6">
+              {/* Clinical Summary */}
+              <div className="bg-blue-50/30 rounded-3xl p-6 border border-blue-100 space-y-6">
+                <div className="flex items-center justify-between border-b border-blue-100 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-50"> <MedicalServicesIcon sx={{ fontSize: 20 }} /> </div>
+                    <div>
+                      <p className="text-[10px] font-black text-gray-400 tracking-widest">Consulting Doctor</p>
+                      <p className="text-sm font-black text-gray-900">{selectedExitPatient.doctor || 'Not Assigned'}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-gray-400 tracking-widest">Department</p>
+                    <p className="text-sm font-black text-blue-600 tracking-widest">{selectedExitPatient.department || 'OPD'}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Medications */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 mb-1"> <MedicationIcon className="text-emerald-500" sx={{ fontSize: 18 }} /> <h4 className="text-[10px] font-black text-gray-900 tracking-widest">Prescribed Medications</h4></div>
+                    <div className="space-y-2">
+                      {selectedExitPatient.medications && selectedExitPatient.medications.length > 0 ? (
+                        selectedExitPatient.medications.map((med, idx) => (
+                          <div key={idx} className="flex items-center justify-between bg-white/60 p-3 rounded-2xl border border-white shadow-sm backdrop-blur-sm">
+                            <span className="text-xs font-bold text-gray-800">{med}</span>
+                            <span className="text-[10px] font-black text-gray-400 ">1-0-1</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-4 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200 text-center">
+                          <p className="text-[10px] font-bold text-gray-400 italic">No Medications Recorded</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tests */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 mb-1"> <ScienceIcon className="text-orange-500" sx={{ fontSize: 18 }} /> <h4 className="text-[10px] font-black text-gray-900 tracking-widest">Diagnostic Investigations</h4></div>
+                    <div className="space-y-2">
+                      {selectedExitPatient.tests && selectedExitPatient.tests.length > 0 ? (
+                        selectedExitPatient.tests.map((test, idx) => (
+                          <div key={idx} className="flex items-center justify-between bg-white/60 p-3 rounded-2xl border border-white shadow-sm backdrop-blur-sm group">
+                            <div> <p className="text-xs font-bold text-gray-800">{test}</p> <p className="text-[9px] font-black text-orange-600 tracking-widest">Est. ₹{(200 + (idx * 150)).toFixed(2)}</p> </div>
+                            <button className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm" title="Download Requisition" onClick={() => alert(`Downloading Requisition for ${test}...`)}> <PrintIcon sx={{ fontSize: 14 }} /> </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-4 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200 text-center"> <p className="text-[10px] font-bold text-gray-400 italic">No Tests Recommended</p></div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Billing, Follow-up, Remarks */}
+              <div className="space-y-6 pb-4">
+                {/* Billing Status */}
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 tracking-widest block mb-2 ml-1">Billing & Payment Check</label>
+                  <div className={`p-4 rounded-2xl border-2 flex items-center justify-between transition-all ${exitForm.billingStatus === 'Paid' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-red-50 border-red-100 text-red-700'}`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${exitForm.billingStatus === 'Paid' ? 'bg-emerald-100' : 'bg-red-100'}`}> <PaymentsIcon sx={{ fontSize: 20 }} /> </div>
+                      <div> <p className="text-[10px] font-black tracking-widest opacity-60">Final Checkout Amount</p>
+                        <p className="font-bold text-sm"> {exitForm.billingStatus === 'Paid' ? 'Fully Paid' : 'Pending: ₹1,450.00'} </p> </div>
+                    </div>
+                    {exitForm.billingStatus !== 'Paid' && (
+                      <button className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-black tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-100" onClick={() => setExitForm({ ...exitForm, billingStatus: 'Paid' })} > Pay Now </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Follow-up Section */}
+                <div className="bg-gray-50 p-5 rounded-3xl border border-gray-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <label className="text-[10px] font-black text-gray-900 tracking-widest block">Follow-up Required?</label>
+                      <p className="text-[10px] text-gray-500 font-medium mt-0.5">Based on doctor's recommendation</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" className="sr-only peer" checked={exitForm.followUpRequired} onChange={(e) => setExitForm({ ...exitForm, followUpRequired: e.target.checked })} />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  {exitForm.followUpRequired && (
+                    <div className="space-y-2 mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Suggested Re-visit Date</label>
+                      <div className="relative">
+                        <input type="date" className="w-full p-4 bg-white border-2 border-gray-100 rounded-2xl text-sm font-bold text-gray-800 focus:border-blue-600 transition-all outline-none" value={exitForm.followUpDate} onChange={(e) => setExitForm({ ...exitForm, followUpDate: e.target.value })} /> <CalendarMonthIcon className="absolute right-4 top-4 text-gray-400" /> </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Remarks */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Exit Remarks / Notes</label>
+                  <textarea className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl text-sm font-bold text-gray-800 focus:border-blue-600 focus:bg-white transition-all outline-none min-h-[100px] resize-none" placeholder="Any final instructions for the patient or internal notes..." value={exitForm.remarks} onChange={(e) => setExitForm({ ...exitForm, remarks: e.target.value })} ></textarea>
+                </div>
+              </div>
             </div>
           </div>
         )}
