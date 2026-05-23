@@ -15,7 +15,6 @@ import {
 } from '@mui/icons-material';
 import { apiFetch } from '../../../../services/apiClient';
 import {
-  DEPARTMENT_LIST,
   DOCTOR_LIST,
   RECEPTIONIST_PATIENT_SEARCH
 } from '../../../../config/api';
