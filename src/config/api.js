@@ -162,6 +162,10 @@ export const DOCTOR_SCHEDULE_CREATE = '/api/v1/doctor-management/schedule/create
 export const DOCTOR_SCHEDULE_SLOT_DETAILS = (scheduleId) => `/api/v1/doctor-management/schedule/${encodeURIComponent(scheduleId)}`;
 export const DOCTOR_STATISTICS_SUMMARY = (period = 'month') => `/api/v1/doctor-management/statistics/summary?period=${period}`;
 
+/** Doctor: profile management */
+export const DOCTOR_PROFILE = '/api/v1/doctor-sidebar/profile';
+export const DOCTOR_PROFILE_UPDATE = '/api/v1/doctor-sidebar/profile';
+
 /** Doctor: reports and analytics */
 export const DOCTOR_REPORTS_PRACTICE_OVERVIEW = '/api/v1/doctor-management/reports/practice-overview';
 export const DOCTOR_REPORTS_PATIENT_ANALYTICS = '/api/v1/doctor-management/reports/patient-analytics';

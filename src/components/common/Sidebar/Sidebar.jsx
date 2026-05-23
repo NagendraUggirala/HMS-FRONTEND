@@ -44,7 +44,7 @@ const Sidebar = ({ activePage, onPageChange, isOpen = false, onClose }) => {
     { id: 'prescriptions', label: 'Prescriptions', icon: 'fa-prescription-bottle-medical' },
     { id: 'labs', label: 'Lab Results', icon: 'fa-flask' },
     { id: 'inpatient', label: 'Inpatient Visits', icon: 'fa-procedures' },
-    { id: 'discharge', label: 'Discharge Summary', icon: 'fa-file-contract' },
+    //{ id: 'discharge', label: 'Discharge Summary', icon: 'fa-file-contract' },
     { id: 'messages', label: 'Messaging', icon: 'fa-comments' },
     { id: 'reports-analytics', label: 'Reports & Analytics', icon: 'fa-chart-pie' },
     { id: 'profile', label: 'My Profile', icon: 'fa-user-md' },
