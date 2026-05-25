@@ -226,6 +226,21 @@ export const PRESCRIPTION_DETAILS = (prescriptionId) => `/api/v1/simple-prescrip
 export const PRESCRIPTION_PDF_DOWNLOAD = (prescriptionId) => `/api/v1/simple-prescription/prescriptions/${encodeURIComponent(prescriptionId)}/pdf`;
 /** Receptionist: patient management */
 export const RECEPTIONIST_PATIENTS = '/api/v1/receptionist/patients';
+
+/** Receptionist: appointment management */
+export const RECEPTIONIST_APPOINTMENTS_SCHEDULE = '/api/v1/receptionist/appointments/schedule';
+export const RECEPTIONIST_APPOINTMENTS_TODAY = '/api/v1/receptionist/appointments/today';
+export const RECEPTIONIST_APPOINTMENTS_REF = (appointmentRef) => `/api/v1/receptionist/appointments/${encodeURIComponent(appointmentRef)}`;
+export const RECEPTIONIST_APPOINTMENTS_STATUS = (appointmentRef) => `/api/v1/receptionist/appointments/${encodeURIComponent(appointmentRef)}/status`;
+export const RECEPTIONIST_APPOINTMENTS_CANCEL = (appointmentRef) => `/api/v1/receptionist/appointments/${encodeURIComponent(appointmentRef)}/cancel`;
+export const RECEPTIONIST_APPOINTMENTS_CHECK_IN = (appointmentRef) => `/api/v1/receptionist/appointments/${encodeURIComponent(appointmentRef)}/check-in`;
+export const RECEPTIONIST_APPOINTMENTS_STATISTICS = '/api/v1/receptionist/appointments/statistics';
+export const RECEPTIONIST_APPOINTMENTS_AVAILABLE_SLOTS = '/api/v1/receptionist/appointments/available-slots';
+export const PUBLIC_APPOINTMENTS_AVAILABLE_SLOTS = '/api/v1/appointments/available-slots';
+export const RECEPTIONIST_APPOINTMENTS_QUEUE = '/api/v1/receptionist/appointments/queue';
+export const RECEPTIONIST_APPOINTMENTS_STATUS_SUMMARY = '/api/v1/receptionist/appointments/status-summary';
+export const STAFF_DOCTOR_SCHEDULES = (doctorName) => `/api/v1/staff/doctor-schedules/${encodeURIComponent(doctorName)}`;
+export const RECEPTIONIST_QUICK_ACTIONS = '/api/v1/receptionist/quick-actions';
 // --- PHARMACY REPORTS ---
 export const PHARMACY_REPORTS_BASE = '/api/v1/pharmacy/reports';
 export const PHARMACY_REPORTS_SALES_SUMMARY = `${PHARMACY_REPORTS_BASE}/sales-summary`;
@@ -278,22 +293,4 @@ export const LAB_EQUIPMENT_QC_BASE = `${LAB_BASE}/equipment-qc/equipment`;
 export const LAB_EQUIPMENT_DETAILS = (id) => `${LAB_EQUIPMENT_QC_BASE}/${encodeURIComponent(id)}`;
 export const LAB_EQUIPMENT_LOGS = (id) => `${LAB_EQUIPMENT_QC_BASE}/${encodeURIComponent(id)}/logs`;
 export const LAB_EQUIPMENT_STATUS = (id) => `${LAB_EQUIPMENT_QC_BASE}/${encodeURIComponent(id)}/status`;
-
-// --- OPD MANAGEMENT ---
-export const OPD_PATIENT_CREATE = '/api/v1/opd/patient';
-export const OPD_TOKENS = '/api/v1/opd/tokens';
-export const OPD_TOKEN_DETAILS = (id) => `/api/v1/opd/tokens/${encodeURIComponent(id)}`;
-export const OPD_PATIENTS_LIST = '/api/v1/opd/patients';
-export const OPD_PATIENT_STATUS = (visitId) => `/api/v1/opd/patient/${encodeURIComponent(visitId)}/status`;
-export const OPD_PATIENT_DELETE = (visitId) => `/api/v1/opd/patient/${encodeURIComponent(visitId)}`;
-export const OPD_DOCTORS = '/api/v1/opd/doctors';
-export const OPD_DOCTOR_CONFIG = '/api/v1/opd/doctor';
-export const OPD_DOCTOR_TOGGLE_STATUS = (doctorUserId) => `/api/v1/opd/doctor/${encodeURIComponent(doctorUserId)}/toggle-status`;
-export const OPD_CONSULTATION = '/api/v1/opd/consultation';
-export const OPD_CONSULTATION_START = '/api/v1/opd/consultations/start';
-export const OPD_CONSULTATION_COMPLETE = (id) => `/api/v1/opd/consultations/${encodeURIComponent(id)}/complete`;
-export const OPD_CONSULTATION_DETAILS = (id) => `/api/v1/opd/consultations/${encodeURIComponent(id)}`;
-export const OPD_CONSULTATION_BY_PATIENT = (patientId) => `/api/v1/opd/consultation/${encodeURIComponent(patientId)}`;
-export const OPD_TRANSFER = '/api/v1/opd/transfer';
-export const OPD_TRANSFER_PATIENT = '/api/v1/opd/transfer-patient';
-export const OPD_DASHBOARD_STATS = '/api/v1/opd/dashboard';
+ 

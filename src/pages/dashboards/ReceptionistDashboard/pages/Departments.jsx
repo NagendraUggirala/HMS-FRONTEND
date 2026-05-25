@@ -471,7 +471,7 @@ const Departments = () => {
                             </div>
                             {formData.emergencyAvailable && (
                                 <div className="flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-600 rounded-xl border border-rose-100 h-fit">
-                                    <span className="text-[10px] font-black tracking-wider   ">Emergency Ready</span>
+                                    <span className="text-[10px] font-black tracking-wider">Emergency Ready</span>
                                 </div>
                             )}
                         </div>
@@ -482,7 +482,7 @@ const Departments = () => {
                             <div className="col-span-1 md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
                                     <div className="flex items-center gap-3 mb-3">
-                                        <span className="text-[10px] font-black text-slate-400 tracking-widest   ">Clinical Capacity</span>
+                                        <span className="text-[10px] font-black text-slate-400 tracking-widest">Clinical Capacity</span>
                                     </div>
                                     <div className="flex items-end gap-2">
                                         <span className="text-2xl font-bold text-slate-800">{formData.availableBeds}</span>
@@ -492,16 +492,16 @@ const Departments = () => {
 
                                 <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
                                     <div className="flex items-center gap-3 mb-3">
-                                        <span className="text-[10px] font-black text-slate-400 tracking-widest   ">Staff Strength</span>
+                                        <span className="text-[10px] font-black text-slate-400 tracking-widest">Staff Strength</span>
                                     </div>
                                     <div className="flex gap-6">
                                         <div>
                                             <p className="text-xl font-bold text-slate-800">{formData.doctorCount}</p>
-                                            <p className="text-[9px] font-black text-slate-400   ">Doctors</p>
+                                            <p className="text-[9px] font-black text-slate-400">Doctors</p>
                                         </div>
                                         <div>
                                             <p className="text-xl font-bold text-slate-800">{formData.nurseCount}</p>
-                                            <p className="text-[9px] font-black text-slate-400   ">Nurses</p>
+                                            <p className="text-[9px] font-black text-slate-400">Nurses</p>
                                         </div>
                                     </div>
                                 </div>
