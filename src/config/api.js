@@ -218,9 +218,6 @@ export const PRESCRIPTION_DOCTOR_LIST = '/api/v1/simple-prescription/doctor/pres
 /** Prescription Management - Pharmacist endpoints */
 export const PRESCRIPTION_PHARMACIST_LIST = '/api/v1/simple-prescription/pharmacist/prescriptions';
 export const PRESCRIPTION_DISPENSE = (prescriptionId) => `/api/v1/simple-prescription/pharmacist/prescriptions/${encodeURIComponent(prescriptionId)}/dispense`;
-/** Prescription Management - Pharmacist endpoints */
-export const PRESCRIPTION_PHARMACIST_LIST = '/api/v1/simple-prescription/pharmacist/prescriptions';
-export const PRESCRIPTION_DISPENSE = (prescriptionId) => `/api/v1/simple-prescription/pharmacist/prescriptions/${encodeURIComponent(prescriptionId)}/dispense`;
 /** Prescription Management - Patient endpoints */
 export const PRESCRIPTION_PATIENT_LIST = '/api/v1/simple-prescription/patient/prescriptions';
 
@@ -254,19 +251,7 @@ export const PHARMACY_SETTINGS_BASE = '/api/v1/pharmacy/settings';
 export const NURSE_BASE = '/api/v1/nurse';
 // NURSE DASHBOARD APIs
 export const NURSE_DASHBOARD_OVERVIEW = '/api/v1/nurse/dashboard';
-export const NURSE_ADD_VITALS = '/api/v1/nurse/vitals';
 
-export const NURSE_GET_VITALS = '/api/v1/nurse/vitals';
-
-export const NURSE_ASSIGNED_PATIENTS = '/api/v1/nurse/assigned-patients';
-
-export const NURSE_MEDICATIONS = '/api/v1/nurse/medications';
-
-export const NURSE_BEDS = '/api/v1/nurse/beds';
-
-export const NURSE_LAB_TESTS = '/api/v1/nurse/lab-tests';
-
-export const NURSE_NURSING_NOTES = '/api/v1/nurse/nursing-notes';
 export const NURSE_ADD_VITALS = '/api/v1/nurse/vitals';
 export const NURSE_GET_VITALS = '/api/v1/nurse/vitals';
 export const NURSE_UPDATE_VITALS = (recordId) => `/api/v1/nurse/vitals/${encodeURIComponent(recordId)}`;

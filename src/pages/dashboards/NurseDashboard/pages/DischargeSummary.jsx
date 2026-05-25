@@ -1,26 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import Modal from '../../../../components/common/Modal/Modal';
-import { apiFetch } from '../../../../services/apiClient';
-import { NURSE_DISCHARGE_SUPPORT, NURSE_DISCHARGE_SUMMARY } from '../../../../config/api';
+import Modal from '../../../../components/common/Modal/Modal'; 
 
 const DischargeSummary = () => {
   // State for active tab in the wizard
   const [activeTab, setActiveTab] = useState('patient');
-
+  
   // State for selected patient
   const [selectedPatient, setSelectedPatient] = useState(null);
-
+  
   // Modals visibility
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+
   // Initial template state
   const initialFormState = {
     id: '',
     patientId: '',
-  const [showFormModal, setShowFormModal] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    admissionNumber: '',
     patientName: '',
     age: '',
     gender: 'Male',
@@ -29,8 +24,6 @@ const DischargeSummary = () => {
     dischargeDate: '',
     attendingPhysician: 'Dr. Meena Rao',
     finalDiagnosis: '',
-    secondaryDiagnoses: '',
-    proceduresPerformed: '',
     hospitalCourse: '',
     dischargeInstructions: '',
     followUpCare: '',
@@ -89,44 +82,6 @@ const DischargeSummary = () => {
       status: "ready"
     },
   ];
-    followUpInstructions: '',
-    dietInstructions: '',
-    activityRestrictions: '',
-    followUpDate: '',
-    followUpDoctor: 'Dr. Meena Rao'
-  });
-
-  const [patients, setPatients] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    fetchDischargePatients();
-  }, []);
-
-  const fetchDischargePatients = async () => {
-    setLoading(true);
-    try {
-      const response = await apiFetch(NURSE_DISCHARGE_SUPPORT);
-      if (response && response.ok) {
-        const data = await response.json();
-        const rawData = Array.isArray(data?.data) ? data.data : [];
-        setPatients(rawData.map(p => ({
-          id: p.id || p.admission_number,
-          admissionNumber: p.admission_number || p.id,
-          name: p.patient_name || p.name || 'Unknown Patient',
-          bed: p.bed_number || p.bed_code || 'N/A',
-          admissionDate: p.admission_date ? new Date(p.admission_date).toLocaleDateString() : 'N/A',
-          condition: p.condition || p.diagnosis || p.chief_complaint || 'N/A',
-          treatment: p.treatment || p.treatment_plan || 'N/A',
-          status: (p.status || 'ready').toLowerCase()
-        })));
-      }
-    } catch (err) {
-      console.error("Error fetching discharge patients:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Local storage history of summaries
   const [savedSummaries, setSavedSummaries] = useState(() => {
@@ -233,7 +188,7 @@ const DischargeSummary = () => {
   // Fill forms automatically on select
   const handlePrepareSummary = (patient) => {
     setSelectedPatient(patient);
-
+    
     // Auto-fill detailed professional clinical fields
     setFormData({
       id: '', // New record initially
@@ -249,7 +204,7 @@ const DischargeSummary = () => {
       hospitalCourse: `Patient was admitted with severe ${patient.condition.toLowerCase()}. Started immediately on ${patient.treatment.toLowerCase()}. Monitored continuously. General state has significantly improved with standard care. Vitals are entirely within normal limits. Discharging in stable condition with proper oral therapy advice.`,
       dischargeInstructions: 'Take complete rest. Avoid heavy physical lifting. Ensure adequate oral hydration (2.5-3 liters water).',
       followUpCare: 'Review in General Medicine OPD if fever recurs or if any respiratory discomfort develops.',
-      followUpAppointment: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      followUpAppointment: new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0],
       followUpDoctor: patient.id % 2 === 0 ? 'Dr. Priya Sharma' : 'Dr. Meena Rao',
       vitalBP: patient.id === 2 ? '130/85' : '120/80',
       vitalPulse: '74',
@@ -261,7 +216,7 @@ const DischargeSummary = () => {
         { name: patient.treatment.includes('Antibiotics') ? 'Tab Amoxicillin' : 'Tab Ibuprofen', dosage: '500mg', route: 'Oral', frequency: 'Twice daily', duration: '5 days', instructions: 'Post breakfast and dinner' }
       ]
     });
-
+    
     setActiveTab('patient');
   };
 
@@ -290,7 +245,7 @@ const DischargeSummary = () => {
 
     setSavedSummaries(updatedList);
     localStorage.setItem('discharge_summaries', JSON.stringify(updatedList));
-
+    
     // Keep updated id in state
     setFormData(updatedSummary);
   };
@@ -299,7 +254,7 @@ const DischargeSummary = () => {
     setFormData(summary);
     setSelectedPatient({ name: summary.patientName });
     setActiveTab('patient');
-
+    
     // Smooth scroll to top of form wizard
     const formElement = document.getElementById('discharge-form-wizard');
     if (formElement) {
@@ -312,43 +267,6 @@ const DischargeSummary = () => {
       const updatedList = savedSummaries.filter(s => s.id !== id);
       setSavedSummaries(updatedList);
       localStorage.setItem('discharge_summaries', JSON.stringify(updatedList));
-  const handleSaveSummary = async (e) => {
-    e.preventDefault();
-    try {
-      const patientId = selectedPatient?.admissionNumber || selectedPatient?.id || formData.admissionNumber || formData.patientName;
-      
-      const payload = {
-        admission_number: patientId, // or patient_id if backend expects it
-        final_diagnosis: formData.finalDiagnosis,
-        secondary_diagnoses: formData.secondaryDiagnoses ? formData.secondaryDiagnoses.split(',').map(s => s.trim()) : [],
-        procedures_performed: formData.proceduresPerformed ? formData.proceduresPerformed.split(',').map(s => s.trim()) : [],
-        hospital_course: formData.hospitalCourse,
-        follow_up_instructions: formData.followUpInstructions,
-        diet_instructions: formData.dietInstructions,
-        activity_restrictions: formData.activityRestrictions,
-        follow_up_date: formData.followUpDate,
-        follow_up_doctor: formData.followUpDoctor
-      };
-
-      const url = isEditing 
-        ? `${NURSE_DISCHARGE_SUMMARY}?admission_number=${encodeURIComponent(patientId)}`
-        : NURSE_DISCHARGE_SUMMARY;
-        
-      const response = await apiFetch(url, {
-        method: isEditing ? 'PATCH' : 'POST',
-        body: JSON.stringify(payload)
-      });
-
-      if (response && response.ok) {
-        alert(`Discharge summary ${isEditing ? 'updated' : 'saved'} successfully!`);
-        setShowFormModal(false);
-        fetchDischargePatients();
-      } else {
-        alert('Failed to save discharge summary.');
-      }
-    } catch (error) {
-      console.error('Error saving discharge summary:', error);
-      alert('Error connecting to backend.');
     }
   };
 
@@ -368,83 +286,6 @@ const DischargeSummary = () => {
     setShowEmailModal(true);
   };
 
-  const handlePrepareSummary = async (patient) => {
-    setSelectedPatient(patient);
-    
-    // Check if summary exists for this patient
-    const admId = patient.admissionNumber || patient.id;
-    try {
-      const res = await apiFetch(`${NURSE_DISCHARGE_SUMMARY}?admission_number=${encodeURIComponent(admId)}`);
-      if (res && res.ok) {
-        const result = await res.json();
-        const existingData = result?.data;
-        if (existingData && existingData.length > 0) {
-          // Pre-fill existing data for PATCH
-          const data = existingData[0];
-          setIsEditing(true);
-          setFormData(prev => ({
-            ...prev,
-            admissionNumber: admId,
-            patientName: patient.name,
-            admissionDate: patient.admissionDate || '',
-            finalDiagnosis: data.final_diagnosis || '',
-            secondaryDiagnoses: data.secondary_diagnoses ? data.secondary_diagnoses.join(', ') : '',
-            proceduresPerformed: data.procedures_performed ? data.procedures_performed.join(', ') : '',
-            hospitalCourse: data.hospital_course || '',
-            followUpInstructions: data.follow_up_instructions || '',
-            dietInstructions: data.diet_instructions || '',
-            activityRestrictions: data.activity_restrictions || '',
-            followUpDate: data.follow_up_date || '',
-            followUpDoctor: data.follow_up_doctor || 'Dr. Meena Rao'
-          }));
-          setShowFormModal(true);
-          return;
-        }
-      }
-    } catch (e) {
-      console.error("No existing summary found or error fetching", e);
-    }
-
-    // Default to POST
-    setIsEditing(false);
-    setFormData({
-      admissionNumber: admId,
-      patientName: patient.name,
-      admissionDate: patient.admissionDate || '',
-      dischargeDate: new Date().toISOString().split('T')[0],
-      finalDiagnosis: '',
-      secondaryDiagnoses: '',
-      proceduresPerformed: '',
-      hospitalCourse: '',
-      followUpInstructions: '',
-      dietInstructions: '',
-      activityRestrictions: '',
-      followUpDate: '',
-      followUpDoctor: 'Dr. Meena Rao'
-    });
-    setShowFormModal(true);
-  };
-
-  const handleManualSummary = () => {
-    setSelectedPatient(null);
-    setIsEditing(false);
-    setFormData({
-      admissionNumber: '',
-      patientName: '',
-      admissionDate: '',
-      dischargeDate: new Date().toISOString().split('T')[0],
-      finalDiagnosis: '',
-      secondaryDiagnoses: '',
-      proceduresPerformed: '',
-      hospitalCourse: '',
-      followUpInstructions: '',
-      dietInstructions: '',
-      activityRestrictions: '',
-      followUpDate: '',
-      followUpDoctor: 'Dr. Meena Rao'
-    });
-    setShowFormModal(true);
-  };
   const handlePrintPatient = (patient) => {
     handlePrepareSummary(patient);
     // Timeout to allow state to settle
@@ -496,8 +337,7 @@ const DischargeSummary = () => {
   return (
     <div className="space-y-8 overflow-x-hidden animate-fade-in p-1">
       {/* Dynamic Printing Style Tag */}
-      <style dangerouslySetInnerHTML={{
-        __html: `
+      <style dangerouslySetInnerHTML={{__html: `
         @media print {
           /* Hide all application elements */
           body * {
@@ -545,33 +385,34 @@ const DischargeSummary = () => {
             {patients.length} active admissions
           </span>
         </div>
-
+        
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {patients.map(patient => {
             const isCurrentlySelected = selectedPatient && selectedPatient.id === patient.id;
             return (
-              <div
-                key={patient.id}
-                className={`bg-white rounded-xl border p-4 transition-all duration-300 flex flex-col justify-between hover:shadow-md ${isCurrentlySelected ? 'ring-2 ring-indigo-500 border-indigo-200 bg-indigo-50/10' : 'border-gray-200'
-                  }`}
+              <div 
+                key={patient.id} 
+                className={`bg-white rounded-xl border p-4 transition-all duration-300 flex flex-col justify-between hover:shadow-md ${
+                  isCurrentlySelected ? 'ring-2 ring-indigo-500 border-indigo-200 bg-indigo-50/10' : 'border-gray-200'
+                }`}
               >
                 <div>
                   <div className="flex items-center gap-3 mb-3">
-                    <img
-                      src={`https://i.pravatar.cc/80?img=${patient.id + 10}`}
-                      className="w-12 h-12 rounded-full border-2 border-indigo-100 object-cover"
-                      alt={patient.name}
+                    <img 
+                      src={`https://i.pravatar.cc/80?img=${patient.id + 10}`} 
+                      className="w-12 h-12 rounded-full border-2 border-indigo-100 object-cover" 
+                      alt={patient.name} 
                     />
                     <div>
                       <h4 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{patient.name}</h4>
                       <p className="text-xs text-gray-500 font-medium">Bed No: <span className="text-indigo-600 font-semibold">{patient.bed}</span></p>
                     </div>
                   </div>
-
+                  
                   <div className="text-xs text-gray-600 space-y-1.5 border-t border-b py-3 my-3">
                     <div className="flex justify-between">
                       <span className="text-gray-400 font-medium">Admission:</span>
-                      <span className="font-semibold">{new Date(patient.admissionDate).toLocaleDateString(undefined, { dateStyle: 'medium' })}</span>
+                      <span className="font-semibold">{new Date(patient.admissionDate).toLocaleDateString(undefined, {dateStyle: 'medium'})}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400 font-medium">Diagnosis:</span>
@@ -587,21 +428,21 @@ const DischargeSummary = () => {
                 </div>
 
                 <div className="grid grid-cols-3 gap-1">
-                  <button
+                  <button 
                     onClick={() => handlePrepareSummary(patient)}
                     title="Prepare Form"
                     className="text-[11px] bg-indigo-50 text-indigo-700 py-1.5 rounded-lg flex flex-col items-center gap-0.5 font-bold hover:bg-indigo-100 transition-colors"
                   >
                     <i className="fas fa-file-medical"></i>Prepare
                   </button>
-                  <button
+                  <button 
                     onClick={() => handlePrintPatient(patient)}
                     title="Quick Print"
                     className="text-[11px] bg-emerald-50 text-emerald-700 py-1.5 rounded-lg flex flex-col items-center gap-0.5 font-bold hover:bg-emerald-100 transition-colors"
                   >
                     <i className="fas fa-print"></i>Print
                   </button>
-                  <button
+                  <button 
                     onClick={() => handleEmailPatient(patient)}
                     title="Quick Email"
                     className="text-[11px] bg-purple-50 text-purple-700 py-1.5 rounded-lg flex flex-col items-center gap-0.5 font-bold hover:bg-purple-100 transition-colors"
@@ -630,7 +471,7 @@ const DischargeSummary = () => {
               <p className="text-xs text-indigo-200 font-medium">Select a patient above or enter details below to generate a new discharge summary.</p>
             )}
           </div>
-
+          
           {formData.patientName && (
             <div className="flex items-center gap-3 w-full md:w-auto">
               <div className="flex-1 md:flex-initial text-right">
@@ -638,9 +479,10 @@ const DischargeSummary = () => {
                 <span className="text-xs font-bold text-white">{completionPercent}%</span>
               </div>
               <div className="w-24 bg-slate-700 rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full transition-all duration-500 ${completionPercent < 50 ? 'bg-amber-500' : completionPercent < 90 ? 'bg-indigo-400' : 'bg-emerald-500'
-                    }`}
+                <div 
+                  className={`h-2 rounded-full transition-all duration-500 ${
+                    completionPercent < 50 ? 'bg-amber-500' : completionPercent < 90 ? 'bg-indigo-400' : 'bg-emerald-500'
+                  }`}
                   style={{ width: `${completionPercent}%` }}
                 ></div>
               </div>
@@ -653,10 +495,11 @@ const DischargeSummary = () => {
           <button
             type="button"
             onClick={() => setActiveTab('patient')}
-            className={`px-5 py-3 text-xs font-bold rounded-t-lg transition-all flex items-center gap-1.5 -mb-px ${activeTab === 'patient'
-                ? 'bg-white border-t border-x border-gray-200 text-indigo-600 shadow-sm'
+            className={`px-5 py-3 text-xs font-bold rounded-t-lg transition-all flex items-center gap-1.5 -mb-px ${
+              activeTab === 'patient' 
+                ? 'bg-white border-t border-x border-gray-200 text-indigo-600 shadow-sm' 
                 : 'text-gray-500 hover:text-indigo-600 hover:bg-white/40'
-              }`}
+            }`}
           >
             <i className="fas fa-id-card"></i>
             1. Patient & Vitals
@@ -664,10 +507,11 @@ const DischargeSummary = () => {
           <button
             type="button"
             onClick={() => setActiveTab('clinical')}
-            className={`px-5 py-3 text-xs font-bold rounded-t-lg transition-all flex items-center gap-1.5 -mb-px ${activeTab === 'clinical'
-                ? 'bg-white border-t border-x border-gray-200 text-indigo-600 shadow-sm'
+            className={`px-5 py-3 text-xs font-bold rounded-t-lg transition-all flex items-center gap-1.5 -mb-px ${
+              activeTab === 'clinical' 
+                ? 'bg-white border-t border-x border-gray-200 text-indigo-600 shadow-sm' 
                 : 'text-gray-500 hover:text-indigo-600 hover:bg-white/40'
-              }`}
+            }`}
           >
             <i className="fas fa-heartbeat"></i>
             2. Clinical Summary
@@ -675,10 +519,11 @@ const DischargeSummary = () => {
           <button
             type="button"
             onClick={() => setActiveTab('medications')}
-            className={`px-5 py-3 text-xs font-bold rounded-t-lg transition-all flex items-center gap-1.5 -mb-px ${activeTab === 'medications'
-                ? 'bg-white border-t border-x border-gray-200 text-indigo-600 shadow-sm'
+            className={`px-5 py-3 text-xs font-bold rounded-t-lg transition-all flex items-center gap-1.5 -mb-px ${
+              activeTab === 'medications' 
+                ? 'bg-white border-t border-x border-gray-200 text-indigo-600 shadow-sm' 
                 : 'text-gray-500 hover:text-indigo-600 hover:bg-white/40'
-              }`}
+            }`}
           >
             <i className="fas fa-capsules"></i>
             3. Medications
@@ -686,10 +531,11 @@ const DischargeSummary = () => {
           <button
             type="button"
             onClick={() => setActiveTab('advice')}
-            className={`px-5 py-3 text-xs font-bold rounded-t-lg transition-all flex items-center gap-1.5 -mb-px ${activeTab === 'advice'
-                ? 'bg-white border-t border-x border-gray-200 text-indigo-600 shadow-sm'
+            className={`px-5 py-3 text-xs font-bold rounded-t-lg transition-all flex items-center gap-1.5 -mb-px ${
+              activeTab === 'advice' 
+                ? 'bg-white border-t border-x border-gray-200 text-indigo-600 shadow-sm' 
                 : 'text-gray-500 hover:text-indigo-600 hover:bg-white/40'
-              }`}
+            }`}
           >
             <i className="fas fa-hand-holding-medical"></i>
             4. Advice & Follow-Up
@@ -698,7 +544,7 @@ const DischargeSummary = () => {
 
         {/* Wizard Form Contents */}
         <form onSubmit={handleSaveSummary} className="p-6 space-y-6">
-
+          
           {/* TAB 1: Patient & Vitals */}
           {activeTab === 'patient' && (
             <div className="space-y-6 animate-fade-in">
@@ -710,41 +556,41 @@ const DischargeSummary = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Patient Full Name</label>
-                    <input
-                      type="text"
+                    <input 
+                      type="text" 
                       name="patientName"
                       value={formData.patientName}
                       onChange={handleInputChange}
-                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500"
+                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500" 
                       placeholder="Enter patient full name"
                       required
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Patient ID / MRN</label>
-                    <input
-                      type="text"
+                    <input 
+                      type="text" 
                       name="patientId"
                       value={formData.patientId}
                       onChange={handleInputChange}
-                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500"
+                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500" 
                       placeholder="e.g. PAT-001"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Age (Years)</label>
-                    <input
-                      type="number"
+                    <input 
+                      type="number" 
                       name="age"
                       value={formData.age}
                       onChange={handleInputChange}
-                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500"
+                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500" 
                       placeholder="Age"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Gender</label>
-                    <select
+                    <select 
                       name="gender"
                       value={formData.gender}
                       onChange={handleInputChange}
@@ -760,43 +606,43 @@ const DischargeSummary = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Room / Bed No.</label>
-                    <input
-                      type="text"
+                    <input 
+                      type="text" 
                       name="roomBed"
                       value={formData.roomBed}
                       onChange={handleInputChange}
-                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500"
+                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500" 
                       placeholder="e.g. Room 101 - Bed A"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Admission Date</label>
-                    <input
-                      type="date"
+                    <input 
+                      type="date" 
                       name="admissionDate"
                       value={formData.admissionDate}
                       onChange={handleInputChange}
-                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500"
+                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500" 
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Discharge Date</label>
-                    <input
-                      type="date"
+                    <input 
+                      type="date" 
                       name="dischargeDate"
                       value={formData.dischargeDate}
                       onChange={handleInputChange}
-                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500"
+                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500" 
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Attending Physician</label>
-                    <input
-                      type="text"
+                    <input 
+                      type="text" 
                       name="attendingPhysician"
                       value={formData.attendingPhysician}
                       onChange={handleInputChange}
-                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500"
+                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500" 
                       placeholder="Physician in charge"
                     />
                   </div>
@@ -812,56 +658,56 @@ const DischargeSummary = () => {
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Blood Pressure (mmHg)</label>
-                    <input
-                      type="text"
+                    <input 
+                      type="text" 
                       name="vitalBP"
                       value={formData.vitalBP}
                       onChange={handleInputChange}
-                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500 font-semibold text-rose-950"
+                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500 font-semibold text-rose-950" 
                       placeholder="e.g. 120/80"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Pulse Rate (bpm)</label>
-                    <input
-                      type="number"
+                    <input 
+                      type="number" 
                       name="vitalPulse"
                       value={formData.vitalPulse}
                       onChange={handleInputChange}
-                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500 font-semibold text-rose-950"
+                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500 font-semibold text-rose-950" 
                       placeholder="Pulse"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Temperature (°F)</label>
-                    <input
-                      type="text"
+                    <input 
+                      type="text" 
                       name="vitalTemp"
                       value={formData.vitalTemp}
                       onChange={handleInputChange}
-                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500 font-semibold text-rose-950"
+                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500 font-semibold text-rose-950" 
                       placeholder="Temp"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">SpO2 (%)</label>
-                    <input
-                      type="number"
+                    <input 
+                      type="number" 
                       name="vitalSpO2"
                       value={formData.vitalSpO2}
                       onChange={handleInputChange}
-                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500 font-semibold text-rose-950"
+                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500 font-semibold text-rose-950" 
                       placeholder="Oxygen Level"
                     />
                   </div>
                   <div className="col-span-2 md:col-span-1">
                     <label className="block text-xs font-bold text-gray-700 mb-1">Respiration Rate (/min)</label>
-                    <input
-                      type="number"
+                    <input 
+                      type="number" 
                       name="vitalRespRate"
                       value={formData.vitalRespRate}
                       onChange={handleInputChange}
-                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500 font-semibold text-rose-950"
+                      className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500 font-semibold text-rose-950" 
                       placeholder="Respiration"
                     />
                   </div>
@@ -876,18 +722,18 @@ const DischargeSummary = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-gray-700 mb-1">Final Diagnosis</label>
-                  <input
-                    type="text"
+                  <input 
+                    type="text" 
                     name="finalDiagnosis"
                     value={formData.finalDiagnosis}
                     onChange={handleInputChange}
-                    className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500 font-semibold text-gray-900"
-                    placeholder="Enter main diagnosis and critical co-morbidities"
+                    className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500 font-semibold text-gray-900" 
+                    placeholder="Enter main diagnosis and critical co-morbidities" 
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Condition at Discharge</label>
-                  <select
+                  <select 
                     name="conditionAtDischarge"
                     value={formData.conditionAtDischarge}
                     onChange={handleInputChange}
@@ -902,43 +748,14 @@ const DischargeSummary = () => {
                 </div>
               </div>
 
-    <div className="space-y-6 overflow-x-hidden">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-3">
-        <h2 className="text-2xl font-semibold text-gray-700">Discharge Summary Support</h2>
-        <button 
-          onClick={handleManualSummary}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center"
-        >
-          <i className="fas fa-plus mr-2"></i> Create Manual Summary
-        </button>
-      </div>
-
-      {/* Patients Grid */}
-      {loading ? (
-        <div className="text-center py-10">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading patients for discharge support...</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {patients.length === 0 ? (
-            <div className="col-span-full text-center text-gray-500 py-10 bg-white rounded-lg border border-dashed">
-              No patients currently pending discharge support.
-            </div>
-          ) : (
-            patients.map(patient => (
-          <div key={patient.id} className="bg-white border rounded p-4 card-shadow fade-in">
-            <div className="flex items-center gap-3 mb-2">
-              <img src={`https://i.pravatar.cc/60?img=${patient.id+10}`} className="avatar" alt={patient.name} />
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">Hospital Course & Clinical Summary</label>
-                <textarea
+                <textarea 
                   name="hospitalCourse"
                   value={formData.hospitalCourse}
                   onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-1 focus:ring-indigo-500 leading-relaxed font-sans"
-                  rows="6"
+                  className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-1 focus:ring-indigo-500 leading-relaxed font-sans" 
+                  rows="6" 
                   placeholder="Record summary of treatment, medical course, surgery performed, lab/radiology findings and response to medication during hospital stay..."
                 ></textarea>
               </div>
@@ -1076,23 +893,23 @@ const DischargeSummary = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">General Discharge Advice & Instructions</label>
-                  <textarea
+                  <textarea 
                     name="dischargeInstructions"
                     value={formData.dischargeInstructions}
                     onChange={handleInputChange}
-                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500"
-                    rows="4"
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500" 
+                    rows="4" 
                     placeholder="Enter special precautions, diet notes, emergency triggers, activity limitations..."
                   ></textarea>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Follow-up Home Care & Signs of Concern</label>
-                  <textarea
+                  <textarea 
                     name="followUpCare"
                     value={formData.followUpCare}
                     onChange={handleInputChange}
-                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500"
-                    rows="4"
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500" 
+                    rows="4" 
                     placeholder="Record clinical indicators when they should return immediately (e.g. pain level, heavy bleeding, high fever)..."
                   ></textarea>
                 </div>
@@ -1101,22 +918,22 @@ const DischargeSummary = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-indigo-50/20 p-4 border border-indigo-100/50 rounded-lg">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Follow-up Review Date</label>
-                  <input
-                    type="date"
+                  <input 
+                    type="date" 
                     name="followUpAppointment"
                     value={formData.followUpAppointment}
                     onChange={handleInputChange}
-                    className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500"
+                    className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500" 
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Consulting Physician</label>
-                  <input
-                    type="text"
+                  <input 
+                    type="text" 
                     name="followUpDoctor"
                     value={formData.followUpDoctor}
                     onChange={handleInputChange}
-                    className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500"
+                    className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-indigo-500" 
                     placeholder="Doctor for review appointment"
                   />
                 </div>
@@ -1162,24 +979,24 @@ const DischargeSummary = () => {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <button
-                type="submit"
+              <button 
+                type="submit" 
                 className="bg-indigo-600 text-white px-4 py-2 text-xs font-bold rounded-lg hover:bg-indigo-700 transition-all flex items-center gap-1 shadow-sm"
               >
                 <i className="fas fa-save"></i>Save Summary
               </button>
-
+              
               {formData.patientName && (
                 <>
-                  <button
-                    type="button"
+                  <button 
+                    type="button" 
                     onClick={handlePrintSummary}
                     className="bg-emerald-600 text-white px-4 py-2 text-xs font-bold rounded-lg hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-sm"
                   >
                     <i className="fas fa-print"></i>Print Summary
                   </button>
-                  <button
-                    type="button"
+                  <button 
+                    type="button" 
                     onClick={handleEmailSummary}
                     className="bg-purple-600 text-white px-4 py-2 text-xs font-bold rounded-lg hover:bg-purple-700 transition-all flex items-center gap-1 shadow-sm"
                   >
@@ -1244,7 +1061,7 @@ const DischargeSummary = () => {
                       </div>
                     </td>
                     <td className="p-3 border-r font-medium text-gray-700">
-                      {summary.dischargeDate ? new Date(summary.dischargeDate).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'N/A'}
+                      {summary.dischargeDate ? new Date(summary.dischargeDate).toLocaleDateString(undefined, {dateStyle: 'medium'}) : 'N/A'}
                     </td>
                     <td className="p-3 border-r text-gray-600 font-semibold">{summary.attendingPhysician}</td>
                     <td className="p-3 border-r text-gray-600 truncate max-w-[200px]" title={summary.finalDiagnosis}>
@@ -1258,12 +1075,13 @@ const DischargeSummary = () => {
                       </div>
                     </td>
                     <td className="p-3 border-r text-center">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${summary.conditionAtDischarge === 'Stable' || summary.conditionAtDischarge === 'Recovered'
-                          ? 'bg-green-100 text-green-800'
-                          : summary.conditionAtDischarge === 'Improving'
-                            ? 'bg-sky-100 text-sky-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        summary.conditionAtDischarge === 'Stable' || summary.conditionAtDischarge === 'Recovered' 
+                          ? 'bg-green-100 text-green-800' 
+                          : summary.conditionAtDischarge === 'Improving' 
+                          ? 'bg-sky-100 text-sky-800' 
+                          : 'bg-amber-100 text-amber-800'
+                      }`}>
                         {summary.conditionAtDischarge}
                       </span>
                     </td>
@@ -1310,201 +1128,6 @@ const DischargeSummary = () => {
           </div>
         )}
       </div>
-        ))
-      )}
-    </div>
-  )}
-
-      {/* Discharge Summary Form Modal */}
-      <Modal
-        isOpen={showFormModal}
-        onClose={() => setShowFormModal(false)}
-        title={isEditing ? "Edit Discharge Summary" : "Prepare Discharge Summary"}
-        size="lg"
-      >
-        <form onSubmit={handleSaveSummary} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Admission Number</label>
-              <input 
-                type="text" 
-                name="admissionNumber"
-                value={formData.admissionNumber}
-                onChange={handleInputChange}
-                className="w-full border rounded p-2" 
-                placeholder="Enter admission number"
-                required
-                disabled={isEditing}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Patient Name</label>
-              <input 
-                type="text" 
-                name="patientName"
-                value={formData.patientName}
-                onChange={handleInputChange}
-                className="w-full border rounded p-2" 
-                placeholder="Enter patient name"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Admission Date</label>
-              <input 
-                type="date" 
-                name="admissionDate"
-                value={formData.admissionDate}
-                onChange={handleInputChange}
-                className="w-full border rounded p-2" 
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Discharge Date</label>
-              <input 
-                type="date" 
-                name="dischargeDate"
-                value={formData.dischargeDate}
-                onChange={handleInputChange}
-                className="w-full border rounded p-2" 
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Attending Physician</label>
-              <input 
-                type="text" 
-                name="followUpDoctor"
-                value={formData.followUpDoctor}
-                onChange={handleInputChange}
-                className="w-full border rounded p-2" 
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Final Diagnosis</label>
-              <input 
-                type="text" 
-                name="finalDiagnosis"
-                value={formData.finalDiagnosis}
-                onChange={handleInputChange}
-                className="w-full border rounded p-2" 
-                placeholder="Enter final diagnosis" 
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Secondary Diagnoses (comma separated)</label>
-              <input 
-                type="text" 
-                name="secondaryDiagnoses"
-                value={formData.secondaryDiagnoses}
-                onChange={handleInputChange}
-                className="w-full border rounded p-2" 
-                placeholder="E.g. Hypertension, Diabetes" 
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Procedures Performed (comma separated)</label>
-              <input 
-                type="text" 
-                name="proceduresPerformed"
-                value={formData.proceduresPerformed}
-                onChange={handleInputChange}
-                className="w-full border rounded p-2" 
-                placeholder="E.g. Appendectomy, Blood Transfusion" 
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Hospital Course</label>
-            <textarea 
-              name="hospitalCourse"
-              value={formData.hospitalCourse}
-              onChange={handleInputChange}
-              className="w-full border rounded p-2" 
-              rows="3" 
-              placeholder="Describe hospital course"
-            ></textarea>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Diet Instructions</label>
-              <textarea 
-                name="dietInstructions"
-                value={formData.dietInstructions}
-                onChange={handleInputChange}
-                className="w-full border rounded p-2" 
-                rows="2" 
-                placeholder="Enter diet instructions"
-              ></textarea>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Activity Restrictions</label>
-              <textarea 
-                name="activityRestrictions"
-                value={formData.activityRestrictions}
-                onChange={handleInputChange}
-                className="w-full border rounded p-2" 
-                rows="2" 
-                placeholder="Enter activity restrictions"
-              ></textarea>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Follow-up Instructions & Discharge Notes</label>
-            <textarea 
-              name="followUpInstructions"
-              value={formData.followUpInstructions}
-              onChange={handleInputChange}
-              className="w-full border rounded p-2" 
-              rows="3" 
-              placeholder="Enter follow-up instructions and discharge notes"
-            ></textarea>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Follow-up Date</label>
-              <input 
-                type="date" 
-                name="followUpDate"
-                value={formData.followUpDate}
-                onChange={handleInputChange}
-                className="w-full border rounded p-2" 
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Follow-up Doctor</label>
-              <input 
-                type="text" 
-                name="followUpDoctor"
-                value={formData.followUpDoctor}
-                onChange={handleInputChange}
-                className="w-full border rounded p-2" 
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 mt-6">
-            <button 
-              type="button" 
-              onClick={() => setShowFormModal(false)}
-              className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300"
-            >
-              <i className="fas fa-times mr-1"></i>Cancel
-            </button>
-            <button 
-              type="submit" 
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-            >
-              <i className="fas fa-save mr-1"></i>Save Summary
-            </button>
-          </div>
-        </form>
-      </Modal>
 
       {/* Print Preview Modal */}
       <Modal
@@ -1516,7 +1139,7 @@ const DischargeSummary = () => {
         <div className="space-y-6">
           {/* Printable Document Box */}
           <div id="print-discharge-summary-document" className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 font-sans text-gray-800">
-
+            
             {/* Logo and Hospital Letterhead */}
             <div className="flex justify-between items-center border-b-2 border-indigo-600 pb-4 mb-6">
               <div className="flex items-center gap-3">
@@ -1561,13 +1184,13 @@ const DischargeSummary = () => {
               <div>
                 <span className="text-gray-400 block uppercase tracking-wider font-bold text-[9px] mb-0.5">Admission Date</span>
                 <span className="font-bold text-gray-900 text-sm block">
-                  {formData.admissionDate ? new Date(formData.admissionDate).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'N/A'}
+                  {formData.admissionDate ? new Date(formData.admissionDate).toLocaleDateString(undefined, {dateStyle: 'medium'}) : 'N/A'}
                 </span>
               </div>
               <div>
                 <span className="text-gray-400 block uppercase tracking-wider font-bold text-[9px] mb-0.5">Discharge Date</span>
                 <span className="font-bold text-gray-900 text-sm block">
-                  {formData.dischargeDate ? new Date(formData.dischargeDate).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'N/A'}
+                  {formData.dischargeDate ? new Date(formData.dischargeDate).toLocaleDateString(undefined, {dateStyle: 'medium'}) : 'N/A'}
                 </span>
               </div>
               <div>
@@ -1666,7 +1289,7 @@ const DischargeSummary = () => {
               <div className="border rounded-lg p-3 bg-white">
                 <h3 className="text-[10px] uppercase font-bold text-indigo-700 tracking-widest border-b pb-1 mb-2">FOLLOW-UP OPD CLINIC DETAILS</h3>
                 <div className="text-xs text-gray-700 space-y-1.5 leading-relaxed font-medium">
-                  <p><strong>Scheduled Appointment:</strong> <span className="font-bold text-indigo-900">{formData.followUpAppointment ? new Date(formData.followUpAppointment).toLocaleDateString(undefined, { dateStyle: 'long' }) : 'No appointment scheduled'}</span></p>
+                  <p><strong>Scheduled Appointment:</strong> <span className="font-bold text-indigo-900">{formData.followUpAppointment ? new Date(formData.followUpAppointment).toLocaleDateString(undefined, {dateStyle: 'long'}) : 'No appointment scheduled'}</span></p>
                   <p><strong>Consulting Physician:</strong> <span className="font-bold text-gray-900">{formData.followUpDoctor}</span></p>
                   <p className="text-[9px] text-red-500 font-bold mt-1.5 leading-normal">
                     ⚠️ CRITICAL RED FLAGS: Please report to emergency or call primary doctors immediately if the patient experiences severe abdominal pain, persistent high fever, chest pressure, severe breath shortness, or bleeding.
@@ -1721,9 +1344,9 @@ const DischargeSummary = () => {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">Recipient Email Address</label>
-            <input
-              type="email"
-              className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500"
+            <input 
+              type="email" 
+              className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500" 
               placeholder="patient@example.com"
               defaultValue={`${formData.patientName ? formData.patientName.toLowerCase().replace(' ', '') : 'patient'}@example.com`}
             />
@@ -1731,17 +1354,17 @@ const DischargeSummary = () => {
 
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">Subject</label>
-            <input
-              type="text"
-              className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500"
+            <input 
+              type="text" 
+              className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500" 
               defaultValue={`Official Patient Discharge Summary: ${formData.patientName || 'Patient'}`}
             />
           </div>
 
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">Email Body Message</label>
-            <textarea
-              className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500 leading-relaxed font-sans"
+            <textarea 
+              className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-indigo-500 leading-relaxed font-sans" 
               rows="8"
               defaultValue={`Dear ${formData.patientName || 'Patient'},
 

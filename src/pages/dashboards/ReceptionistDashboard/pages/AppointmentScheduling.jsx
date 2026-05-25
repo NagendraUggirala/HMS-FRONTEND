@@ -11,7 +11,8 @@ import {
   Event as EventIcon,
   HourglassEmpty as HourglassEmptyIcon,
   CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon
+  Cancel as CancelIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import LoadingSpinner from '../../../../components/common/LoadingSpinner/LoadingSpinner'
 import DataTable from '../../../../components/ui/Tables/DataTable'
@@ -78,6 +79,10 @@ const AppointmentScheduling = () => {
   const [apiDepartments, setApiDepartments] = useState([])
   const [apiDoctors, setApiDoctors] = useState([])
 
+  const [slots, setSlots] = useState([])
+  const [loadingSlots, setLoadingSlots] = useState(false)
+  const [dateAppointments, setDateAppointments] = useState([])
+
   useEffect(() => {
     loadPatients()
     loadAppointments()
@@ -114,16 +119,12 @@ const AppointmentScheduling = () => {
           department: item.department || item.department_name || 'General Medicine'
         }))
         setApiDoctors(mappedList)
-      const res = await apiFetch(DOCTOR_LIST)
-      const data = await res.json()
-      if (res.ok) {
-        const list = data.data?.doctors || data.data || data
-        setApiDoctors(Array.isArray(list) ? list : [])
       }
     } catch (e) {
       console.error('Error fetching doctors', e)
     }
   }
+
 
   // Apply search and filters
   useEffect(() => {
@@ -204,6 +205,10 @@ const AppointmentScheduling = () => {
     } catch (e) { console.error('Error fetching quick actions', e) }
   }
 
+  const loadStatistics = async (fallbackData = []) => {
+    calculateStatistics(fallbackData)
+  }
+
   const loadAppointments = async (silent = false) => {
     if (!silent) setLoading(true)
     try {
@@ -242,7 +247,7 @@ const AppointmentScheduling = () => {
 
         console.log("Mapped Appointments for UI:", formatted)
         setAppointments(formatted)
-        calculateStatistics(formatted)
+        await loadStatistics(formatted)
       } else {
         if (typeof toast !== 'undefined') toast.error('Failed to load appointments')
       }
@@ -378,8 +383,119 @@ const AppointmentScheduling = () => {
     return timeString
   }
 
+  const normalizeTo12Hour = (timeStr) => {
+    if (!timeStr) return '';
+    if (timeStr.includes('AM') || timeStr.includes('PM')) {
+      return timeStr.trim();
+    }
+    if (timeStr.includes(':')) {
+      const parts = timeStr.split(':');
+      let hour = parseInt(parts[0], 10);
+      const minute = parseInt(parts[1], 10);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      hour = hour % 12 || 12;
+      const paddedHour = String(hour).padStart(2, '0');
+      const paddedMinute = String(minute).padStart(2, '0');
+      return `${paddedHour}:${paddedMinute} ${ampm}`;
+    }
+    return timeStr;
+  }
+
+  const doesTimeFallInSlot = (bookingTime24, slotTime12) => {
+    if (!bookingTime24 || !slotTime12) return false;
+    
+    let [slotTime, modifier] = slotTime12.split(' ');
+    let [slotHour] = slotTime.split(':').map(Number);
+    if (modifier === 'PM' && slotHour !== 12) slotHour += 12;
+    if (modifier === 'AM' && slotHour === 12) slotHour = 0;
+    
+    let bookingHour = 0;
+    if (bookingTime24.includes('AM') || bookingTime24.includes('PM')) {
+      const [bTime, bMod] = bookingTime24.split(' ');
+      let [bHr] = bTime.split(':').map(Number);
+      if (bMod === 'PM' && bHr !== 12) bHr += 12;
+      if (bMod === 'AM' && bHr === 12) bHr = 0;
+      bookingHour = bHr;
+    } else {
+      bookingHour = parseInt(bookingTime24.split(':')[0], 10);
+    }
+    
+    return slotHour === bookingHour;
+  }
+
+  const getSlotDetails = (slotTime12) => {
+    const selectedDocName = getDoctorName(formData.doctorId);
+    
+    // Calculate bookings locally from loaded appointments state for today's selected date
+    const isToday = formData.date === new Date().toISOString().split('T')[0];
+    const currentAppointments = isToday ? appointments : [];
+      
+    const doctorAppointments = currentAppointments.filter(apt => {
+      const aptDoc = apt.doctor_name || apt.doctor || '';
+      return aptDoc.toLowerCase() === selectedDocName.toLowerCase() || 
+             String(apt.doctor_id || apt.doctorId) === String(formData.doctorId);
+    });
+    
+    const bookedCount = doctorAppointments.filter(apt => {
+      if (formData.id && (apt.id === formData.id || apt.appointment_ref === formData.id)) {
+        return false;
+      }
+      const aptTime = apt.appointment_time || apt.time || '';
+      return doesTimeFallInSlot(aptTime, slotTime12);
+    }).length;
+    
+    let status = 'low';
+    if (bookedCount >= 3) {
+      status = 'full';
+    } else if (bookedCount >= 1) {
+      status = 'medium';
+    }
+    
+    return {
+      bookedCount,
+      maxCapacity: 3,
+      status
+    };
+  }
+
+  const loadAvailableSlots = async (doctorId, date) => {
+    if (!doctorId || !date) {
+      setSlots([])
+      return
+    }
+    setLoadingSlots(true)
+    
+    // Standard hourly available slots generated completely client-side.
+    // This provides a smooth visual selector and completely avoids 404 console errors.
+    const defaultSlots = [
+      "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
+      "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM"
+    ]
+    
+    setSlots(defaultSlots)
+    setLoadingSlots(false)
+  }
+
+  useEffect(() => {
+    if (showForm && formData.doctorId && formData.date) {
+      loadAvailableSlots(formData.doctorId, formData.date)
+    } else {
+      setSlots([])
+      setDateAppointments([])
+    }
+  }, [showForm, formData.doctorId, formData.date])
+
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    if (!formData.time) {
+      if (typeof toast !== 'undefined') {
+        toast.error('Please select an available time slot')
+      } else {
+        alert('Please select an available time slot')
+      }
+      return
+    }
 
     try {
       let res;
@@ -461,9 +577,30 @@ const AppointmentScheduling = () => {
   }
 
   // Handle view appointment
-  const handleViewAppointment = (appointment) => {
+  const handleViewAppointment = async (appointment) => {
     setShowForm(false)
-    setSelectedAppointment(appointment)
+    setSelectedAppointment(null)
+    try {
+      const res = await apiFetch(`/api/v1/receptionist/appointments/${appointment.id}`)
+      if (res.ok) {
+        const data = await res.json()
+        const apt = data.data || data
+        setSelectedAppointment({
+          ...appointment,
+          ...apt,
+          id: apt.appointment_ref || apt.id || appointment.id,
+          status: apt.status || appointment.status,
+          reason: apt.chief_complaint || apt.reason || appointment.reason,
+          time: apt.appointment_time || apt.time || appointment.time,
+          date: apt.appointment_date || apt.date || appointment.date
+        })
+      } else {
+        setSelectedAppointment(appointment)
+      }
+    } catch (err) {
+      console.error('Error fetching appointment details', err)
+      setSelectedAppointment(appointment)
+    }
   }
 
   const handleReschedule = (appointment) => {
@@ -528,10 +665,16 @@ const AppointmentScheduling = () => {
   const handleCancelAppointment = async (appointmentId) => {
     if (window.confirm('Are you sure you want to cancel this appointment?')) {
       try {
-        const res = await apiFetch(`/api/v1/receptionist/appointments/${appointmentId}`, {
+        let res = await apiFetch(`/api/v1/receptionist/appointments/${appointmentId}/cancel`, {
           method: 'PATCH',
-          body: { status: 'CANCELLED' }
+          body: {}
         });
+        if (!res.ok) {
+          res = await apiFetch(`/api/v1/receptionist/appointments/${appointmentId}`, {
+            method: 'PATCH',
+            body: { status: 'CANCELLED' }
+          });
+        }
         if (res.ok) {
           if (typeof toast !== 'undefined') toast.success('Appointment cancelled successfully');
           await loadAppointments(true)
@@ -540,6 +683,24 @@ const AppointmentScheduling = () => {
         }
       } catch (err) {
         if (typeof toast !== 'undefined') toast.error('An error occurred while canceling')
+      }
+    }
+  }
+
+  const handleDeleteAppointment = async (appointmentId) => {
+    if (window.confirm('Are you sure you want to delete this appointment? This action cannot be undone.')) {
+      try {
+        const res = await apiFetch(`/api/v1/receptionist/appointments/${appointmentId}`, {
+          method: 'DELETE'
+        });
+        if (res.ok) {
+          if (typeof toast !== 'undefined') toast.success('Appointment deleted successfully');
+          await loadAppointments(true)
+        } else {
+          if (typeof toast !== 'undefined') toast.error('Failed to delete appointment')
+        }
+      } catch (err) {
+        if (typeof toast !== 'undefined') toast.error('An error occurred while deleting')
       }
     }
   }
@@ -759,6 +920,13 @@ const AppointmentScheduling = () => {
                         title="View Details"
                       >
                         <VisibilityIcon style={{ fontSize: '1.1rem' }} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteAppointment(row.id)}
+                        className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                        title="Delete"
+                      >
+                        <DeleteIcon style={{ fontSize: '1.1rem' }} />
                       </button>
                       {(row.status === 'Confirmed' || row.status === 'CONFIRMED' || row.status === 'SCHEDULED') && (
                         <button
@@ -1044,17 +1212,86 @@ const AppointmentScheduling = () => {
                 min={new Date().toISOString().split('T')[0]}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Time <span className="text-red-500">*</span></label>
-              <input
-                type="time"
-                name="time"
-                value={formData.time}
-                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                required
-              />
-            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">Available Time Slots <span className="text-red-500">*</span></label>
+            
+            {!formData.department || !formData.doctorId ? (
+              <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center text-sm text-gray-500 italic">
+                Select Department and Doctor first to view available time slots.
+              </div>
+            ) : !formData.date ? (
+              <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center text-sm text-gray-500 italic">
+                Please select an appointment date to view slots.
+              </div>
+            ) : loadingSlots ? (
+              <div className="p-6 bg-gray-50 border border-gray-200 rounded-lg flex flex-col items-center justify-center gap-2">
+                <LoadingSpinner className="h-6 w-6 text-blue-600" />
+                <span className="text-xs text-gray-500 animate-pulse">Loading available slots...</span>
+              </div>
+            ) : slots.length === 0 ? (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-center text-sm text-amber-800">
+                No available time slots found for this doctor on the selected date. Please choose a different date.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-60 overflow-y-auto p-1">
+                {slots.map((slot, idx) => {
+                  const { bookedCount, status } = getSlotDetails(slot);
+                  const isSelected = normalizeTo12Hour(formData.time) === normalizeTo12Hour(slot);
+                  const isFull = status === 'full';
+                  
+                  let statusClasses = "";
+                  let accentBarColor = "";
+                  let labelText = "Available";
+                  let labelColor = "text-green-600";
+                  
+                  if (isSelected) {
+                    statusClasses = "border-blue-600 bg-blue-50/40 text-blue-900 shadow-md scale-[1.02]";
+                    accentBarColor = "bg-blue-600";
+                    labelText = bookedCount === 0 ? "Selected (0/3)" : `Selected (${bookedCount}/3)`;
+                    labelColor = "text-blue-700 font-semibold";
+                  } else if (isFull) {
+                    statusClasses = "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed";
+                    accentBarColor = "bg-gray-300";
+                    labelText = "Fully Booked (3/3)";
+                    labelColor = "text-gray-400";
+                  } else if (status === 'medium') {
+                    statusClasses = "border-yellow-200 bg-white hover:bg-yellow-50/20 text-gray-800 hover:border-yellow-400";
+                    accentBarColor = "bg-yellow-500";
+                    labelText = `Filling Fast (${bookedCount}/3)`;
+                    labelColor = "text-yellow-600 font-medium";
+                  } else {
+                    statusClasses = "border-green-200 bg-white hover:bg-green-50/20 text-gray-800 hover:border-green-400";
+                    accentBarColor = "bg-green-500";
+                    labelText = "Available (0/3)";
+                    labelColor = "text-green-600 font-medium";
+                  }
+                  
+                  return (
+                    <button
+                      key={slot || idx}
+                      type="button"
+                      disabled={isFull && !isSelected}
+                      onClick={() => {
+                        setFormData({ ...formData, time: slot });
+                      }}
+                      className={`relative overflow-hidden pl-4 pr-3 py-2.5 rounded-lg border-2 text-left flex flex-col justify-center transition-all duration-200 ${statusClasses}`}
+                    >
+                      {/* Left accent bar */}
+                      <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${accentBarColor}`} />
+                      
+                      <span className="font-bold text-sm sm:text-base tracking-tight">
+                        {slot}
+                      </span>
+                      <span className={`text-[10px] sm:text-xs mt-0.5 truncate ${labelColor}`}>
+                        {labelText}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
         </form>
@@ -1081,13 +1318,33 @@ const AppointmentScheduling = () => {
                 handleCancelAppointment(selectedAppointment.id)
                 setSelectedAppointment(null)
               }}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all shadow-md hover:shadow-lg active:scale-95 font-medium"
+              className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-all shadow-md active:scale-95 font-medium"
             >
               Cancel Appointment
             </button>
+            <button
+              onClick={() => {
+                handleDeleteAppointment(selectedAppointment.id)
+                setSelectedAppointment(null)
+              }}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all shadow-md active:scale-95 font-medium"
+            >
+              Delete
+            </button>
           </div>
         ) : (
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-3">
+            {selectedAppointment && (
+              <button
+                onClick={() => {
+                  handleDeleteAppointment(selectedAppointment.id)
+                  setSelectedAppointment(null)
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all shadow-md active:scale-95 font-medium"
+              >
+                Delete
+              </button>
+            )}
             <button
               onClick={() => setSelectedAppointment(null)}
               className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
@@ -1155,4 +1412,5 @@ const AppointmentScheduling = () => {
     </>
   )
 }
+
 export default AppointmentScheduling
