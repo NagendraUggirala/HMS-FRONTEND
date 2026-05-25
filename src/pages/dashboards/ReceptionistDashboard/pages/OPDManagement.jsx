@@ -18,10 +18,16 @@ import {
   HistoryEdu as HistoryEduIcon
 } from '@mui/icons-material';
 import { apiFetch } from '../../../../services/apiClient';
+import { toast } from 'react-toastify';
 import {
   DEPARTMENT_LIST,
   DOCTOR_LIST,
-  RECEPTIONIST_PATIENT_SEARCH
+  RECEPTIONIST_PATIENT_SEARCH,
+  OPD_PATIENT_CREATE, OPD_TOKENS, OPD_TOKEN_DETAILS, OPD_PATIENTS_LIST, 
+  OPD_PATIENT_STATUS, OPD_PATIENT_DELETE, OPD_DOCTORS, OPD_DOCTOR_CONFIG, 
+  OPD_DOCTOR_TOGGLE_STATUS, OPD_CONSULTATION, OPD_CONSULTATION_START, 
+  OPD_CONSULTATION_COMPLETE, OPD_CONSULTATION_DETAILS, OPD_CONSULTATION_BY_PATIENT, 
+  OPD_TRANSFER, OPD_TRANSFER_PATIENT, OPD_DASHBOARD_STATS
 } from '../../../../config/api';
 
 
@@ -441,153 +447,38 @@ const OPDManagement = () => {
         experience: d.experience ? `${d.experience} ${d.experienceUnit || 'years'}` : '10 years'
       })) : [];
 
-      // 2. Populate patients with mapped live doctor info
-      const initialPatients = [
-        {
-          id: 'OPD-001',
-          patientId: 'PAT-001',
-          patientName: 'Ravi Kumar',
-          age: 45,
-          gender: 'Male',
-          token: 'T-101',
-          waitingTime: '15 mins',
-          status: 'Waiting',
-          assignedDoctorId: mappedDoctors[0]?.id || 'D-001',
-          doctor: mappedDoctors[0]?.name || 'Dr. Meena Rao',
-          department: mappedDoctors[0]?.department || 'Cardiology',
-          priority: 'Normal',
-          queuePosition: 1,
-          arrivalTime: '9:15 AM',
-          bloodGroup: 'B+',
-          type: 'Regular',
-          visitType: 'New',
-          phoneNo: '+91 98765 43210',
-          vitals: { bp: '130/85', pulse: '78', temperature: '98.6', spo2: '97', weight: '78', height: '175' }
-        },
-        {
-          id: 'OPD-002',
-          patientId: 'PAT-002',
-          patientName: 'Anita Sharma',
-          age: 32,
-          gender: 'Female',
-          token: 'T-102',
-          waitingTime: '5 mins',
-          status: 'In Consultation',
-          assignedDoctorId: mappedDoctors[0]?.id || 'D-001',
-          doctor: mappedDoctors[0]?.name || 'Dr. Meena Rao',
-          department: mappedDoctors[0]?.department || 'Cardiology',
-          priority: 'Normal',
-          queuePosition: 1,
-          tests: ['CBC', 'Lipid Profile', 'Blood Sugar', 'ECG', 'Urine Routine'],
-          performedTests: ['CBC', 'Lipid Profile', 'Blood Sugar', 'ECG', 'Urine Routine'],
-          diagnosis: 'Mild Hypertension & Dyslipidemia',
-          prescription: '1. Tab. Amlodipine 5mg - OD - 30 Days\n2. Tab. Atorvastatin 10mg - HS - 30 Days\n3. Tab. Multivitamin - OD - 15 Days',
-          advice: 'Reduce salt intake. Morning walk for 30 mins daily. Review after 1 month.',
-          uploadedBy: 'Lab Tech (Ravi)',
-          date: '12 May 2026',
-          vitals: { bp: '145/95', pulse: '82', temperature: '98.4', spo2: '98', weight: '65', height: '162' },
-          arrivalTime: '9:00 AM',
-          bloodGroup: 'A+',
-          type: 'Follow-up',
-          visitType: 'Follow-up',
-          phoneNo: '+91 87654 32109'
-        },
-        {
-          id: 'OPD-003',
-          patientId: 'PAT-004',
-          patientName: 'Kiran Reddy',
-          age: 28,
-          gender: 'Male',
-          token: 'T-104',
-          waitingTime: '0 mins',
-          status: 'Completed',
-          assignedDoctorId: mappedDoctors[3]?.id || mappedDoctors[0]?.id || 'D-004',
-          doctor: mappedDoctors[3]?.name || mappedDoctors[0]?.name || 'Dr. Gupta',
-          department: mappedDoctors[3]?.department || mappedDoctors[0]?.department || 'General Medicine',
-          priority: 'Normal',
-          queuePosition: 1,
-          arrivalTime: '8:45 AM',
-          bloodGroup: 'AB+',
-          type: 'New Patient',
-          visitType: 'New',
-          phoneNo: '+91 65432 10987',
-          tests: ['CBC', 'Blood Sugar', 'Widal Test', 'Dengue NS1'],
-          surgeries: ['Stitching'],
-          vitals: { bp: '110/70', pulse: '88', temperature: '102.4', spo2: '96', weight: '68', height: '172' },
-          diagnosis: 'Acute Viral Fever (Suspected Dengue)',
-          prescription: '1. Tab. Paracetamol 650mg - QID - 3 Days\n2. Syp. Caripill - 10ml - TDS - 5 Days\n3. ORS Liquids - 2 Liters daily',
-          medicationList: [
-            { name: 'Paracetamol 650mg', dosage: '1 Tab', duration: '3 Days', instruction: 'After Food', frequency: { morning: true, afternoon: true, night: true } },
-            { name: 'Caripill Syrup', dosage: '10ml', duration: '5 Days', instruction: 'After Food', frequency: { morning: true, afternoon: true, night: true } }
-          ],
-          medications: ['Paracetamol 650mg', 'Caripill Syrup'],
-          advice: 'Complete bed rest. Monitor platelet count daily. High fluid intake.',
-          history: 'No major past illness. Fever since 2 days.',
-          allergies: 'None known.'
-        },
-        {
-          id: 'OPD-004',
-          patientId: 'PAT-005',
-          patientName: 'Pooja Desai',
-          age: 40,
-          gender: 'Female',
-          token: 'T-105',
-          waitingTime: '0 mins',
-          status: 'Exited',
-          assignedDoctorId: mappedDoctors[1]?.id || mappedDoctors[0]?.id || 'D-002',
-          doctor: mappedDoctors[1]?.name || mappedDoctors[0]?.name || 'Dr. Sharma',
-          department: mappedDoctors[1]?.department || mappedDoctors[0]?.department || 'Orthopedics',
-          priority: 'Normal',
-          queuePosition: 1,
-          arrivalTime: '8:00 AM',
-          bloodGroup: 'B-',
-          type: 'Follow-up',
-          visitType: 'Follow-up',
-          phoneNo: '+91 98765 12345',
-          tests: ['X-Ray Left Ankle', 'Bone Density Test'],
-          vitals: { bp: '110/70', pulse: '75', temperature: '98.4', spo2: '99', weight: '60', height: '160' },
-          diagnosis: 'Grade 1 Ankle Sprain',
-          prescription: '1. Tab. Ibuprofen 400mg - BD - 3 Days\n2. Oint. Volini - Local Application\n3. Crepe Bandage Application',
-          medicationList: [
-            { name: 'Ibuprofen 400mg', dosage: '1 Tab', duration: '3 Days', instruction: 'After Meals', frequency: { morning: true, afternoon: false, night: true } },
-            { name: 'Volini Ointment', dosage: 'Apply', duration: '5 Days', instruction: 'Local Application', frequency: { morning: true, afternoon: false, night: true } }
-          ],
-          medications: ['Ibuprofen 400mg', 'Volini Ointment'],
-          advice: 'Rest for 2 days. Avoid heavy lifting. Keep ankle elevated.',
-          followUpRequired: true,
-          followUpDate: '21 May 2026'
-        },
-        {
-          id: 'OPD-005',
-          patientId: 'PAT-006',
-          patientName: 'Sanjay Dutt',
-          age: 52,
-          gender: 'Male',
-          token: 'E-101',
-          waitingTime: 'Immediate',
-          status: 'Waiting',
-          assignedDoctorId: mappedDoctors[3]?.id || mappedDoctors[0]?.id || 'D-004',
-          doctor: mappedDoctors[3]?.name || mappedDoctors[0]?.name || 'Dr. Gupta',
-          department: mappedDoctors[3]?.department || mappedDoctors[0]?.department || 'General Medicine',
-          priority: 'Urgent',
-          queuePosition: 0,
-          arrivalTime: '10:45 AM',
-          bloodGroup: 'O-',
-          visitType: 'Emergency',
-          phoneNo: '+91 99988 77766',
-          vitals: { bp: '90/60', pulse: '110', temperature: '98.6', spo2: '92', weight: '82', height: '180' }
-        }
-      ].map(p => ({
-        ...p,
-        waitingTime: calculateWaitingTime(p.queuePosition)
-      }));
+      // 2. Fetch OPD tokens (patients in queue)
+      const tokenRes = await apiFetch(OPD_TOKENS);
+      const tokenData = await tokenRes.json().catch(() => ({}));
+      const tokensList = tokenData.data || tokenData || [];
+
+      const initialPatients = Array.isArray(tokensList) ? tokensList.map((t, idx) => ({
+        id: t.id || `OPD-${idx}`,
+        visitId: t.visit_id || t.id,
+        patientId: t.patientId || t.patient_id || 'Unknown',
+        patientName: t.patientName || t.patient_name || 'Unknown Patient',
+        age: t.age || 30,
+        gender: t.gender || 'Male',
+        token: t.tokenNumber || t.token_number || `T-${idx + 100}`,
+        waitingTime: calculateWaitingTime(idx + 1),
+        status: t.status || t.tokenStatus || 'Waiting',
+        assignedDoctorId: t.doctorId || t.doctor_user_id || 'Unknown',
+        doctor: t.doctorName || t.doctor_name || 'Dr. Unknown',
+        department: t.department || t.department_name || 'General',
+        priority: t.priority || 'Normal',
+        queuePosition: idx + 1,
+        arrivalTime: t.arrivalTime || t.arrival_time || '09:00 AM',
+        bloodGroup: t.bloodGroup || t.blood_group || 'O+',
+        visitType: t.visitType || t.visit_type || 'New',
+        phoneNo: t.phoneNo || t.phone || 'Not specified'
+      })) : [];
 
       const doctorsWithQueue = mappedDoctors.map(doctor => {
         const waitingPatients = initialPatients.filter(
-          p => p.assignedDoctorId === doctor.id && p.status === 'Waiting'
+          p => p.assignedDoctorId === doctor.id && p.status === 'WAITING' || p.status === 'Waiting'
         );
         const inConsultationPatient = initialPatients.find(
-          p => p.assignedDoctorId === doctor.id && p.status === 'In Consultation'
+          p => p.assignedDoctorId === doctor.id && p.status === 'IN_CONSULTATION' || p.status === 'In Consultation'
         );
 
         return {
@@ -605,6 +496,7 @@ const OPDManagement = () => {
       await loadApiPatients('');
     } catch (e) {
       console.error('Error loading live OPD data:', e);
+      toast.error('Failed to load OPD data');
     } finally {
       setLoading(false);
     }
@@ -738,34 +630,40 @@ const OPDManagement = () => {
     });
     setShowConsultationForm(true);
 
-    if (['Token Generated', 'Waiting', 'Vitals Completed'].includes(patient.status)) {
-      const updatedPatients = opdPatients.map(p => {
-        if (p.id === patient.id) {
-          return { ...p, status: 'In Consultation' };
+    if (['Token Generated', 'WAITING', 'Waiting', 'Vitals Completed'].includes(patient.status)) {
+      apiFetch(OPD_PATIENT_STATUS(patient.visitId), {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'IN_CONSULTATION' })
+      }).then(res => {
+        if (res.ok) {
+          loadOPDData();
+        } else {
+          toast.error('Failed to update patient status');
         }
-        return p;
+      }).catch(err => {
+        console.error('Error updating status:', err);
       });
-      setOpdPatients(updatedPatients);
     }
   };
 
-  const handlePatientExit = (patient) => {
-    setOpdPatients(prev => prev.map(p => {
-      if (p.id === patient.id) {
-        return {
-          ...p,
-          status: 'Exited',
-          exitDate: new Date().toLocaleDateString(),
-          exitTime: new Date().toLocaleTimeString(),
-          billingStatus: 'Paid',
-          followUpRequired: exitForm.followUpRequired,
-          followUpDate: exitForm.followUpDate,
-          exitRemarks: exitForm.remarks
-        };
+  const handlePatientExit = async (patient) => {
+    try {
+      const res = await apiFetch(OPD_PATIENT_STATUS(patient.visitId), {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'COMPLETED' })
+      });
+      
+      if (res.ok) {
+        toast.success(`${patient.patientName} has been successfully checked out and visit record finalized.`);
+        loadOPDData();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.message || err.detail || 'Failed to check out patient');
       }
-      return p;
-    }));
-    alert(`${patient.patientName} has been successfully checked out and visit record finalized.`);
+    } catch (e) {
+      console.error('Error checking out patient:', e);
+      toast.error('Error connecting to the server');
+    }
   };
 
   const generateToken = () => {
@@ -800,65 +698,49 @@ const OPDManagement = () => {
     setShowTokenModal(true);
   };
 
-  const handleTokenSubmit = (e) => {
+  const handleTokenSubmit = async (e) => {
     e.preventDefault();
 
     if (!tokenForm.patientName || !tokenForm.department || !tokenForm.doctorId) {
-      alert('Please fill in all required fields');
+      toast.error('Please fill in all required fields (Patient Name, Department, Doctor)');
       return;
     }
 
-    const selectedDoctor = doctors.find(d => d.id === tokenForm.doctorId);
-    const tokenNumber = Math.floor(Math.random() * 1000);
-    const currentTime = new Date();
-    const arrivalTime = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    try {
+      const payload = {
+        patientId: tokenForm.patientId || null,
+        patientName: tokenForm.patientName,
+        phoneNo: tokenForm.phoneNo || null,
+        email: tokenForm.email || null,
+        age: tokenForm.age ? parseInt(tokenForm.age) : null,
+        gender: tokenForm.gender || "Male",
+        bloodGroup: tokenForm.bloodGroup || null,
+        address: tokenForm.address || null,
+        department: tokenForm.department || null,
+        doctorId: tokenForm.doctorId || null, // Must be UUID or null
+        type: tokenForm.visitType || "Regular",
+        priority: tokenForm.priority || "Normal"
+      };
 
-    // Calculate queue position for the selected doctor
-    const doctorWaitingPatients = opdPatients.filter(
-      p => p.assignedDoctorId === tokenForm.doctorId && p.status === 'Waiting'
-    );
-    let queuePosition = doctorWaitingPatients.length;
+      const res = await apiFetch(OPD_TOKENS, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
 
-    const newToken = {
-      id: `OPD-${Date.now()}`,
-      uhid: tokenForm.uhid || `UHID-${Math.floor(100000 + Math.random() * 900000)}`,
-      visitId: `VST-${Math.floor(10000 + Math.random() * 90000)}`,
-      tokenNumber: `T-${tokenNumber}`,
-      patientId: tokenForm.patientId || tokenForm.uhid || `PAT-${Math.floor(1000 + Math.random() * 9000)}`,
-      patientName: tokenForm.patientName,
-      phoneNo: tokenForm.phoneNo || 'Not specified',
-      email: tokenForm.email || 'Not specified',
-      age: tokenForm.age || 'Not specified',
-      gender: tokenForm.gender,
-      token: `T-${tokenNumber}`,
-      waitingTime: calculateWaitingTime(queuePosition + 1),
-      status: 'Token Generated',
-      assignedDoctorId: tokenForm.doctorId,
-      doctor: selectedDoctor.name,
-      department: tokenForm.department,
-      visitType: tokenForm.visitType,
-      appointmentType: tokenForm.appointmentType,
-      priority: tokenForm.priority,
-      queuePosition: queuePosition + 1,
-      arrivalTime: arrivalTime,
-      bloodGroup: tokenForm.bloodGroup || 'Not specified',
-      address: tokenForm.address || 'Not specified',
-      referredBy: tokenForm.referredBy
-    };
-
-    setOpdPatients([newToken, ...opdPatients]);
-
-    // Update doctor's queue count
-    const updatedDoctors = doctors.map(d => {
-      if (d.id === tokenForm.doctorId) {
-        return { ...d, queue: d.queue + 1 };
+      if (res.ok) {
+        const data = await res.json();
+        toast.success('Token generated successfully');
+        setGeneratedToken(data.data || data);
+        setTokenStep('slip');
+        loadOPDData(); // Refresh the list
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.message || err.detail || 'Failed to generate token. Database constraint may be violated.');
       }
-      return d;
-    });
-    setDoctors(updatedDoctors);
-
-    setGeneratedToken(newToken);
-    setTokenStep('slip');
+    } catch (error) {
+      console.error('Error generating token:', error);
+      toast.error('Error connecting to the server');
+    }
   };
 
   const handlePrintPrescription = () => {
@@ -1082,58 +964,24 @@ const OPDManagement = () => {
     printWindow.document.close();
   };
 
-  const handleConfirmDeactivation = () => {
+  const handleConfirmDeactivation = async () => {
     if (!doctorToDeactivate) return;
     const doctorId = doctorToDeactivate.id;
-    const activeDoctors = doctors.filter(d => d.isActive && d.id !== doctorId);
-    if (activeDoctors.length === 0) {
-      alert('No other active doctors available. Cannot deactivate.');
-      return;
-    }
-
-    let updatedPatients = [...opdPatients];
-    let currentDoctors = [...doctors];
-    patientsToReassign.forEach(patient => {
-      const bestDoctor = activeDoctors.reduce((prev, curr) =>
-        prev.queue < curr.queue ? prev : curr
-      );
-      const newQueuePosition = updatedPatients.filter(
-        p => p.assignedDoctorId === bestDoctor.id && p.status === 'Waiting'
-      ).length;
-      updatedPatients = updatedPatients.map(p => {
-        if (p.id === patient.id) {
-          return {
-            ...p,
-            assignedDoctorId: bestDoctor.id,
-            doctor: bestDoctor.name,
-            department: bestDoctor.department,
-            queuePosition: newQueuePosition + 1,
-            waitingTime: `${(newQueuePosition + 1) * 15} mins`
-          };
-        }
-        return p;
+    try {
+      const res = await apiFetch(OPD_DOCTOR_TOGGLE_STATUS(doctorId), {
+        method: 'PUT'
       });
-
-      // Update the queue count for the best doctor in our local copy
-      const bestDocIndex = activeDoctors.findIndex(d => d.id === bestDoctor.id);
-      if (bestDocIndex !== -1) {
-        activeDoctors[bestDocIndex].queue += 1;
+      if (res.ok) {
+        toast.success('Doctor status toggled successfully');
+        loadOPDData();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.message || 'Failed to toggle doctor status');
       }
-    });
-    // Update doctors state
-    const finalDoctors = currentDoctors.map(d => {
-      const matchingActiveDoc = activeDoctors.find(ad => ad.id === d.id);
-      if (matchingActiveDoc) {
-        return { ...d, queue: matchingActiveDoc.queue };
-      }
-      if (d.id === doctorId) {
-        return { ...d, isActive: false, queue: 0, currentPatient: null, currentPatientName: null };
-      }
-      return d;
-    });
-
-    setOpdPatients(updatedPatients);
-    setDoctors(finalDoctors);
+    } catch (e) {
+      console.error('Error toggling doctor status:', e);
+      toast.error('Error connecting to the server');
+    }
     setShowDeactivateModal(false);
     setDoctorToDeactivate(null);
     setPatientsToReassign([]);
@@ -1152,82 +1000,53 @@ const OPDManagement = () => {
     setShowTransferModal(true);
   };
 
-  const handleConfirmTransfer = () => {
+  const handleConfirmTransfer = async () => {
     if (!selectedTransferDoctor || !transferPatient) return;
-    const newDoctor = selectedTransferDoctor;
-    const patient = transferPatient;
-    const newQueueCount = opdPatients.filter(
-      p => p.assignedDoctorId === newDoctor.id && p.status === 'Waiting'
-    ).length;
-    const oldDoctor = doctors.find(d => d.id === patient.assignedDoctorId);
-    const updatedDoctors = doctors.map(doctor => {
-      if (doctor.id === oldDoctor.id) {
-        return { ...doctor, queue: Math.max(0, doctor.queue - 1) };
+    try {
+      const payload = {
+        opd_visit_id: transferPatient.visitId,
+        to_doctor_user_id: selectedTransferDoctor.id,
+        reason: 'Patient transferred from reception'
+      };
+      const res = await apiFetch(OPD_TRANSFER_PATIENT, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        toast.success('Patient transferred successfully');
+        loadOPDData();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.message || 'Failed to transfer patient');
       }
-      if (doctor.id === newDoctor.id) {
-        return { ...doctor, queue: doctor.queue + 1 };
-      }
-      return doctor;
-    });
-
-    const updatedPatients = opdPatients.map(p => {
-      if (p.id === patient.id) {
-        return {
-          ...p,
-          assignedDoctorId: newDoctor.id,
-          doctor: newDoctor.name,
-          department: newDoctor.department,
-          queuePosition: newQueueCount + 1,
-          waitingTime: `${(newQueueCount + 1) * 15} mins`
-        };
-      }
-      if (p.assignedDoctorId === oldDoctor.id && p.status === 'Waiting' && p.queuePosition > patient.queuePosition) {
-        return { ...p, queuePosition: p.queuePosition - 1 };
-      }
-      return p;
-    });
-    setDoctors(updatedDoctors);
-    setOpdPatients(updatedPatients);
+    } catch (e) {
+      console.error('Error transferring patient:', e);
+    }
     setShowTransferModal(false);
     setTransferPatient(null);
     setSelectedTransferDoctor(null);
   };
 
-  const handleCancelPatient = (patient) => {
+  const handleCancelPatient = async (patient) => {
     if (window.confirm(`Cancel token ${patient.token} for ${patient.patientName}?`)) {
-      if (patient.assignedDoctorId) {
-        const updatedDoctors = doctors.map(doctor => {
-          if (doctor.id === patient.assignedDoctorId) {
-            const newQueue = patient.status === 'In Consultation' ? doctor.queue : Math.max(0, doctor.queue - 1);
-            const currentPatient = patient.status === 'In Consultation' ? null : doctor.currentPatient;
-            const currentPatientName = patient.status === 'In Consultation' ? null : doctor.currentPatientName;
-            return {
-              ...doctor,
-              queue: newQueue,
-              currentPatient,
-              currentPatientName
-            };
-          }
-          return doctor;
+      try {
+        const res = await apiFetch(OPD_PATIENT_DELETE(patient.visitId), {
+          method: 'DELETE'
         });
-
-        const updatedPatients = opdPatients
-          .filter(p => p.id !== patient.id)
-          .map(p => {
-            if (p.assignedDoctorId === patient.assignedDoctorId &&
-              p.status === 'Waiting' &&
-              p.queuePosition > patient.queuePosition) {
-              return { ...p, queuePosition: p.queuePosition - 1 };
-            }
-            return p;
-          });
-        setDoctors(updatedDoctors);
-        setOpdPatients(updatedPatients);
-      } else {
-        setOpdPatients(opdPatients.filter(p => p.id !== patient.id));
+        if (res.ok) {
+          toast.success('Patient visit cancelled successfully');
+          loadOPDData();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          toast.error(err.message || 'Failed to cancel patient');
+        }
+      } catch (e) {
+        console.error('Error cancelling patient:', e);
+        toast.error('Error connecting to the server');
       }
     }
   };
+
   const handlePrintSlip = () => {
     const printWindow = window.open('', '', 'width=800,height=800');
     const invoiceHTML = `
@@ -1526,40 +1345,40 @@ const OPDManagement = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
-        {/* TOTAL PATIENTS */}
+        {/* TOTAL QUEUE */}
         <div className="relative bg-white rounded-xl p-5 border border-gray-200 border-t-[3px] border-t-blue-500 shadow-sm overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-50/40 via-transparent to-transparent pointer-events-none" />
           <div className="relative flex flex-col">
             <p className="text-3xl font-bold text-blue-600 mb-1">{opdPatients.length}</p>
-            <p className="text-sm font-semibold text-gray-800">Total Patients</p>
-            <p className="text-xs text-blue-500 mt-1">Active: {opdPatients.filter(p => p.status === 'Waiting').length} waiting </p>
+            <p className="text-sm font-semibold text-gray-800">Total Queue</p>
+            <p className="text-xs text-blue-500 mt-1">Tokens issued today</p>
           </div>
         </div>
-        {/* ACTIVE DOCTORS */}
-        <div className="relative bg-white rounded-xl p-5 border border-gray-200 border-t-[3px] border-t-green-500 shadow-sm overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-green-50/40 via-transparent to-transparent pointer-events-none" />
-          <div className="relative flex flex-col">
-            <p className="text-3xl font-bold text-green-600 mb-1">{activeDoctors.length}</p>
-            <p className="text-sm font-semibold text-gray-800">Active Doctors</p>
-            <p className="text-xs text-green-500 mt-1">{doctors.length} total doctors</p>
-          </div>
-        </div>
-        {/* IN CONSULTATION */}
+        {/* WAITING PATIENTS */}
         <div className="relative bg-white rounded-xl p-5 border border-gray-200 border-t-[3px] border-t-yellow-500 shadow-sm overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-yellow-50/40 via-transparent to-transparent pointer-events-none" />
           <div className="relative flex flex-col">
-            <p className="text-3xl font-bold text-yellow-500 mb-1">{opdPatients.filter(p => p.status === 'In Consultation').length}</p>
-            <p className="text-sm font-semibold text-gray-800">In Consultation</p>
-            <p className="text-xs text-yellow-600 mt-1">Patients currently with doctors</p>
+            <p className="text-3xl font-bold text-yellow-600 mb-1">{opdPatients.filter(p => p.status?.toUpperCase() === 'WAITING' || p.status === 'Waiting').length}</p>
+            <p className="text-sm font-semibold text-gray-800">Waiting Patients</p>
+            <p className="text-xs text-yellow-500 mt-1">Patients waiting for doctor</p>
           </div>
         </div>
-        {/* COMPLETED TODAY */}
+        {/* PENDING BILLING */}
         <div className="relative bg-white rounded-xl p-5 border border-gray-200 border-t-[3px] border-t-purple-500 shadow-sm overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-purple-50/40 via-transparent to-transparent pointer-events-none" />
           <div className="relative flex flex-col">
-            <p className="text-3xl font-bold text-purple-600 mb-1">{opdPatients.filter(p => p.status === 'Completed').length}</p>
-            <p className="text-sm font-semibold text-gray-800">Completed Today</p>
-            <p className="text-xs text-purple-500 mt-1">Throughput for today</p>
+            <p className="text-3xl font-bold text-purple-500 mb-1">{opdPatients.filter(p => p.status?.toUpperCase() === 'COMPLETED' || p.status === 'Completed').length}</p>
+            <p className="text-sm font-semibold text-gray-800">Pending Billing</p>
+            <p className="text-xs text-purple-600 mt-1">Consultation done, awaiting bill</p>
+          </div>
+        </div>
+        {/* PATIENTS EXITED */}
+        <div className="relative bg-white rounded-xl p-5 border border-gray-200 border-t-[3px] border-t-green-500 shadow-sm overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-green-50/40 via-transparent to-transparent pointer-events-none" />
+          <div className="relative flex flex-col">
+            <p className="text-3xl font-bold text-green-600 mb-1">{opdPatients.filter(p => p.status?.toUpperCase() === 'EXITED' || p.status === 'Exited').length}</p>
+            <p className="text-sm font-semibold text-gray-800">Patients Exited</p>
+            <p className="text-xs text-green-500 mt-1">Fully processed today</p>
           </div>
         </div>
       </div>
@@ -1571,39 +1390,9 @@ const OPDManagement = () => {
           <PersonIcon className="mr-2" fontSize="small" />Patients ({opdPatients.length})
         </button>
 
-        {/* Emergency */}
-        <button className={`px-4 py-3 font-medium text-sm flex items-center whitespace-nowrap ${activeTab === 'emergency' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'}`} onClick={() => setActiveTab('emergency')}>
-          <WarningIcon className="mr-2" fontSize="small" />Emergency
-        </button>
-
-        {/* Consultation */}
-        <button className={`px-4 py-3 font-medium text-sm flex items-center whitespace-nowrap ${activeTab === 'consultation' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'}`} onClick={() => setActiveTab('consultation')}>
-          <DescriptionIcon className="mr-2" fontSize="small" />Consultation
-        </button>
-
-        {/* Lab */}
-        <button className={`px-4 py-3 font-medium text-sm flex items-center whitespace-nowrap ${activeTab === 'lab' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'}`} onClick={() => setActiveTab('lab')}>
-          <ScienceIcon className="mr-2" fontSize="small" />Lab
-        </button>
-
-        {/* Pharmacy */}
-        <button className={`px-4 py-3 font-medium text-sm flex items-center whitespace-nowrap ${activeTab === 'pharmacy' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'}`} onClick={() => setActiveTab('pharmacy')}>
-          <MedicationIcon className="mr-2" fontSize="small" />Pharmacy
-        </button>
-
-        {/* Referrals */}
-        <button className={`px-4 py-3 font-medium text-sm flex items-center whitespace-nowrap ${activeTab === 'referrals' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'}`} onClick={() => setActiveTab('referrals')}>
-          <SwapHorizIcon className="mr-2" fontSize="small" />Referrals
-        </button>
-
         {/* Billing */}
         <button className={`px-4 py-3 font-medium text-sm flex items-center whitespace-nowrap ${activeTab === 'billing' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'}`} onClick={() => setActiveTab('billing')}>
           <ReceiptLongIcon className="mr-2" fontSize="small" />Billing
-        </button>
-
-        {/* Reports */}
-        <button className={`px-4 py-3 font-medium text-sm flex items-center whitespace-nowrap ${activeTab === 'reports' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'}`} onClick={() => setActiveTab('reports')}>
-          <AssessmentIcon className="mr-2" fontSize="small" />Reports
         </button>
 
         {/* Patient Exit */}
@@ -1770,562 +1559,7 @@ const OPDManagement = () => {
 
         </div>
       )}
-      {/* Emergency Tab */}
-      {activeTab === 'emergency' && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4">
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div>
-                <h3 className="text-lg font-black text-gray-900 tracking-tight">Emergency Triage Queue</h3>
-              </div>
-            </div>
-            <div className="relative w-64">
-              <input type="text" placeholder="Search emergency..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 shadow-sm" value={patientQueueSearch} onChange={(e) => setPatientQueueSearch(e.target.value)} />
-              <SearchIcon className="absolute left-3 top-2.5 text-gray-400" fontSize="small" />
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Patient</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Doctor</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Queue</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {opdPatients.filter(p => p.visitType === 'Emergency' || p.priority === 'Urgent').length === 0 ? (
-                  <tr>
-                    <td colSpan="5" className="px-4 py-12 text-center text-gray-500 italic">
-                      No active emergency cases currently recorded in triage.
-                    </td>
-                  </tr>
-                ) : (
-                  opdPatients.filter(p => p.visitType === 'Emergency' || p.priority === 'Urgent').map(patient => (
-                    <tr key={patient.id} className="hover:bg-red-50/20">
-                      <td className="px-4 py-4 align-middle">
-                        <div>
-                          <p className="font-medium text-gray-900">{patient.patientName}</p>
-                          <p className="text-xs text-gray-500 mt-1">{patient.token} • {patient.age}y, {patient.gender}</p>
-                          <div className="flex gap-2 mt-1.5">
-                            <span className="text-[9px] font-black text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-100">BP: {patient.vitals?.bp}</span>
-                            <span className="text-[9px] font-black text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-100">SpO2: {patient.vitals?.spo2}%</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 align-middle">
-                        <div>
-                          <p className="font-medium text-gray-900">{patient.doctor}</p>
-                          <p className="text-xs text-gray-500">{patient.department}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 align-middle">
-                        <div className="flex items-center">
-                          <span className={`text-sm font-bold ${patient.priority === 'Urgent' ? 'text-red-600' : 'text-gray-700'}`}>
-                            {patient.waitingTime}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 align-middle">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium w-fit transition-all cursor-default ${getStatusColor(patient.status)}`}>
-                          {patient.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 align-middle">
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => { setSelectedPatientForView(patient); setShowViewPatientModal(true); }} title="View Patient Details" className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded transition-colors">
-                            <VisibilityIcon fontSize="small" />
-                          </button>
-                          {['Waiting', 'Token Generated'].includes(patient.status) && patient.assignedDoctorId && (
-                            <>
-                              <button onClick={() => handleStartConsultation(patient)} title="Start Emergency Consultation" className="w-8 h-8 flex items-center justify-center text-green-600 hover:bg-red-50 rounded transition-colors">
-                                <PlayArrowIcon fontSize="small" />
-                              </button>
 
-                              <button onClick={() => handleTransferPatient(patient)} title="Transfer" className="w-8 h-8 flex items-center justify-center text-yellow-600 hover:bg-blue-50 rounded transition-colors">
-                                <SwapHorizIcon fontSize="small" />
-                              </button>
-                            </>
-                          )}
-
-                          {patient.status === 'In Consultation' && (
-                            <button onClick={() => handleStartConsultation(patient)} title="View Consultation" className="w-8 h-8 flex items-center justify-center text-blue-600 hover:bg-blue-50 rounded transition-colors">
-                              <DescriptionIcon fontSize="small" />
-                            </button>
-                          )}
-                          <button onClick={() => handleCancelPatient(patient)} title="Cancel Emergency Record" className="w-8 h-8 flex items-center justify-center text-red-600 hover:bg-blue-50 rounded transition-colors">
-                             <CloseIcon fontSize="small" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-      {/* Consultation Tab */}
-      {activeTab === 'consultation' && (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-gray-200">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <h3 className="text-lg font-semibold text-gray-800">Ongoing Consultations</h3>
-              <div className="relative w-full sm:w-64">
-                <input type="text" placeholder="Search consultations..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500" value={consultationSearch} onChange={(e) => setConsultationSearch(e.target.value)} />
-                <SearchIcon className="absolute left-3 top-2.5 text-gray-400 text-sm" fontSize="small" />
-              </div>
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 ">Patient</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 ">Doctor</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 ">Room</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 ">Duration</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 ">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {opdPatients.filter(p => p.status === 'In Consultation' && p.patientName.toLowerCase().includes(consultationSearch.toLowerCase())).map(patient => (
-                  <tr key={patient.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-4 font-medium text-gray-900">{patient.patientName}<br /><span className="text-xs text-gray-500">{patient.token}</span></td>
-                    <td className="px-4 py-4">{patient.doctor}</td>
-                    <td className="px-4 py-4">{doctors.find(d => d.id === patient.assignedDoctorId)?.opdRoom || 'N/A'}</td>
-                    <td className="px-4 py-4">12 mins</td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => { setSelectedPatientForView(patient); setShowViewPatientModal(true); }} title="View Patient Details" className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded">
-                          <VisibilityIcon fontSize="small" />
-                        </button>
-                        <button onClick={() => handleStartConsultation(patient)} title="View Consultation Notes" className="w-8 h-8 flex items-center justify-center text-blue-600 hover:bg-blue-50 rounded">
-                          <DescriptionIcon fontSize="small" />
-                        </button>
-                        <button onClick={() => handleCancelPatient(patient)} title="Cancel/End Consultation" className="w-8 h-8 flex items-center justify-center text-red-600 hover:bg-red-50 rounded">
-                          <CloseIcon fontSize="small" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-      {/* Lab Tab */}
-      {activeTab === 'lab' && (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-gray-200">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-800">Lab Investigations</h3>
-              </div>
-              <div className="relative w-full sm:w-64">
-                <input type="text" placeholder="Search lab orders..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500" value={labSearch} onChange={(e) => setLabSearch(e.target.value)} />
-                <SearchIcon className="absolute left-3 top-2.5 text-gray-400 text-sm" fontSize="small" />
-              </div>
-            </div>
-          </div>
-          <div className="overflow-x-auto bg-white rounded-2xl border border-slate-200 shadow-sm">
-            <table className="min-w-full text-sm border-collapse">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 tracking-[0.2em] ">Test Date</th>
-                  <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 tracking-[0.2em] ">Patient Identity</th>
-                  <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 tracking-[0.2em] ">Prescribed Panel</th>
-                  <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 tracking-[0.2em] ">Fulfillment Status</th>
-                  <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 tracking-[0.2em] ">Clinical Result</th>
-                  <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 tracking-[0.2em] ">Authorized By</th>
-                  <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 tracking-[0.2em] ">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {opdPatients.filter(p => p.status !== 'Exited' && p.patientName.toLowerCase().includes(labSearch.toLowerCase())).map(patient => (
-                  <tr key={patient.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-black text-slate-700">{formattedCurrentDate}</span>
-                        <span className="text-[9px] font-bold text-slate-400  tracking-tighter">Diagnostic Cycle</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-black text-slate-900  tracking-tight">{patient.patientName}</span>
-                        <span className="text-[10px] font-medium text-slate-500">UHID: {patient.patientId}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="max-w-[200px]">
-                        <p className="text-xs font-bold text-slate-600 truncate" title={(patient.tests || []).join(', ')}>
-                          {(patient.tests || []).join(', ') || 'General Panel'}
-                        </p>
-                        <p className="text-[9px] font-black text-blue-600  tracking-widest mt-0.5">
-                          {(patient.tests || []).length > 1 ? 'Multi-Parameter' : 'Specific Investigation'}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black  tracking-widest ${patient.status === 'Completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-amber-50 text-amber-700 border border-amber-100'}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${patient.status === 'Completed' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-                        {patient.status === 'Completed' ? 'Completed' : 'Processing'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {patient.status === 'Completed' ? (
-                        <div className="flex items-center gap-2">
-                          <CheckCircleIcon sx={{ fontSize: 14 }} className="text-emerald-500" />
-                          <span className="text-xs font-bold text-slate-700 italic">Normal Range</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <AccessTimeIcon sx={{ fontSize: 14 }} className="text-slate-300" />
-                          <span className="text-xs font-bold text-slate-400  tracking-widest">Pending</span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        {patient.uploadedBy || (patient.status === 'Completed' ? 'Senior Lab Tech' : 'Pending Authorization')}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-start gap-2">
-                        <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-all border border-transparent hover:border-blue-100 shadow-sm hover:shadow-md" title="View Detailed Diagnostic Report" onClick={() => handleViewLabResult(patient)}>
-                          <VisibilityIcon sx={{ fontSize: 18 }} />
-                        </button>
-                        <button className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all border border-transparent hover:border-emerald-100 shadow-sm hover:shadow-md" title="Download Verified PDF Report">
-                          <PrintIcon sx={{ fontSize: 18 }} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-      {/* Pharmacy Tab */}
-      {activeTab === 'pharmacy' && (
-        <div className="space-y-6">
-          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-800">Pharmacy Queue</h3>
-              </div>
-              <div className="relative w-full sm:w-64">
-                <input type="text" placeholder="Search prescriptions..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 shadow-sm" value={pharmacySearch} onChange={(e) => setPharmacySearch(e.target.value)} />
-                <SearchIcon className="absolute left-3 top-2.5 text-gray-400 text-sm" fontSize="small" />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {opdPatients.filter(p => p.status === 'Completed' && p.patientName.toLowerCase().includes(pharmacySearch.toLowerCase())).map(patient => (
-              <div key={patient.id} className="bg-white rounded-3xl border border-gray-200 shadow-sm hover:shadow-md transition-all overflow-hidden group">
-                <div className="p-6 border-b border-gray-100">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600"><MedicationIcon sx={{ fontSize: 28 }} /></div>
-                    <span className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-black tracking-[0.2em] border border-green-100">Ready</span>
-                  </div>
-                  <h4 className="text-xl font-black text-gray-900 tracking-tight">{patient.patientName}</h4>
-                  <p className="text-[10px] font-bold text-gray-400 tracking-widest mt-1">{patient.patientId}</p>
-                </div>
-
-                <div className="p-6 space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-black text-gray-400 tracking-widest">Prescribing Doctor</p>
-                      <p className="text-sm font-bold text-gray-800">{patient.doctor}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-black text-gray-400 tracking-widest">Department</p>
-                      <p className="text-sm font-bold text-gray-800">{patient.department}</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <p className="text-[10px] font-black text-gray-900 tracking-[0.2em]  mb-4 flex items-center gap-2">
-                      Medication Preview
-                    </p>
-
-                    {(patient.medicationList || [
-                      { name: 'Paracetamol 500mg', dosage: '1 Tab', duration: '5 Days', instruction: 'After Breakfast', frequency: { morning: true, afternoon: true, night: true } },
-                      { name: 'Amoxicillin 250mg', dosage: '1 Cap', duration: '7 Days', instruction: 'Before Food', frequency: { morning: true, afternoon: false, night: true } },
-                      { name: 'Cetirizine 10mg', dosage: '1 Tab', duration: '3 Days', instruction: 'After Food', frequency: { morning: false, afternoon: false, night: true } }
-                    ]).map((med, index) => (
-                      <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                        <div className="min-w-0">
-                          <p className="text-sm font-black text-gray-900 truncate tracking-tight">{med.name}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] font-bold text-blue-600 bg-white px-2 py-0.5 rounded border border-blue-50">{med.dosage || med.dose}</span>
-                            <span className="text-[10px] font-bold text-gray-400">{med.duration}</span>
-                            <span className="text-[10px] font-bold text-blue-600">{med.instruction}</span>
-                          </div>
-                        </div>
-                        <div className="flex gap-1 shrink-0 ml-2">
-                          {['M', 'A', 'N'].map((slot, idx) => {
-                            const active = idx === 0 ? (med.frequency?.morning || med.morning) :
-                              idx === 1 ? (med.frequency?.afternoon || med.afternoon) :
-                                (med.frequency?.night || med.night);
-                            return (
-                              <div key={slot} className={`w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-black border ${active ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-200 text-gray-300'}`}>
-                                {slot}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="pt-6 border-t border-gray-50 flex justify-end gap-3">
-                    <button className="w-12 h-12 border-2 border-gray-100 text-blue-700 rounded-2xl flex items-center justify-center group" title="View Prescription Details" onClick={() => {
-                      setSelectedPharmacyRecord({
-                        ...patient,
-                        prescriptions: [
-                          { name: 'Paracetamol 500mg', dose: '1-1-1', duration: '5 Days', instruction: 'After Breakfast', morning: true, afternoon: true, night: true },
-                          { name: 'Amoxicillin 250mg', dose: '1-0-1', duration: '7 Days', instruction: 'Before Food', morning: true, afternoon: false, night: true },
-                          { name: 'Cetirizine 10mg', dose: '0-0-1', duration: '10 Days', instruction: 'After Dinner', morning: false, afternoon: false, night: true }
-                        ]
-                      });
-                      setShowPharmacyModal(true);
-                    }}>
-                      <VisibilityIcon sx={{ fontSize: 22 }} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {/* Referrals Tab */}
-      {activeTab === 'referrals' && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4">
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-black text-gray-900 tracking-tight">Patient Referral & Transfer</h3>
-            </div>
-            <div className="relative w-64">
-              <input type="text" placeholder="Search for referral..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 shadow-sm" value={patientQueueSearch} onChange={(e) => setPatientQueueSearch(e.target.value)} />
-              <SearchIcon className="absolute left-3 top-2.5 text-gray-400" fontSize="small" />
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Patient</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Doctor</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Queue</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 whitespace-nowrap">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {opdPatients.filter(p => p.status !== 'Exited' && p.patientName.toLowerCase().includes(patientQueueSearch.toLowerCase())).map(patient => (
-                  <tr key={patient.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-4 align-middle">
-                      <div>
-                        <p className="font-medium text-gray-900">{patient.patientName}</p>
-                        <p className="text-xs text-gray-500 mt-1">{patient.token} • {patient.age}y, {patient.gender}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 align-middle">
-                      <div>
-                        <p className="font-medium text-gray-900">{patient.doctor}</p>
-                        <p className="text-xs text-gray-500">{patient.department}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 align-middle">
-                      <div className="flex items-center">
-                        <span className="w-7 h-7 mr-2 rounded-full bg-yellow-100 text-yellow-800 flex items-center justify-center text-xs font-semibold shadow-sm">{patient.queuePosition || 1}</span>
-                        <span className="text-xs text-gray-600">{patient.waitingTime || 'Immediate'}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 align-middle">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium w-fit transition-all ${getStatusColor(patient.status)}`}>
-                        {patient.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 align-middle">
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => { setSelectedPatientForView(patient); setShowViewPatientModal(true); }} title="View Patient Details" className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded transition-colors">
-                          <VisibilityIcon fontSize="small" />
-                        </button>
-
-                        {patient.status === 'In Consultation' && (
-                          <button onClick={() => handleStartConsultation(patient)} title="View Consultation" className="w-8 h-8 flex items-center justify-center text-blue-600 hover:bg-blue-50 rounded transition-colors">
-                            <DescriptionIcon fontSize="small" />
-                          </button>
-                        )}
-
-                        <button onClick={() => handleCancelPatient(patient)} title="Cancel" className="w-8 h-8 flex items-center justify-center text-red-600 hover:bg-red-50 rounded transition-colors">
-                          <DeleteIcon fontSize="small" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-      {/* Reports Tab */}
-      {activeTab === 'reports' && (
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">OPD Reports</h3>
-              </div>
-
-              <div className="relative w-full lg:w-72">
-                <input type="text" placeholder="Search patient, token, doctor..." className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm" value={reportsSearch} onChange={(e) => setReportsSearch(e.target.value)} />
-                <SearchIcon className="absolute left-3 top-3 text-gray-400" fontSize="small" />
-              </div>
-
-            </div>
-          </div>
-
-          {/* Reports Table */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-
-                {/* Table Header */}
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-5 py-4 text-left text-[11px] font-black tracking-widest text-gray-500 ">Report Info</th>
-                    <th className="px-5 py-4 text-left text-[11px] font-black tracking-widest text-gray-500 ">Patient Details</th>
-                    <th className="px-5 py-4 text-left text-[11px] font-black tracking-widest text-gray-500 ">Visit Details</th>
-                    <th className="px-5 py-4 text-left text-[11px] font-black tracking-widest text-gray-500 ">Doctor & Department</th>
-                    <th className="px-5 py-4 text-left text-[11px] font-black tracking-widest text-gray-500 ">Report Status</th>
-                    <th className="px-5 py-4 text-center text-[11px] font-black tracking-widest text-gray-500 ">Actions</th>
-                  </tr>
-                </thead>
-
-                {/* Table Body */}
-                <tbody className="divide-y divide-gray-100">
-
-                  {opdPatients.filter(patient => patient.patientName?.toLowerCase().includes(reportsSearch.toLowerCase()) || patient.patientId?.toLowerCase().includes(reportsSearch.toLowerCase()) || patient.token?.toLowerCase().includes(reportsSearch.toLowerCase()) || patient.doctor?.toLowerCase().includes(reportsSearch.toLowerCase())).map(patient => {
-
-                    return (
-                      <tr key={patient.id} className="hover:bg-gray-50 transition-all">
-                        {/* Report Info */}
-                        <td className="px-5 py-5">
-                          <div className="space-y-1">
-                            <p className="text-xs font-black text-gray-900"> {patient.status === 'Exited' ? `OPD_FINAL_${patient.token}` : `OPD_VISIT_${patient.token}`} </p>
-                            <p className="text-[10px] font-bold text-gray-400 tracking-widest">GENERATED REPORT</p>
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="px-2 py-1 rounded-lg bg-gray-100 text-gray-700 text-[10px] font-bold">{patient.token}</span>
-                              <span className="px-2 py-1 rounded-lg bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-100">{patient.visitType || 'New'}</span>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Patient Details */}
-                        <td className="px-5 py-5">
-                          <div className="space-y-1">
-                            <p className="text-sm font-bold text-gray-900"> {patient.patientName} </p>
-                            <p className="text-[11px] text-gray-500 font-medium"> {patient.patientId} </p>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              <span className="text-[10px] px-2 py-1 rounded-md bg-gray-100 text-gray-700 font-bold">{patient.age} Yrs</span>
-                              <span className="text-[10px] px-2 py-1 rounded-md bg-pink-50 text-pink-700 font-bold">{patient.gender}</span>
-                              <span className="text-[10px] px-2 py-1 rounded-md bg-red-50 text-red-700 font-bold">{patient.bloodGroup || 'N/A'}</span>
-                            </div>
-                          </div>
-                        </td>
-                        {/* Visit Details */}
-                        <td className="px-5 py-5">
-                          <div className="space-y-2">
-                            <div>
-                              <p className="text-[10px] font-black text-gray-400 tracking-widest">ARRIVAL TIME</p>
-                              <p className="text-xs font-semibold text-gray-800">{patient.arrivalTime || '--'}</p>
-                            </div>
-
-                            <div>
-                              <p className="text-[10px] font-black text-gray-400 tracking-widest">WAITING TIME</p>
-                              <p className="text-xs font-semibold text-gray-800">{patient.waitingTime || '--'}</p>
-                            </div>
-
-                            <div>
-                              <p className="text-[10px] font-black text-gray-400 tracking-widest">VISIT DATE</p>
-                              <p className="text-xs font-semibold text-gray-800">{patient.exitDate || new Date().toLocaleDateString()}</p>
-                            </div>
-
-                          </div>
-                        </td>
-
-                        {/* Doctor & Department */}
-                        <td className="px-5 py-5">
-                          <div className="space-y-2">
-                            <div>
-                              <p className="text-sm font-bold text-gray-900">{patient.doctor}</p>
-                              <p className="text-[11px] text-gray-500 font-medium">{patient.department}</p>
-                            </div>
-
-                            <div className="flex gap-2 flex-wrap">
-                              <span className="px-2 py-1 rounded-md bg-green-50 text-green-700 border border-green-100 text-[10px] font-bold">{patient.priority || 'Normal'}</span>
-                              <span className="px-2 py-1 rounded-md bg-yellow-50 text-yellow-700 border border-yellow-100 text-[10px] font-bold"> Queue #{patient.queuePosition || 1}</span>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-5 py-5">
-                          <div className="space-y-2">
-                            <span className={`inline-flex px-3 py-1 rounded-full text-[10px] font-black tracking-widest border ${patient.status === 'Exited' ? 'bg-purple-50 text-purple-700 border-purple-100' : patient.status === 'Completed' ? 'bg-green-50 text-green-700 border-green-100' : patient.status === 'In Consultation' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-yellow-50 text-yellow-700 border-yellow-100'}`}>
-                              {patient.status}
-                            </span>
-
-                            <div>
-                              <p className="text-[10px] text-gray-400 font-black tracking-widest">REPORT TYPE</p>
-                              <p className="text-xs font-semibold text-gray-700"> {patient.status === 'Exited' ? 'Final Visit Summary' : 'OPD Consultation Report'}</p>
-                            </div>
-
-                          </div>
-
-                        </td>
-
-                        {/* Actions */}
-                        <td className="px-5 py-5">
-                          <div className="flex items-center justify-center gap-2">
-
-                            <button onClick={() => { setSelectedPatientForView(patient); setShowViewPatientModal(true); }} className="w-10 h-10 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-100 transition-all flex items-center justify-center" title="View Complete Report">
-                              <VisibilityIcon sx={{ fontSize: 18 }} />
-                            </button>
-
-                            <button onClick={() => handlePrintPrescription(patient)} className="w-10 h-10 rounded-xl border border-blue-100 text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center" title="Print Prescription">
-                              <PrintIcon sx={{ fontSize: 18 }} />
-                            </button>
-
-                            <button onClick={() => handlePrintInvoice(patient)} className="w-10 h-10 rounded-xl border border-green-100 text-green-600 hover:bg-green-50 transition-all flex items-center justify-center" title="Print Invoice">
-                              <ReceiptLongIcon sx={{ fontSize: 18 }} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-
-                </tbody>
-
-              </table>
-            </div>
-
-          </div>
-        </div>
-      )}
       {/* Billing Tab */}
       {activeTab === 'billing' && (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
