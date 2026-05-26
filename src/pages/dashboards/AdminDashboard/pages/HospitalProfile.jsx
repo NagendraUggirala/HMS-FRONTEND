@@ -82,6 +82,7 @@ const HospitalProfile = () => {
   // Plan Modal States
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [showPlanDetailsModal, setShowPlanDetailsModal] = useState(false)
+  const [isYearly, setIsYearly] = useState(false)
   // Department Modal States
   const [showDepartmentModal, setShowDepartmentModal] = useState(false)
   const [selectedDepartment, setSelectedDepartment] = useState(null)
@@ -1352,63 +1353,129 @@ const HospitalProfile = () => {
 
       {/* Upgrade Plan Modal */}
       {showUpgradeModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm z-40 flex items-center justify-center p-3 sm:p-4 animate-fade-in overflow-y-auto" style={{ zIndex: 100 }}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full transform transition-all animate-scale my-auto relative">
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 flex items-center justify-between rounded-t-2xl">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                  <i className="fas fa-rocket text-white text-lg"></i>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white">Upgrade Subscription</h3>
-                  <p className="text-indigo-100 text-sm">Choose the plan that fits your hospital's growth</p>
-                </div>
-              </div>
-              <button className="text-white hover:text-gray-200 transition-colors" onClick={() => setShowUpgradeModal(false)}>
+        <div className="fixed inset-0 bg-black bg-opacity-40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-gray-50 rounded-3xl shadow-2xl w-full max-w-7xl max-h-[90vh] flex flex-col overflow-hidden relative">
+            <div className="p-6 md:p-8 text-center relative z-10 shrink-0">
+              <button className="absolute top-6 right-6 w-10 h-10 bg-white rounded-full flex items-center justify-center text-gray-500 hover:text-gray-800 shadow-sm hover:shadow-md transition-all" onClick={() => setShowUpgradeModal(false)}>
                 <i className="fas fa-times text-xl"></i>
               </button>
-            </div>
-            
-            <div className="p-6 sm:p-8 bg-gray-50 grid grid-cols-1 md:grid-cols-2 gap-6 rounded-b-2xl">
-              {/* Current Plan Column */}
-              <div className="bg-white border-2 border-gray-200 rounded-2xl p-6 relative">
-                <div className="absolute top-0 right-0 bg-gray-100 text-gray-600 text-xs font-bold px-3 py-1 rounded-bl-xl rounded-tr-xl">CURRENT</div>
-                <h4 className="text-2xl font-bold text-gray-900 mb-2">Premium</h4>
-                <div className="flex items-baseline mb-6">
-                  <span className="text-4xl font-black text-gray-900">₹2,250</span>
-                  <span className="text-gray-500 font-medium ml-2">/month</span>
-                </div>
-                <button className="w-full py-3 rounded-xl bg-gray-100 text-gray-500 font-bold mb-6 cursor-not-allowed">Active Plan</button>
-                <ul className="space-y-4">
-                  <li className="flex gap-3 text-gray-600"><i className="fas fa-check text-green-500 mt-1"></i> Up to 5 doctors</li>
-                  <li className="flex gap-3 text-gray-600"><i className="fas fa-check text-green-500 mt-1"></i> Up to 11 patients</li>
-                  <li className="flex gap-3 text-gray-600"><i className="fas fa-check text-green-500 mt-1"></i> 30 appointments / month</li>
-                  <li className="flex gap-3 text-gray-600"><i className="fas fa-check text-green-500 mt-1"></i> Analytics Dashboard</li>
-                  <li className="flex gap-3 text-gray-400"><i className="fas fa-times text-red-300 mt-1"></i> No Priority Support</li>
-                  <li className="flex gap-3 text-gray-400"><i className="fas fa-times text-red-300 mt-1"></i> No Custom Integrations</li>
-                </ul>
-              </div>
-
-              {/* Upgrade Column */}
-              <div className="bg-white border-2 border-indigo-500 rounded-2xl p-6 relative shadow-lg transform md:-translate-y-2 hover:shadow-xl transition-shadow">
-                <div className="absolute top-0 right-0 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs font-bold px-3 py-1 rounded-bl-xl rounded-tr-xl shadow-sm">RECOMMENDED</div>
-                <h4 className="text-2xl font-bold text-indigo-700 mb-2">Enterprise</h4>
-                <div className="flex items-baseline mb-6">
-                  <span className="text-4xl font-black text-gray-900">₹9,999</span>
-                  <span className="text-gray-500 font-medium ml-2">/month</span>
-                </div>
-                <button className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold mb-6 hover:shadow-lg hover:from-indigo-600 hover:to-purple-700 transition-all flex justify-center items-center gap-2" onClick={() => alert("Redirecting to sales portal...")}>
-                  <span>Contact Sales to Upgrade</span>
-                  <i className="fas fa-arrow-right"></i>
+              <h2 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight mb-4">Choose the Right Plan for Your Hospital</h2>
+              <p className="text-gray-500 max-w-2xl mx-auto mb-8 font-medium">Scale your hospital operations with our flexible plans. Each plan grants different module access and usage limits.</p>
+              
+              <div className="flex items-center justify-center gap-4">
+                <span className={`text-sm font-bold ${!isYearly ? 'text-gray-900' : 'text-gray-500'}`}>Monthly Billing</span>
+                <button 
+                  className={`w-16 h-8 rounded-full p-1 transition-colors duration-300 ${isYearly ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                  onClick={() => setIsYearly(!isYearly)}
+                >
+                  <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 ${isYearly ? 'translate-x-8' : 'translate-x-0'}`}></div>
                 </button>
-                <ul className="space-y-4">
-                  <li className="flex gap-3 text-gray-800 font-medium"><i className="fas fa-check text-indigo-500 mt-1"></i> Unlimited doctors</li>
-                  <li className="flex gap-3 text-gray-800 font-medium"><i className="fas fa-check text-indigo-500 mt-1"></i> Unlimited patients</li>
-                  <li className="flex gap-3 text-gray-800 font-medium"><i className="fas fa-check text-indigo-500 mt-1"></i> Unlimited appointments</li>
-                  <li className="flex gap-3 text-gray-800 font-medium"><i className="fas fa-check text-indigo-500 mt-1"></i> Advanced AI Analytics</li>
-                  <li className="flex gap-3 text-gray-800 font-medium"><i className="fas fa-check text-indigo-500 mt-1"></i> 24/7 Priority Support</li>
-                  <li className="flex gap-3 text-gray-800 font-medium"><i className="fas fa-check text-indigo-500 mt-1"></i> Custom API Integrations</li>
-                </ul>
+                <span className={`text-sm font-bold flex items-center gap-2 ${isYearly ? 'text-gray-900' : 'text-gray-500'}`}>
+                  Yearly Billing 
+                  <span className="bg-green-100 text-green-700 text-[10px] uppercase font-black px-2 py-0.5 rounded-full">Save 20%</span>
+                </span>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-x-auto overflow-y-auto pb-10 px-6 md:px-8">
+              <div className="flex gap-6 min-w-max pb-8 snap-x">
+                {[
+                  {
+                    name: "FREE", color: "from-gray-400 to-gray-500", shadow: "shadow-gray-200", btnClass: "bg-gray-800 hover:bg-gray-900",
+                    monthly: 0, yearly: 0, 
+                    desc: "Limited staff and patient management.",
+                    features: ["Limited access", "Lab Tests Module"],
+                    disabled: ["Pharmacy Module", "Video Consultation", "Priority Support"]
+                  },
+                  {
+                    name: "BASIC", color: "from-blue-400 to-blue-500", shadow: "shadow-blue-200", btnClass: "bg-blue-500 hover:bg-blue-600",
+                    monthly: 999, yearly: 10000, 
+                    desc: "Affordable starter plan.",
+                    features: ["Limited staff & patient capacity", "Lab Tests Module", "Pharmacy Module"],
+                    disabled: ["Video Consultation", "Advanced AI Analytics", "Priority Support"]
+                  },
+                  {
+                    name: "STANDARD", color: "from-purple-500 to-purple-600", shadow: "shadow-purple-200", btnClass: "bg-purple-600 hover:bg-purple-700",
+                    monthly: 2250, yearly: 27000, 
+                    desc: "Medium-scale hospital features.",
+                    features: ["Increased staff & patient limits", "Lab Tests Module", "Pharmacy Module", "Video Consultation Module"],
+                    disabled: ["Advanced AI Analytics", "Custom API Integrations"]
+                  },
+                  {
+                    name: "PREMIUM", color: "from-pink-500 to-rose-500", shadow: "shadow-pink-200", btnClass: "bg-pink-500 hover:bg-pink-600",
+                    monthly: 4999, yearly: 55000, 
+                    desc: "Advanced features with high usage limits.",
+                    features: ["Large staff & patient capacity", "Most advanced modules & features", "Priority Support"],
+                    disabled: ["Unlimited Doctors & Patients", "Custom API Integrations"]
+                  },
+                  {
+                    name: "ENTERPRISE", color: "from-indigo-600 to-indigo-800", shadow: "shadow-indigo-200", btnClass: "bg-indigo-700 hover:bg-indigo-800",
+                    monthly: 9999, yearly: 100000, 
+                    desc: "Unlimited access for all modules & services.",
+                    features: ["Unlimited Doctors & Patients", "Unlimited Appointments", "Advanced AI Analytics", "24/7 Priority Support", "Custom API Integrations", "All Platform Modules Enabled"],
+                    disabled: []
+                  }
+                ].map((p, idx) => (
+                  <div key={idx} className="snap-center shrink-0 w-[320px] bg-white rounded-3xl overflow-hidden relative shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 flex flex-col group hover:-translate-y-2">
+                    <div className="p-8 pb-6 text-center">
+                      <h3 className="text-xl font-black text-gray-800 uppercase tracking-widest mb-1">{p.name}</h3>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-6">{isYearly ? 'PER YEAR' : 'PER MONTH'}</p>
+                      
+                      <div className={`relative mb-8 py-6 w-[120%] -ml-[10%] bg-gradient-to-r ${p.color} ${p.shadow} shadow-lg skew-y-[-3deg] transform origin-left`}>
+                        <div className="skew-y-[3deg]">
+                          <div className="flex items-start justify-center gap-1 text-white">
+                            <span className="text-2xl font-bold mt-2">₹</span>
+                            <span className="text-6xl font-black tracking-tighter">{isYearly ? p.yearly.toLocaleString() : p.monthly.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <p className="text-sm font-medium text-gray-500 mb-6 h-10 flex items-center justify-center">{p.desc}</p>
+
+                      <div className="space-y-4 text-left">
+                        {p.features.map((f, i) => (
+                          <div key={i} className="flex items-start gap-3">
+                            <div className="w-5 h-5 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                              <i className="fas fa-check text-[10px] text-green-500"></i>
+                            </div>
+                            <span className="text-sm text-gray-700 font-medium">{f}</span>
+                          </div>
+                        ))}
+                        {p.disabled.map((f, i) => (
+                          <div key={i} className="flex items-start gap-3 opacity-50">
+                            <div className="w-5 h-5 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                              <i className="fas fa-times text-[10px] text-red-400"></i>
+                            </div>
+                            <span className="text-sm text-gray-500 font-medium line-through">{f}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="p-6 mt-auto bg-gray-50 border-t border-gray-100">
+                      <button 
+                        className={`w-full py-3.5 rounded-2xl text-white font-bold text-sm tracking-wide transition-all shadow-md hover:shadow-lg ${p.btnClass} flex items-center justify-center gap-2`}
+                        onClick={() => {
+                          const newPlan = {
+                            name: p.name === 'ENTERPRISE' ? "Enterprise" : p.name === 'PREMIUM' ? 'Premium' : p.name === 'STANDARD' ? 'Standard' : p.name === 'BASIC' ? 'Basic' : 'Free',
+                            type: p.name,
+                            price: `₹${isYearly ? p.yearly.toLocaleString() : p.monthly.toLocaleString()}`,
+                            frequency: isYearly ? "/year" : "/month",
+                            yearlyPrice: `₹${p.yearly.toLocaleString()}/year`,
+                            features: p.features,
+                            status: "Active",
+                            renewalDate: new Date(new Date().setFullYear(new Date().getFullYear() + (isYearly ? 1 : 0), new Date().getMonth() + (isYearly ? 0 : 1))).toISOString().split('T')[0]
+                          };
+                          setHospital(prev => ({ ...prev, currentPlan: newPlan }));
+                          setFormData(prev => ({ ...prev, currentPlan: newPlan }));
+                          setShowUpgradeModal(false);
+                        }}>
+                        <span>ORDER NOW</span>
+                        <i className="fas fa-chevron-right text-xs"></i>
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

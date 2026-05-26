@@ -1,3 +1,4 @@
+// src/redux/slices/authSlice.js
 import { createSlice } from '@reduxjs/toolkit'
 
 const USER_KEY = 'user'
@@ -96,6 +97,12 @@ const authSlice = createSlice({
       state.requiresPasswordChange = false
       localStorage.removeItem(REQUIRES_HOSPITAL_ADMIN_PW_KEY)
     },
+    updateAuthUser: (state, action) => {
+      if (state.user) {
+        state.user = { ...state.user, ...action.payload }
+        localStorage.setItem(USER_KEY, JSON.stringify(state.user))
+      }
+    },
     setTokens: (state, action) => {
       state.token = action.payload.token
       if (action.payload.refreshToken != null) {
@@ -123,5 +130,6 @@ export const {
   clearError,
   setTokens,
   hospitalAdminPasswordChangeComplete,
+  updateAuthUser,
 } = authSlice.actions
 export default authSlice.reducer

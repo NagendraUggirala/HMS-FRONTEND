@@ -1,36 +1,13 @@
+// src/pages/dashboards/AdminDashboard/pages/DoctorManagement.jsx
 import React, { useState, useEffect } from 'react'
 import LoadingSpinner from '../../../../components/common/LoadingSpinner/LoadingSpinner'
 import Modal from '../../../../components/common/Modal/Modal'
 import { HOSPITAL_ADMIN_STAFF } from '../../../../config/api'
 import { apiFetch } from '../../../../services/apiClient'
-import {
-  Lock,
-  LocalHospital,
-  Add,
-  Search,
-  ExpandMore,
-  FiberManualRecord,
-  Badge,
-  EmojiEvents,
-  MailOutline,
-  Phone,
-  CalendarMonth,
-  CurrencyRupee,
-  VideoCall,
-  School,
-  WarningAmber,
-  DeleteOutline,
-  SaveOutlined,
-  CheckCircle,
-  Close,
-  Visibility,
-  VisibilityOff,
-  MenuBook,
-  MarkEmailRead,
-  Edit,
-  PlayArrow,
-  Pause
-} from '@mui/icons-material'
+import {  Lock,  LocalHospital,  Add,  Search,  ExpandMore,  FiberManualRecord,  Badge,  EmojiEvents,
+  MailOutline,  Phone,  CalendarMonth,  CurrencyRupee,  VideoCall,  School,  WarningAmber,  DeleteOutline,
+  SaveOutlined,  CheckCircle,  Close,  Visibility,  VisibilityOff,  MenuBook,  MarkEmailRead,
+  Edit,  PlayArrow,  Pause} from '@mui/icons-material'
 
 const DoctorManagement = () => {
   const [loading, setLoading] = useState(true)
@@ -44,6 +21,7 @@ const DoctorManagement = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [currentDoctor, setCurrentDoctor] = useState(null)
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isAddMode, setIsAddMode] = useState(true)
   const [submitLoading, setSubmitLoading] = useState(false)
   const [departmentDropdownOpen, setDepartmentDropdownOpen] = useState(false)
@@ -57,11 +35,17 @@ const DoctorManagement = () => {
     email: '',
     phone: '',
     password: '',
+    confirm_password: '',
     role: 'DOCTOR',
     emergency_contact: '',
     shift_timing: '',
     joining_date: '',
-    address: ''
+    address: '',
+    department_name: '',
+    doctor_specialization: '',
+    experience: '',
+    fee: '',
+    qualification: ''
   })
 
   useEffect(() => {
@@ -88,13 +72,16 @@ const DoctorManagement = () => {
       shift_timing: staffItem?.shift_timing || '',
       joining_date: staffItem?.joining_date || staffItem?.hire_date || '',
       address: staffItem?.address || '',
-      department_name: staffItem?.department_name || staffItem?.department || 'General',
-      department: staffItem?.department_name || staffItem?.department || 'General',
+      department_name: staffItem?.department_name || staffItem?.department || '',
+      department: staffItem?.department_name || staffItem?.department || '',
       status: staffItem?.status === 'ACTIVE' ? 'Active' : (staffItem?.is_active === false ? 'Inactive' : 'Active'),
       image: `https://i.pravatar.cc/100?img=${Math.floor(Math.random() * 70) + 1}`,
       contact: staffItem?.phone || '',
       is_active: staffItem?.is_active !== false,
-      specialization: staffItem?.specialization || staffItem?.doctor_specialization || 'General Physician'
+      specialization: staffItem?.specialization || staffItem?.doctor_specialization || '',
+      experience: staffItem?.experience || '',
+      fee: staffItem?.fee || staffItem?.consultation_fee || '',
+      qualification: staffItem?.qualification || staffItem?.education || ''
     }
   }
 
@@ -105,7 +92,6 @@ const DoctorManagement = () => {
       params.set('page', '1')
       params.set('limit', '100')
       params.set('role', 'DOCTOR')
-      
       const res = await apiFetch(`${HOSPITAL_ADMIN_STAFF}?${params.toString()}`)
       const data = await res.json().catch(() => ({}))
       
@@ -120,13 +106,14 @@ const DoctorManagement = () => {
       const items = Array.isArray(raw?.items) ? raw.items : 
                    Array.isArray(raw?.staff) ? raw.staff : 
                    Array.isArray(raw) ? raw : []
-      
       const mappedDoctors = items.map(mapDoctorData)
       setDoctors(mappedDoctors)
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Error loading doctors:', error)
       setDoctors([])
-    } finally {
+    }
+    finally {
       setLoading(false)
     }
   }
@@ -134,7 +121,6 @@ const DoctorManagement = () => {
   // Edit doctor
   const handleEditDoctor = () => {
     if (!validateForm()) return
-
     setDoctors(prev => 
       prev.map(doctor => 
         doctor.id === currentDoctor.id 
@@ -150,7 +136,13 @@ const DoctorManagement = () => {
               emergency_contact: formData.emergency_contact,
               shift_timing: formData.shift_timing,
               joining_date: formData.joining_date,
-              address: formData.address
+              address: formData.address,
+              department_name: formData.department_name,
+              department: formData.department_name,
+              specialization: formData.doctor_specialization || '',
+              experience: formData.experience,
+              fee: formData.fee,
+              qualification: formData.qualification
             }
           : doctor
       )
@@ -163,7 +155,6 @@ const DoctorManagement = () => {
   const handleAddDoctor = async () => {
     if (!validateForm()) return
     setSubmitLoading(true)
-
     try {
       const payload = {
         email: formData.email.trim(),
@@ -177,12 +168,11 @@ const DoctorManagement = () => {
         shift_timing: formData.shift_timing?.trim() || '',
         joining_date: formData.joining_date,
         address: formData.address?.trim() || '',
-        doctor_specialization: 'General Physician'
+        department_name: formData.department_name?.trim() || ''
       }
       
       const res = await apiFetch(HOSPITAL_ADMIN_STAFF, { method: 'POST', body: payload })
       const data = await res.json().catch(() => ({}))
-      
       if (!res.ok) {
         window.alert(data?.message || data?.detail?.message || `Failed to create doctor (${res.status})`)
         return
@@ -191,9 +181,11 @@ const DoctorManagement = () => {
       setIsEditModalOpen(false)
       resetForm()
       loadDoctors()
-    } catch (error) {
+    }
+    catch (error) {
       window.alert(error?.message || 'Unable to create doctor.')
-    } finally {
+    }
+    finally {
       setSubmitLoading(false)
     }
   }
@@ -233,11 +225,17 @@ const DoctorManagement = () => {
       email: doctor.email || '',
       phone: doctor.phone || doctor.contact || '',
       password: '',
+      confirm_password: '',
       role: doctor.role || 'DOCTOR',
       emergency_contact: doctor.emergency_contact || '',
       shift_timing: doctor.shift_timing || '',
       joining_date: doctor.joining_date || '',
-      address: doctor.address || ''
+      address: doctor.address || '',
+      department_name: doctor.department_name || doctor.department || '',
+      doctor_specialization: doctor.specialization || '',
+      experience: doctor.experience || '',
+      fee: doctor.fee || '',
+      qualification: doctor.qualification || ''
     })
     setDepartmentSearchTerm('')
     setSpecializationSearchTerm('')
@@ -267,11 +265,17 @@ const DoctorManagement = () => {
       email: '',
       phone: '',
       password: '',
+      confirm_password: '',
       role: 'DOCTOR',
       emergency_contact: '',
       shift_timing: '',
       joining_date: '',
-      address: ''
+      address: '',
+      department_name: '',
+      doctor_specialization: '',
+      experience: '',
+      fee: '',
+      qualification: ''
     })
     setDepartmentSearchTerm('')
     setSpecializationSearchTerm('')
@@ -296,6 +300,16 @@ const DoctorManagement = () => {
         return false
       }
     }
+    if (isAddMode) {
+      if (!formData.password) {
+        alert('Please fill in the password field')
+        return false
+      }
+      if (formData.password !== formData.confirm_password) {
+        alert('Passwords do not match')
+        return false
+      }
+    }
     return true
   }
 
@@ -303,10 +317,10 @@ const DoctorManagement = () => {
     const matchesSearch = !searchTerm || 
       doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       doctor.specialization.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesDepartment = !departmentFilter || doctor.department === departmentFilter || doctor.department_name === departmentFilter
     const matchesStatus = !statusFilter || doctor.status === statusFilter
     const matchesConsultationType = !consultationTypeFilter || doctor.consultationType === consultationTypeFilter
-    
-    return matchesSearch && matchesStatus && matchesConsultationType
+    return matchesSearch && matchesDepartment && matchesStatus && matchesConsultationType
   })
 
   // Departments and specializations data
@@ -353,38 +367,23 @@ const DoctorManagement = () => {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             First Name <span className="text-red-500">*</span>
           </label>
-          <input
-            type="text"
-            required
-            value={formData.first_name}
+          <input className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            placeholder="First Name" type="text" required value={formData.first_name}
             onChange={(e) => handleInputChange('first_name', e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-            placeholder="First Name"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Middle Name
-          </label>
-          <input
-            type="text"
-            value={formData.middle_name}
+          <label className="block text-sm font-medium text-gray-700 mb-1">Middle Name</label>
+          <input className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            placeholder="Middle Name" type="text" value={formData.middle_name}
             onChange={(e) => handleInputChange('middle_name', e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-            placeholder="Middle Name"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Last Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            required
-            value={formData.last_name}
+          <label className="block text-sm font-medium text-gray-700 mb-1">Last Name <span className="text-red-500">*</span></label>
+          <input className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            placeholder="Last Name" type="text" required value={formData.last_name}
             onChange={(e) => handleInputChange('last_name', e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-            placeholder="Last Name"
           />
         </div>
       </div>
@@ -394,54 +393,39 @@ const DoctorManagement = () => {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Email <span className="text-red-500">*</span>
           </label>
-          <input
-            type="email"
-            required
-            value={formData.email}
+          <input className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            placeholder="doctor@hospital.com" type="email" required value={formData.email}
             onChange={(e) => handleInputChange('email', e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-            placeholder="doctor@hospital.com"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Phone Number <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="tel"
-            required
-            value={formData.phone}
+          <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number <span className="text-red-500">*</span></label>
+          <input className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            placeholder="+91 98765 43210" type="tel" required value={formData.phone}
             onChange={(e) => handleInputChange('phone', e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-            placeholder="+91 98765 43210"
           />
         </div>
       </div>
 
       {isAddMode && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="password"
-              required={isAddMode}
-              value={formData.password}
-              onChange={(e) => handleInputChange('password', e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              placeholder="Enter password"
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Password <span className="text-red-500">*</span></label>
+            <div className="relative">
+              <input className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 pr-10"
+                placeholder="Enter password" type={showPassword ? 'text' : 'password'} required={isAddMode} value={formData.password}
+                onChange={(e) => handleInputChange('password', e.target.value)}
+              />
+              <button type="button" className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                onClick={() => setShowPassword(!showPassword)} tabIndex="-1" >
+                {showPassword ? <VisibilityOff style={{fontSize: '20px'}} /> : <Visibility style={{fontSize: '20px'}} />}
+              </button>
+            </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Role
-            </label>
-            <input
-              type="text"
-              value={formData.role}
-              disabled
-              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+            <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+            <input className="w-full p-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+              placeholder="Role" type="text" value={formData.role} readOnly
             />
           </div>
         </div>
@@ -449,58 +433,138 @@ const DoctorManagement = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Emergency Contact
-          </label>
-          <input
-            type="tel"
-            value={formData.emergency_contact}
-            onChange={(e) => handleInputChange('emergency_contact', e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+          <label className="block text-sm font-medium text-gray-700 mb-1">Emergency Contact</label>
+          <input className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
             placeholder="Emergency Contact"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Shift Timing
-          </label>
-          <input
-            type="text"
-            value={formData.shift_timing}
+          <label className="block text-sm font-medium text-gray-700 mb-1">Shift Timing</label>
+          <input className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            placeholder="e.g. 9 AM - 5 PM" type="text" value={formData.shift_timing}
             onChange={(e) => handleInputChange('shift_timing', e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-            placeholder="e.g. 9 AM - 5 PM"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Joining Date
-          </label>
-          <input
-            type="date"
-            value={formData.joining_date}
-            onChange={(e) => handleInputChange('joining_date', e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+          <label className="block text-sm font-medium text-gray-700 mb-1">Joining Date</label>
+          <input className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            type="date" value={formData.joining_date} onChange={(e) => handleInputChange('joining_date', e.target.value)}
           />
         </div>
-        <div className="md:col-span-2">
+        <div className="relative">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Address
+            Department Name <span className="text-red-500">*</span>
           </label>
-          <textarea
-            rows="3"
-            value={formData.address}
-            onChange={(e) => handleInputChange('address', e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-            placeholder="Full Address"
+          <input className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            placeholder="Type or select department" type="text" required
+            value={departmentSearchTerm || formData.department_name} onFocus={() => setDepartmentDropdownOpen(true)}
+            onBlur={() => setTimeout(() => setDepartmentDropdownOpen(false), 150)}
+            onChange={(e) => {
+              setDepartmentSearchTerm(e.target.value)
+              setDepartmentDropdownOpen(true)
+              handleInputChange('department_name', e.target.value)
+            }}
+          />
+          {departmentDropdownOpen && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
+              {departments
+                .filter(dept => 
+                  !departmentSearchTerm || dept.toLowerCase().includes(departmentSearchTerm.toLowerCase())
+                )
+                .map(dept => (
+                  <div className="w-full text-left px-4 py-2.5 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                    key={dept}
+                    onClick={() => {
+                      handleInputChange('department_name', dept)
+                      setDepartmentSearchTerm('')
+                      setDepartmentDropdownOpen(false)
+                    }}>
+                    {dept}
+                  </div>
+                ))}
+              {departments.filter(dept => 
+                !departmentSearchTerm || dept.toLowerCase().includes(departmentSearchTerm.toLowerCase())
+              ).length === 0 && (
+                <div className="px-4 py-2.5 text-gray-500 text-sm">No departments found</div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="relative">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Specialization
+          </label>
+          <input className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            placeholder="Type or select specialization" type="text"
+            value={specializationSearchTerm || formData.doctor_specialization}
+            onFocus={() => setSpecializationDropdownOpen(true)}
+            onBlur={() => setTimeout(() => setSpecializationDropdownOpen(false), 150)}
+            onChange={(e) => {
+              setSpecializationSearchTerm(e.target.value)
+              setSpecializationDropdownOpen(true)
+              handleInputChange('doctor_specialization', e.target.value)
+            }}
+          />
+          {specializationDropdownOpen && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto w-full">
+              {specializations
+                .filter(spec => 
+                  !specializationSearchTerm || spec.toLowerCase().includes(specializationSearchTerm.toLowerCase())
+                )
+                .map(spec => (
+                  <div className="w-full text-left px-4 py-2.5 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                    key={spec}
+                    onClick={() => {
+                      handleInputChange('doctor_specialization', spec)
+                      setSpecializationSearchTerm('')
+                      setSpecializationDropdownOpen(false)
+                    }}>
+                    {spec}
+                  </div>
+                ))}
+              {specializations.filter(spec => 
+                !specializationSearchTerm || spec.toLowerCase().includes(specializationSearchTerm.toLowerCase())
+              ).length === 0 && (
+                <div className="px-4 py-2.5 text-gray-500 text-sm">No specializations found</div>
+              )}
+            </div>
+          )}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Experience (Years)</label>
+          <input className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            placeholder="e.g. 5" type="number" value={formData.experience}
+            onChange={(e) => handleInputChange('experience', e.target.value)}
           />
         </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Consultation Fee</label>
+          <input className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            placeholder="e.g. 500" type="number" value={formData.fee}
+            onChange={(e) => handleInputChange('fee', e.target.value)}
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Qualification</label>
+        <input className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+          placeholder="e.g. MBBS, MD" type="text" value={formData.qualification}
+          onChange={(e) => handleInputChange('qualification', e.target.value)}
+        />
+      </div>
+      <div className="md:col-span-2">
+        <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+        <textarea className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+          placeholder="Full Address" rows="3" value={formData.address} onChange={(e) => handleInputChange('address', e.target.value)}
+        />
       </div>
     </div>
   )
 
   if (loading) return <LoadingSpinner />
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className=" px-4 sm:px-6 lg:px-8 py-5">
@@ -511,10 +575,8 @@ const DoctorManagement = () => {
               <p className="text-gray-600 mt-2 text-xs sm:text-sm">Manage your medical team efficiently</p>
             </div>
           </div>
-          <button
-            onClick={openModal}
-            className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-center gap-2 font-medium"
-          >
+          <button className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-center gap-2 font-medium"
+            onClick={openModal}>
             <i className="fas fa-plus-circle text-lg"></i>
             <span>Add New Doctor</span>
           </button>
@@ -528,29 +590,31 @@ const DoctorManagement = () => {
             {/* Search Input - Full Width on Mobile */}
             <div className="sm:col-span-2 lg:col-span-2">
               <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2  items-center gap-2">
-                <Search className="text-blue-500" style={{fontSize: '20px'}} />
-                Search
-              </label>
-              <input 
-                type="text" 
-                placeholder="Doctor name or specialization..." 
-                className="w-full px-4 py-2.5 bg-white/80 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-900 placeholder-gray-500 transition-all duration-200 text-sm"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                <Search className="text-blue-500" style={{fontSize: '20px'}} />Search</label>
+              <input className="w-full px-4 py-2.5 bg-white/80 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-900 placeholder-gray-500 transition-all duration-200 text-sm"
+                type="text" placeholder="Doctor name or specialization..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
               />
+            </div>
+            {/* Department Filter */}
+            <div className="lg:col-span-1">
+              <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2  items-center gap-2">
+                <LocalHospital className="text-green-500" style={{fontSize: '20px'}} />Dept</label>
+              <div className="relative">
+                <select className="w-full px-3 py-2.5 pr-8 bg-white/80 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 text-gray-900 transition-all duration-200 text-sm appearance-none cursor-pointer"
+                  value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)}>
+                  <option value="">All</option>
+                  {departments.map(dept => (<option key={dept} value={dept}>{dept}</option>))}
+                </select>
+                <ExpandMore className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 pointer-events-none" style={{fontSize: '20px'}} />
+              </div>
             </div>
             {/* Status Filter */}
             <div>
               <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2  items-center gap-2">
-                <FiberManualRecord className="text-orange-500" style={{fontSize: '20px'}} />
-                Status
-              </label>
+                <FiberManualRecord className="text-orange-500" style={{fontSize: '20px'}} />Status</label>
               <div className="relative">
-                <select 
-                  className="w-full px-3 py-2.5 pr-8 bg-white/80 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 text-gray-900 transition-all duration-200 text-sm appearance-none cursor-pointer"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                >
+                <select className="w-full px-3 py-2.5 pr-8 bg-white/80 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 text-gray-900 transition-all duration-200 text-sm appearance-none cursor-pointer"
+                  value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                   <option value="">All</option>
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
@@ -561,15 +625,10 @@ const DoctorManagement = () => {
             {/* Consultation Type Filter */}
             <div>
               <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2  items-center gap-2">
-                <LocalHospital className="text-purple-500" style={{fontSize: '20px'}} />
-                Consultation Type
-              </label>
+                <LocalHospital className="text-purple-500" style={{fontSize: '20px'}} />Consultation Type</label>
               <div className="relative">
-                <select 
-                  className="w-full px-3 py-2.5 pr-8 bg-white/80 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-gray-900 transition-all duration-200 text-sm appearance-none cursor-pointer"
-                  value={consultationTypeFilter}
-                  onChange={(e) => setConsultationTypeFilter(e.target.value)}
-                >
+                <select className="w-full px-3 py-2.5 pr-8 bg-white/80 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-gray-900 transition-all duration-200 text-sm appearance-none cursor-pointer"
+                  value={consultationTypeFilter} onChange={(e) => setConsultationTypeFilter(e.target.value)}>
                   <option value="">All</option>
                   <option value="In-Person">In-Person</option>
                   <option value="Telemedicine">Telemedicine</option>
@@ -586,19 +645,13 @@ const DoctorManagement = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-12">
             {filteredDoctors.map((doctor, idx) => {
               return (
-              <div 
-                key={doctor.id} 
-                className="group h-full backdrop-blur-3xl bg-gradient-to-br from-white/30 to-white/10 border border-gray-300 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden relative cursor-pointer"
-                style={{animationDelay: `${idx * 50}ms`}}
-              >
+              <div key={doctor.id} className="group h-full backdrop-blur-3xl bg-gradient-to-br from-white/30 to-white/10 border border-gray-300 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden relative cursor-pointer"
+                style={{animationDelay: `${idx * 50}ms`}}>
                 {/* Premium Gradient Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-4xl"></div>
 
                 {/* Main Card Content - Click to open modal */}
-                <div 
-                  onClick={() => openViewModal(doctor)}
-                  className="relative p-6 sm:p-7"
-                >
+                <div onClick={() => openViewModal(doctor)} className="relative p-6 sm:p-7">
                   {/* Collapsed View - Always Show */}
                   <div>
                     <div className="flex items-start justify-between gap-4">
@@ -656,35 +709,23 @@ const DoctorManagement = () => {
       </div>
 
       {/* Edit Doctor Modal */}
-      <Modal 
-        isOpen={isEditModalOpen} 
+      <Modal title={isAddMode ? "Add New Doctor" : "Edit Doctor"} size="lg" isOpen={isEditModalOpen} 
         onClose={() => {
           setIsEditModalOpen(false)
           resetForm()
-        }} 
-        title={isAddMode ? "Add New Doctor" : "Edit Doctor"}
-        size="lg"
-      >
-        <div className="bg-gradient-to-b from-indigo-50/50 to-white/50 rounded-lg p-2">
+        }}>
+        <div className="bg-gradient-to-b from-indigo-50/50 to-white/50 rounded-lg p-2 max-h-[60vh] overflow-y-auto">
           {renderFormFields()}
         </div>
         <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-6 border-t border-gray-200/50 mt-6">
-          <button
-            type="button"
-            onClick={() => {
+          <button className="px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 active:scale-95"
+            type="button" onClick={() => {
               setIsEditModalOpen(false)
               resetForm()
-            }}
-            className="px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 active:scale-95"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={isAddMode ? handleAddDoctor : handleEditDoctor}
-            disabled={!formData.first_name || !formData.last_name || !formData.email || !formData.phone || submitLoading}
-            className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 active:scale-95 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
-          >
+            }}>Cancel</button>
+          <button className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 active:scale-95 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+            type="button" onClick={isAddMode ? handleAddDoctor : handleEditDoctor}
+            disabled={!formData.first_name || !formData.last_name || !formData.email || !formData.phone || !formData.department_name || submitLoading}>
             {submitLoading ? (
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
@@ -696,15 +737,11 @@ const DoctorManagement = () => {
       </Modal>
 
       {/* Delete Confirmation Modal */}
-      <Modal 
-        isOpen={isDeleteModalOpen} 
+      <Modal title="Delete Doctor" size="md" isOpen={isDeleteModalOpen} 
         onClose={() => {
           setIsDeleteModalOpen(false)
           setCurrentDoctor(null)
-        }} 
-        title="Delete Doctor"
-        size="md"
-      >
+        }}>
         <div className="text-center p-8">
           <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-red-100 to-pink-100 rounded-2xl flex items-center justify-center shadow-lg">
             <WarningAmber className="text-red-600" style={{fontSize: '36px'}} />
@@ -713,19 +750,15 @@ const DoctorManagement = () => {
           <p className="text-gray-600 mb-2">Are you sure you want to delete <span className="font-bold text-red-600">{currentDoctor?.name}</span>?</p>
           <p className="text-gray-500 text-sm mb-8">This action cannot be undone.</p>
           <div className="flex flex-col-reverse sm:flex-row justify-center gap-3">
-            <button
+            <button className="px-8 py-3 border-2 border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 active:scale-95"
               onClick={() => {
                 setIsDeleteModalOpen(false)
                 setCurrentDoctor(null)
-              }}
-              className="px-8 py-3 border-2 border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 active:scale-95"
-            >
+              }}>
               Cancel
             </button>
-            <button
-              onClick={handleDeleteDoctor}
-              className="px-8 py-3 bg-gradient-to-r from-red-500 to-pink-600 text-white font-semibold rounded-lg hover:from-red-600 hover:to-pink-700 transition-all duration-200 active:scale-95 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
-            >
+            <button className="px-8 py-3 bg-gradient-to-r from-red-500 to-pink-600 text-white font-semibold rounded-lg hover:from-red-600 hover:to-pink-700 transition-all duration-200 active:scale-95 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+              onClick={handleDeleteDoctor}>
               <DeleteOutline style={{fontSize: '20px'}} />
               Delete Doctor
             </button>
@@ -734,16 +767,12 @@ const DoctorManagement = () => {
       </Modal>
 
       {/* View Doctor Details Modal */}
-      <Modal 
-        isOpen={isViewModalOpen} 
+      <Modal title="Doctor Details" size="lg" isOpen={isViewModalOpen} 
         onClose={() => {
           setIsViewModalOpen(false)
           setCurrentDoctor(null)
           setShowPassword(false)
-        }} 
-        title="Doctor Details"
-        size="lg"
-      >
+        }}>
         {currentDoctor && (
           <div className="bg-white">
             {/* Header Banner */}
@@ -786,7 +815,7 @@ const DoctorManagement = () => {
                   </div>
                   <label className="text-[11px] font-bold text-purple-600 uppercase tracking-widest">Experience</label>
                 </div>
-                <p className="text-base font-bold text-gray-900">{currentDoctor.experience || ''} Years</p>
+                <p className="text-base font-bold text-gray-900">{currentDoctor.experience ? `${currentDoctor.experience} Years` : 'Not Specified'}</p>
               </div>
 
               {/* Email */}
@@ -819,7 +848,7 @@ const DoctorManagement = () => {
                   </div>
                   <label className="text-[11px] font-bold text-teal-600 uppercase tracking-widest">Availability</label>
                 </div>
-                <p className="text-base font-bold text-gray-900">{currentDoctor.shift_timing || currentDoctor.availability || ''}</p>
+                <p className="text-base font-bold text-gray-900">{currentDoctor.shift_timing || currentDoctor.availability || 'Not Specified'}</p>
               </div>
 
               {/* Consultation Fee */}
@@ -830,43 +859,39 @@ const DoctorManagement = () => {
                   </div>
                   <label className="text-[11px] font-bold text-yellow-600 uppercase tracking-widest">Consultation Fee</label>
                 </div>
-                <p className="text-base font-bold text-gray-900">₹ {currentDoctor.fee || ''}</p>
+                <p className="text-base font-bold text-gray-900">{currentDoctor.fee ? `₹ ${currentDoctor.fee}` : 'Not Specified'}</p>
               </div>
 
               {/* Qualification */}
-              <div className="bg-white border border-blue-100 rounded-xl p-4 shadow-sm sm:col-span-1">
+              <div className="bg-white border border-blue-100 rounded-xl p-4 shadow-sm sm:col-span-2">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-8 h-8 bg-indigo-100/70 rounded-lg flex items-center justify-center">
                     <School className="text-indigo-600" style={{fontSize: '18px'}} />
                   </div>
                   <label className="text-[11px] font-bold text-indigo-600 uppercase tracking-widest">Qualification</label>
                 </div>
-                <p className="text-base font-bold text-gray-900">{currentDoctor.qualification || ''}</p>
+                <p className="text-base font-bold text-gray-900">{currentDoctor.qualification || 'Not Specified'}</p>
               </div>
             </div>
 
             {/* Footer Buttons */}
             <div className="flex justify-center sm:justify-end gap-3 px-6 pb-6 pt-2 border-t border-gray-100">
-              <button
+              <button className="px-6 py-2.5 text-sm font-semibold bg-[#e2e8f0] text-slate-700 rounded-lg hover:bg-slate-300 transition-colors"
                 type="button"
                 onClick={() => {
                   setIsViewModalOpen(false)
                   setCurrentDoctor(null)
-                }}
-                className="px-6 py-2.5 text-sm font-semibold bg-[#e2e8f0] text-slate-700 rounded-lg hover:bg-slate-300 transition-colors"
-              >
+                }}>
                 Close
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  handleToggleStatus(currentDoctor.id)
-                  setCurrentDoctor({...currentDoctor, status: currentDoctor.status === 'Active' ? 'Inactive' : 'Active'})
-                }}
+              <button type="button"
                 className={`px-6 py-2.5 text-sm font-semibold rounded-lg text-white transition-colors flex items-center gap-2 shadow-sm ${
                   currentDoctor.status === 'Active' ? 'bg-[#f46036] hover:bg-[#e05631]' : 'bg-[#2ec4b6] hover:bg-[#27a89c]'
                 }`}
-              >
+                onClick={() => {
+                  handleToggleStatus(currentDoctor.id)
+                  setCurrentDoctor({...currentDoctor, status: currentDoctor.status === 'Active' ? 'Inactive' : 'Active'})
+                }}>
                 {currentDoctor.status === 'Active' ? (
                   <Pause style={{fontSize: '18px'}} />
                 ) : (
@@ -874,14 +899,12 @@ const DoctorManagement = () => {
                 )}
                 {currentDoctor.status === 'Active' ? 'Deactivate' : 'Activate'}
               </button>
-              <button
+              <button className="px-6 py-2.5 text-sm font-semibold bg-[#4361ee] text-white rounded-lg hover:bg-[#3a56d4] transition-colors flex items-center gap-2 shadow-sm"
                 type="button"
                 onClick={() => {
                   setIsViewModalOpen(false)
                   openEditModal(currentDoctor)
-                }}
-                className="px-6 py-2.5 text-sm font-semibold bg-[#4361ee] text-white rounded-lg hover:bg-[#3a56d4] transition-colors flex items-center gap-2 shadow-sm"
-              >
+                }}>
                 <Edit style={{fontSize: '18px'}} />
                 Edit Doctor
               </button>

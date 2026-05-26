@@ -4,17 +4,16 @@ import { useAuth } from '../../../hooks/useAuth'
 import { useSelector } from 'react-redux'
 import { getInitials } from '../../../utils/helpers'
 import { useNavigate } from 'react-router-dom'
+import { PUBLIC_API_BASE_URL } from '../../../config/api'
 
 const Header = ({ onMenuToggle = () => {}, onSidebarToggle = () => {}, isSidebarOpen = true }) => {
   const { user, logout } = useAuth()
   const { logo: hospitalLogo, name: hospitalName } = useSelector(state => state.hospital)
   const isSuperAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'super_admin'
   const navigate = useNavigate()
-
   const [showNotifications, setShowNotifications] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [isAnimating, setIsAnimating] = useState(false)
-
   const notifRef = useRef(null)
   const profileRef = useRef(null)
 
@@ -71,7 +70,6 @@ const Header = ({ onMenuToggle = () => {}, onSidebarToggle = () => {}, isSidebar
     e.stopPropagation()
     setIsAnimating(true)
     onMenuToggle?.()
-    
     setTimeout(() => {
       setIsAnimating(false)
     }, 300)
@@ -111,8 +109,7 @@ const Header = ({ onMenuToggle = () => {}, onSidebarToggle = () => {}, isSidebar
             className={`lg:hidden md:hidden p-2 rounded-lg hover:bg-gray-100 transition-all duration-300 ease-in-out touch-target ${
               isAnimating ? 'transform scale-95' : ''
             }`}
-            aria-label="Toggle menu"
-          >
+            aria-label="Toggle menu">
             <i className="fas fa-bars text-gray-600 text-lg transition-transform duration-300 ease-in-out"></i>
           </button>
 
@@ -120,13 +117,11 @@ const Header = ({ onMenuToggle = () => {}, onSidebarToggle = () => {}, isSidebar
           <div className={`hidden md:block transition-all duration-500 ease-in-out overflow-hidden ${
             isSidebarOpen ? 'w-0 opacity-0' : 'w-auto opacity-100'
           }`}>
-            <button
-              onClick={handleSidebarToggle}
+            <button onClick={handleSidebarToggle}
               className={`p-2 rounded-lg hover:bg-gray-100 transition-all duration-500 ease-in-out touch-target ${
                 isAnimating ? 'transform scale-95' : 'hover:scale-105'
               }`}
-              aria-label="Open sidebar"
-            >
+              aria-label="Open sidebar">
               <i className="fas fa-bars text-gray-600 text-lg transition-all duration-300 ease-in-out"></i>
             </button>
           </div>
@@ -146,12 +141,8 @@ const Header = ({ onMenuToggle = () => {}, onSidebarToggle = () => {}, isSidebar
             
             {/* Hospital Name for Desktop and Tablet */}
             <div className="hidden sm:block">
-              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent transition-all duration-300">
-               {!isSuperAdmin ? hospitalName : 'Super Admin'}
-              </h1>
-              <p className="text-xs text-gray-500 font-medium transition-all duration-300">
-                {!isSuperAdmin ? 'Hospital Management System' : 'Platform Administration'}
-              </p>
+              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent transition-all duration-300">{!isSuperAdmin ? hospitalName : 'Super Admin'}</h1>
+              <p className="text-xs text-gray-500 font-medium transition-all duration-300">{!isSuperAdmin ? 'Hospital Management System' : 'Platform Administration'}</p>
             </div>
 
             {/* Hospital Name for Mobile - Compact version */}
@@ -159,16 +150,14 @@ const Header = ({ onMenuToggle = () => {}, onSidebarToggle = () => {}, isSidebar
               <h1 className="text-sm font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent transition-all duration-300 truncate">
                 {!isSuperAdmin ? hospitalName : 'Admin'}
               </h1>
-              <p className="text-[10px] text-gray-500 font-medium transition-all duration-300 truncate">
-                {!isSuperAdmin ? 'HMS' : 'Portal'}
-              </p>
+              <p className="text-[10px] text-gray-500 font-medium transition-all duration-300 truncate">{!isSuperAdmin ? 'HMS' : 'Portal'}</p>
             </div>
           </div>
         </div>
 
         {/* Right: notifications + profile */}
         <div className="flex items-center gap-2">
-          {/* Notifications with smooth dropdown - Only mobile fixed */}
+          {/* Notifications with smooth dropdown */}
           {/* <div className="relative" ref={notifRef}>
             <button
               onClick={(e) => {
@@ -303,7 +292,15 @@ const Header = ({ onMenuToggle = () => {}, onSidebarToggle = () => {}, isSidebar
               aria-expanded={showProfileMenu}
               aria-haspopup="menu"
             >
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-semibold transition-all duration-300 hover:scale-110">
+              {user?.profile_picture_url ? (
+                <img 
+                  src={user.profile_picture_url.startsWith('http') || user.profile_picture_url.startsWith('data:') ? user.profile_picture_url : `${PUBLIC_API_BASE_URL}${user.profile_picture_url.startsWith('/') ? '' : '/'}${user.profile_picture_url}`}
+                  alt="Profile"
+                  className="w-8 h-8 rounded-full object-cover shadow-sm transition-all duration-300 hover:scale-110"
+                  onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }}
+                />
+              ) : null}
+              <div className={`w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-semibold transition-all duration-300 hover:scale-110 ${user?.profile_picture_url ? 'hidden' : ''}`}>
                 {getInitials(user?.name || 'U')}
               </div>
               <span className="text-sm text-gray-700 hidden md:block transition-all duration-300">
@@ -347,11 +344,8 @@ const Header = ({ onMenuToggle = () => {}, onSidebarToggle = () => {}, isSidebar
                   <i className="fas fa-cog mr-2 text-gray-400 transition-colors duration-200"></i>
                   Settings
                 </button>
-                <button
-                  onClick={handleLogout}
-                  className="w-full text-left px-3 py-3 text-sm text-red-600 hover:bg-red-50 rounded flex items-center touch-target transition-all duration-200 hover:translate-x-1 hover:text-red-700"
-                  role="menuitem"
-                >
+                <button className="w-full text-left px-3 py-3 text-sm text-red-600 hover:bg-red-50 rounded flex items-center touch-target transition-all duration-200 hover:translate-x-1 hover:text-red-700"
+                  onClick={handleLogout} role="menuitem">
                   <i className="fas fa-sign-out-alt mr-2 transition-colors duration-200"></i>
                   Logout
                 </button>
