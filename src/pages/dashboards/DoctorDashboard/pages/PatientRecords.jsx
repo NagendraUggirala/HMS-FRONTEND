@@ -266,9 +266,14 @@ const PatientRecords = () => {
         </div>
         <button
           type="button"
-          className="btn-secondary"
+          className="btn-primary"
+          style={{borderRadius:10,
+            height:45,
+            width:230
+          }}
           onClick={() => setIsAdvancedOpen((prev) => !prev)}
         >
+          <i className="bi bi-search me-2"></i>
           {isAdvancedOpen ? 'Hide Advanced Search' : 'Show Advanced Search'}
         </button>
       </div>
@@ -328,7 +333,7 @@ const PatientRecords = () => {
             />
             Include inactive
           </label>
-          <button type="button" className="btn-primary" onClick={handleSearchPatients} disabled={loadingSearch}>
+          <button type="button" className="btn-primary"   style={{borderRadius:10 , width:100}}   onClick={handleSearchPatients} disabled={loadingSearch}>
             {loadingSearch ? 'Searching...' : 'Search'}
           </button>
         </div>
@@ -488,7 +493,8 @@ const PatientRecords = () => {
               value={globalRecordFilters.date_to}
               onChange={(e) => setGlobalRecordFilters((prev) => ({ ...prev, date_to: e.target.value }))}
             />
-            <button type="button" className="btn-primary" onClick={handleLoadGlobalRecords}>
+            <br />
+            <button type="button" className="btn-primary" style={{borderRadius:8,height:45,width:120, marginTop:10}} onClick={handleLoadGlobalRecords}>
               {loadingGlobalRecords ? 'Loading...' : 'Load Records'}
             </button>
           </div>

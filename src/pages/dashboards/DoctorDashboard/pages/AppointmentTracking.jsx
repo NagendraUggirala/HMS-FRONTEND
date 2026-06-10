@@ -530,7 +530,15 @@ const AppointmentTracking = () => {
           <h2 className="text-2xl md:text-3xl font-bold text-gray-800">Appointment Tracking</h2>
           <p className="text-sm text-gray-500 mt-1">Live tracking, notifications, delays, and communication overview.</p>
         </div>
-        <button type="button" onClick={() => loadDashboardData(false)} className="btn-secondary" disabled={refreshing}>
+        <button type="button"  style={{
+    backgroundColor: "#007bff",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+    padding: "10px 20px",
+    cursor: "pointer"
+    }} onClick={() => loadDashboardData(false)} className="btn-secondary" disabled={refreshing}>
+       <i className="fas fa-sync-alt mr-2"></i>
           {refreshing ? 'Refreshing...' : 'Refresh'}
         </button>
       </div>
@@ -710,7 +718,16 @@ const AppointmentTracking = () => {
                 placeholder="Leave empty to use backend template"
               />
             </div>
-            <button type="submit" className="btn-primary" disabled={isSendingNotification}>
+            <button type="submit"
+               style={{
+    backgroundColor: "#007bff",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+    padding: "10px 20px",
+    cursor: "pointer"
+  }}
+            className="btn-primary" disabled={isSendingNotification}>
               {isSendingNotification ? 'Sending...' : 'Send Notification'}
             </button>
           </form>
@@ -780,7 +797,16 @@ const AppointmentTracking = () => {
                 placeholder="Use {patient_name}, {doctor_name}, {appointment_date}, {appointment_time}, {appointment_ref}"
               />
             </div>
-            <button type="submit" className="btn-primary" disabled={isSendingBulkNotification}>
+            <button type="submit"  style={{ 
+    backgroundColor: "#007bff",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+    padding: "10px 20px",
+    cursor: "pointer"
+  }}
+
+            className="btn-primary" disabled={isSendingBulkNotification}>
               {isSendingBulkNotification ? 'Queueing...' : 'Send Bulk Notifications'}
             </button>
           </form>
@@ -845,7 +871,17 @@ const AppointmentTracking = () => {
               />
               Notify patient immediately
             </label>
-            <button type="submit" className="btn-primary" disabled={isUpdatingDelay}>
+            <button type="submit"  style={{
+    backgroundColor: "#007bff",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    marginLeft:"10px",
+    height:"40px",
+    width:"130px", 
+    
+  }} className="btn-primary" disabled={isUpdatingDelay}>
               {isUpdatingDelay ? 'Updating...' : 'Update Delay'}
             </button>
           </form>
