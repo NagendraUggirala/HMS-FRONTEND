@@ -1,1309 +1,1507 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { toast } from "react-toastify";
-import LoadingSpinner from "../../../../components/common/LoadingSpinner/LoadingSpinner";
-import DataTable from "../../../../components/ui/Tables/DataTable";
-import Modal from "../../../../components/common/Modal/Modal";
+import { apiFetch } from "../../../../services/apiClient";
+import { DOCTOR_PROFILE } from "../../../../config/api";
 import {
-  cleanupDoctorTreatmentPlanDates,
-  createDoctorTreatmentPlan,
-  createDoctorTreatmentPlanFromTemplate,
-  doctorAppointmentErrorMessage,
-  getDoctorTreatmentPlanAnalytics,
-  getDoctorTreatmentPlanDetails,
-  getDoctorTreatmentPlanOutcome,
-  getDoctorTreatmentPlanStatus,
-  getDoctorTreatmentPlanTemplates,
-  getDoctorTreatmentPlans,
-  recordDoctorTreatmentPlanOutcome,
-  updateDoctorTreatmentPlan,
-  updateDoctorTreatmentPlanProgress,
-} from "../../../../services/doctorApi";
+  Users,
+  Activity,
+  AlertTriangle,
+  User,
+  FlaskConical,
+  FileText,
+  ArrowRightLeft,
+  Search,
+  Filter,
+  Calendar,
+  X,
+  Stethoscope,
+  Plus,
+  RefreshCw,
+  Edit,
+  Trash2
+} from "lucide-react";
 
-const PLAN_STATUS_OPTIONS = [
-  "",
-  "ACTIVE",
-  "COMPLETED",
-  "DISCONTINUED",
-  "DRAFT",
+// ==========================================
+// 1. Initial Dummy Patient Records (JSON Format)
+// ==========================================
+const INITIAL_PATIENTS = [
+  {
+    id: "PAT-1001",
+    name: "Ramesh Kumar",
+    age: 45,
+    gender: "Male",
+    doctor: "Dr. Sharma",
+    diagnosis: "Hypertension",
+    treatmentStatus: "Active",
+    priority: "Medium",
+    lastVisit: "2026-06-12",
+    labTests: ["Blood Test"],
+    prescriptions: [{ medication: "Amlodipine", dosage: "5mg", frequency: "Once daily" }],
+    ipdTransfer: null
+  },
+  {
+    id: "PAT-1002",
+    name: "Sita Devi",
+    age: 32,
+    gender: "Female",
+    doctor: "Dr. Priya",
+    diagnosis: "Diabetes",
+    treatmentStatus: "Under Review",
+    priority: "High",
+    lastVisit: "2026-06-13",
+    labTests: ["HbA1c Test"],
+    prescriptions: [{ medication: "Metformin", dosage: "500mg", frequency: "Twice daily" }],
+    ipdTransfer: null
+  },
+  {
+    id: "PAT-1003",
+    name: "Mohan Rao",
+    age: 58,
+    gender: "Male",
+    doctor: "Dr. Rajesh",
+    diagnosis: "Asthma",
+    treatmentStatus: "Completed",
+    priority: "Low",
+    lastVisit: "2026-06-10",
+    labTests: ["Chest X-Ray"],
+    prescriptions: [{ medication: "Albuterol Inhaler", dosage: "2 puffs", frequency: "As needed" }],
+    ipdTransfer: null
+  },
+  {
+    id: "PAT-1004",
+    name: "Anjali Gupta",
+    age: 27,
+    gender: "Female",
+    doctor: "Dr. Neha",
+    diagnosis: "Migraine",
+    treatmentStatus: "Active",
+    priority: "Medium",
+    lastVisit: "2026-06-14",
+    labTests: [],
+    prescriptions: [],
+    ipdTransfer: null
+  },
+  {
+    id: "PAT-1005",
+    name: "Rahul Verma",
+    age: 39,
+    gender: "Male",
+    doctor: "Dr. Kumar",
+    diagnosis: "Chest Pain",
+    treatmentStatus: "Critical",
+    priority: "Emergency",
+    lastVisit: "2026-06-15",
+    labTests: ["ECG"],
+    prescriptions: [{ medication: "Aspirin", dosage: "150mg", frequency: "Immediate" }],
+    ipdTransfer: { department: "Emergency Department", ward: "Red Zone ICU", reason: "Acute chest pain" }
+  }
 ];
 
-function parseJsonArray(value, fieldName) {
-  const raw = String(value || "").trim();
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) throw new Error();
-    return parsed;
-  } catch {
-    throw new Error(`${fieldName} must be a valid JSON array.`);
-  }
-}
+// Available lab tests options for Quick Action
+const LAB_TEST_OPTIONS = [
+  "Blood Test",
+  "Urine Test",
+  "X-Ray",
+  "CT Scan",
+  "MRI",
+  "ECG",
+  "Lipid Profile",
+  "Thyroid Panel"
+];
 
-function formatDate(value) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleDateString();
-}
+// Badge styling helper for Status
+const getStatusBadgeClass = (status) => {
+  switch (status) {
+    case "Active":
+      return "bg-green-50 text-green-700 border border-green-200";
+    case "Under Review":
+      return "bg-yellow-50 text-yellow-700 border border-yellow-200";
+    case "Completed":
+      return "bg-blue-50 text-blue-700 border border-blue-200";
+    case "Critical":
+      return "bg-red-50 text-red-700 border border-red-200";
+    default:
+      return "bg-gray-50 text-gray-700 border border-gray-200";
+  }
+};
+
+// Badge styling helper for Priority
+const getPriorityBadgeClass = (priority) => {
+  switch (priority) {
+    case "Low":
+      return "bg-gray-100 text-gray-600 border border-gray-200";
+    case "Medium":
+      return "bg-blue-50 text-blue-700 border border-blue-200";
+    case "High":
+      return "bg-orange-50 text-orange-700 border border-orange-200";
+    case "Emergency":
+      return "bg-red-100 text-red-700 border border-red-200 animate-pulse";
+    default:
+      return "bg-gray-100 text-gray-600 border border-gray-200";
+  }
+};
 
 const TreatmentPlans = () => {
-  const [loading, setLoading] = useState(true);
-  const [submitLoading, setSubmitLoading] = useState(false);
-  const [plans, setPlans] = useState([]);
-  const [filters, setFilters] = useState({
-    status: "",
-    patient_ref: "",
-    limit: 50,
-  });
-  const [selectedPlan, setSelectedPlan] = useState(null);
-  const [planDetails, setPlanDetails] = useState(null);
-  const [planStatus, setPlanStatus] = useState(null);
-  const [planOutcome, setPlanOutcome] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showProgressModal, setShowProgressModal] = useState(false);
-  const [showOutcomeModal, setShowOutcomeModal] = useState(false);
-  const [templates, setTemplates] = useState([]);
-  const [templatesLoading, setTemplatesLoading] = useState(false);
-  const [analytics, setAnalytics] = useState(null);
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  // Main local state for patients data
+  const [patients, setPatients] = useState(INITIAL_PATIENTS);
 
-  const [createForm, setCreateForm] = useState({
-    patient_ref: "",
-    plan_name: "",
-    primary_diagnosis: "",
-    initial_notes: "",
-    short_term_goals: "[]",
-    long_term_goals: "[]",
-    interventions: "[]",
-    milestones: "[]",
-  });
+  // Dynamic doctor name loaded from profile
+  const [doctorName, setDoctorName] = useState("Dr. Sharma");
 
-  const [progressForm, setProgressForm] = useState({
-    progress_note: "",
-    significant_change: false,
-    next_review_date: "",
-  });
+  // Search and Filter criteria states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("");
 
-  const [outcomeForm, setOutcomeForm] = useState({
-    outcome_date: "",
-    overall_outcome: "GOOD",
-    outcome_summary: "",
-    goals_achieved: 0,
-    goals_partially_achieved: 0,
-    goals_not_achieved: 0,
-    clinical_effectiveness: "GOOD",
-    treatment_adherence: 0,
-    patient_satisfaction_score: 0,
-    quality_of_life_score: 0,
-    complications: "[]",
-    future_recommendations: "[]",
-    follow_up_plan: "",
-    lessons_learned: "",
-  });
+  // Quick Action Modal states
+  const [activeModal, setActiveModal] = useState(null); // 'lab' | 'prescription' | 'transfer' | 'add_patient' | null
+  const [selectedPatient, setSelectedPatient] = useState(null);
 
-  const [templateForm, setTemplateForm] = useState({
-    diagnosis: "",
-    specialty: "",
-    template_id: "",
-    patient_ref: "",
-  });
-
-  const [analyticsFilters, setAnalyticsFilters] = useState({
-    date_from: "",
-    date_to: "",
-  });
-
-  const stats = useMemo(() => {
-    return {
-      total: plans.length,
-      active: plans.filter(
-        (plan) => String(plan.status || "").toUpperCase() === "ACTIVE",
-      ).length,
-      completed: plans.filter(
-        (plan) => String(plan.status || "").toUpperCase() === "COMPLETED",
-      ).length,
-      avgProgress:
-        plans.length > 0
-          ? Math.round(
-              plans.reduce(
-                (sum, plan) => sum + Number(plan.progress_percentage || 0),
-                0,
-              ) / plans.length,
-            )
-          : 0,
-    };
-  }, [plans]);
-
-  const loadPlans = async () => {
-    setLoading(true);
-    try {
-      const response = await getDoctorTreatmentPlans(filters);
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        toast.error(doctorAppointmentErrorMessage(payload));
-        setPlans([]);
-        return;
-      }
-      setPlans(payload?.plans || payload?.data?.plans || []);
-    } catch {
-      toast.error("Could not load treatment plans.");
-      setPlans([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Fetch doctor profile data on component mount
   useEffect(() => {
-    loadPlans();
+    const fetchDoctorProfile = async () => {
+      try {
+        const response = await apiFetch(DOCTOR_PROFILE);
+        if (response && response.ok) {
+          const data = await response.json();
+          const fullName = `${data.first_name || ""} ${data.middle_name || ""} ${data.last_name || ""}`.trim();
+          if (fullName) {
+            const formatted = fullName.toLowerCase().startsWith("dr.") 
+              ? fullName 
+              : `Dr. ${fullName}`;
+            setDoctorName(formatted);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching doctor profile in TreatmentPlans:", err);
+      }
+    };
+    fetchDoctorProfile();
   }, []);
 
-  const handleOpenPlan = async (plan) => {
-    const planId = plan?.plan_id || plan?.id;
-    if (!planId) return;
-    setSelectedPlan(plan);
-    setDetailLoading(true);
-    try {
-      const [detailRes, statusRes, outcomeRes] = await Promise.all([
-        getDoctorTreatmentPlanDetails(planId),
-        getDoctorTreatmentPlanStatus(planId),
-        getDoctorTreatmentPlanOutcome(planId),
-      ]);
-      const [detailPayload, statusPayload, outcomePayload] = await Promise.all([
-        detailRes.json().catch(() => ({})),
-        statusRes.json().catch(() => ({})),
-        outcomeRes.json().catch(() => ({})),
-      ]);
-      if (detailRes.ok) {
-        setPlanDetails(detailPayload?.data || detailPayload);
-      } else {
-        setPlanDetails(null);
-      }
-      if (statusRes.ok) {
-        setPlanStatus(statusPayload?.data || statusPayload);
-      } else {
-        setPlanStatus(null);
-      }
-      if (
-        outcomeRes.ok &&
-        !outcomePayload?.message?.startsWith("No treatment outcome assessment")
-      ) {
-        setPlanOutcome(outcomePayload?.data || outcomePayload);
-      } else {
-        setPlanOutcome(null);
-      }
-    } catch {
-      toast.error("Could not load treatment plan details.");
-      setPlanDetails(null);
-      setPlanStatus(null);
-      setPlanOutcome(null);
-    } finally {
-      setDetailLoading(false);
-    }
+  // Forms state
+  const [labForm, setLabForm] = useState({
+    tests: [],
+    notes: ""
+  });
+
+  const [prescriptionForm, setPrescriptionForm] = useState({
+    medications: [
+      { medication: "", dosage: "", frequency: "Once daily", duration: "" }
+    ],
+    notes: ""
+  });
+
+  const [editMedicationForm, setEditMedicationForm] = useState({
+    medication: "",
+    dosage: "",
+    frequency: "Once daily",
+    duration: ""
+  });
+  const [editingIndex, setEditingIndex] = useState(null);
+
+  const [transferForm, setTransferForm] = useState({
+    department: "IPD Admission",
+    ward: "General Ward",
+    reason: ""
+  });
+
+  const [newPatientForm, setNewPatientForm] = useState({
+    name: "",
+    age: "",
+    gender: "Male",
+    doctor: "Dr. Sharma",
+    diagnosis: "",
+    treatmentStatus: "Active",
+    priority: "Medium"
+  });
+
+  // Calculate summary statistics
+  const stats = useMemo(() => {
+    const total = patients.length;
+    const active = patients.filter((p) => p.treatmentStatus === "Active").length;
+    const critical = patients.filter(
+      (p) => p.treatmentStatus === "Critical" || p.priority === "Emergency"
+    ).length;
+
+    return { total, active, critical };
+  }, [patients]);
+
+  // Filtered patients list based on search and selected filter dropdowns
+  const filteredPatients = useMemo(() => {
+    return patients.filter((patient) => {
+      const matchesSearch =
+        patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        patient.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        patient.diagnosis.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        doctorName.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesStatus = statusFilter === "" || patient.treatmentStatus === statusFilter;
+      const matchesPriority = priorityFilter === "" || patient.priority === priorityFilter;
+
+      return matchesSearch && matchesStatus && matchesPriority;
+    });
+  }, [patients, searchQuery, statusFilter, priorityFilter, doctorName]);
+
+  // Reset filter inputs
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("");
+    setPriorityFilter("");
+    toast.info("Filters cleared");
   };
 
-  const handleCreatePlan = async () => {
-    try {
-      const body = {
-        patient_ref: createForm.patient_ref,
-        plan_name: createForm.plan_name,
-        primary_diagnosis: createForm.primary_diagnosis,
-        initial_notes: createForm.initial_notes || null,
-        short_term_goals: parseJsonArray(
-          createForm.short_term_goals,
-          "Short term goals",
-        ),
-        long_term_goals: parseJsonArray(
-          createForm.long_term_goals,
-          "Long term goals",
-        ),
-        interventions: parseJsonArray(
-          createForm.interventions,
-          "Interventions",
-        ),
-        milestones: parseJsonArray(createForm.milestones, "Milestones"),
-      };
-
-      if (!body.patient_ref || !body.plan_name || !body.primary_diagnosis) {
-        toast.info(
-          "Patient ref, plan name and primary diagnosis are required.",
-        );
-        return;
-      }
-
-      setSubmitLoading(true);
-      const response = await createDoctorTreatmentPlan(body);
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        toast.error(doctorAppointmentErrorMessage(payload));
-        return;
-      }
-      toast.success(payload?.message || "Treatment plan created successfully.");
-      setShowCreateModal(false);
-      await loadPlans();
-    } catch (error) {
-      toast.error(error.message || "Could not create treatment plan.");
-    } finally {
-      setSubmitLoading(false);
-    }
+  // Open Lab modal
+  const handleOpenLabModal = (patient) => {
+    setSelectedPatient(patient);
+    setLabForm({ tests: [], notes: "" });
+    setActiveModal("lab");
   };
 
-  const handleMarkCompleted = async (plan) => {
-    const planId = plan?.plan_id || plan?.id;
-    if (!planId) return;
-    setSubmitLoading(true);
-    try {
-      const response = await updateDoctorTreatmentPlan(planId, {
-        status: "COMPLETED",
-        completion_notes: "Completed from doctor dashboard",
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        toast.error(doctorAppointmentErrorMessage(payload));
-        return;
-      }
-      toast.success(payload?.message || "Treatment plan updated successfully.");
-      await loadPlans();
-      if (
-        selectedPlan &&
-        (selectedPlan.plan_id || selectedPlan.id) === planId
-      ) {
-        await handleOpenPlan(plan);
-      }
-    } catch {
-      toast.error("Could not update treatment plan.");
-    } finally {
-      setSubmitLoading(false);
-    }
+  // Toggle lab test selection in checkboxes
+  const handleToggleLabTest = (test) => {
+    setLabForm((prev) => {
+      const isSelected = prev.tests.includes(test);
+      const updatedTests = isSelected
+        ? prev.tests.filter((t) => t !== test)
+        : [...prev.tests, test];
+      return { ...prev, tests: updatedTests };
+    });
   };
 
-  const handleSaveProgress = async () => {
-    const planId = selectedPlan?.plan_id || selectedPlan?.id;
-    if (!planId) return;
-    if (!progressForm.progress_note.trim()) {
-      toast.info("Progress note is required.");
+  // Submit lab tests assignment
+  const handleAssignLabTest = (e) => {
+    e.preventDefault();
+    if (labForm.tests.length === 0) {
+      toast.warning("Please select at least one laboratory investigation.");
       return;
     }
-    setSubmitLoading(true);
-    try {
-      const response = await updateDoctorTreatmentPlanProgress(planId, {
-        milestone_updates: [],
-        goal_updates: [],
-        intervention_updates: [],
-        progress_note: progressForm.progress_note,
-        significant_change: progressForm.significant_change,
-        next_review_date: progressForm.next_review_date || null,
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        toast.error(doctorAppointmentErrorMessage(payload));
-        return;
-      }
-      toast.success(payload?.message || "Progress updated successfully.");
-      setShowProgressModal(false);
-      setProgressForm({
-        progress_note: "",
-        significant_change: false,
-        next_review_date: "",
-      });
-      await loadPlans();
-      await handleOpenPlan(selectedPlan);
-    } catch {
-      toast.error("Could not update treatment progress.");
-    } finally {
-      setSubmitLoading(false);
-    }
+
+    setPatients((prevPatients) =>
+      prevPatients.map((p) => {
+        if (p.id === selectedPatient.id) {
+          return { ...p, labTests: labForm.tests };
+        }
+        return p;
+      })
+    );
+
+    toast.success(
+      `Updated lab assignments for patient ${selectedPatient.name}`
+    );
+    setActiveModal(null);
   };
 
-  const handleSaveOutcome = async () => {
-    const planId = selectedPlan?.plan_id || selectedPlan?.id;
-    if (!planId) return;
-    if (!outcomeForm.outcome_date || !outcomeForm.outcome_summary.trim()) {
-      toast.info("Outcome date and summary are required.");
+  // Open Edit Lab Assignments modal (pre-fills existing tests)
+  const handleOpenEditLabModal = (patient) => {
+    setSelectedPatient(patient);
+    setLabForm({
+      tests: patient.labTests || [],
+      notes: ""
+    });
+    setActiveModal("lab");
+  };
+
+  // Delete Single Lab Test from Card
+  const handleDeleteLabTest = (patient, test) => {
+    setPatients((prevPatients) =>
+      prevPatients.map((p) => {
+        if (p.id === patient.id) {
+          const updatedTests = (p.labTests || []).filter((t) => t !== test);
+          return { ...p, labTests: updatedTests };
+        }
+        return p;
+      })
+    );
+    toast.success(`Removed ${test} assignment for ${patient.name}`);
+  };
+
+  // Open Prescription modal
+  const handleOpenPrescriptionModal = (patient) => {
+    setSelectedPatient(patient);
+    setPrescriptionForm({
+      medications: [
+        { medication: "", dosage: "", frequency: "Once daily", duration: "" }
+      ],
+      notes: ""
+    });
+    setActiveModal("prescription");
+  };
+
+  // Add another tablet row in modal
+  const handleAddMedicationRow = () => {
+    setPrescriptionForm((prev) => ({
+      ...prev,
+      medications: [
+        ...prev.medications,
+        { medication: "", dosage: "", frequency: "Once daily", duration: "" }
+      ]
+    }));
+  };
+
+  // Remove tablet row in modal
+  const handleRemoveMedicationRow = (index) => {
+    setPrescriptionForm((prev) => {
+      const updated = prev.medications.filter((_, idx) => idx !== index);
+      return { ...prev, medications: updated };
+    });
+  };
+
+  // Handle specific field changes for a medication row in modal
+  const handleMedicationFieldChange = (index, field, value) => {
+    setPrescriptionForm((prev) => {
+      const updatedMeds = prev.medications.map((med, idx) => {
+        if (idx === index) {
+          return { ...med, [field]: value };
+        }
+        return med;
+      });
+      return { ...prev, medications: updatedMeds };
+    });
+  };
+
+  // Submit prescription send action (adds all medications in the list to the patient)
+  const handleSendPrescription = (e) => {
+    e.preventDefault();
+    const { medications } = prescriptionForm;
+
+    // Validation
+    const invalidMeds = medications.some(
+      (m) => !m.medication.trim() || !m.dosage.trim() || !m.duration.trim()
+    );
+    if (invalidMeds) {
+      toast.warning("Please fill out the Medication Name, Dosage, and Duration fields for all rows.");
       return;
     }
-    setSubmitLoading(true);
-    try {
-      const response = await recordDoctorTreatmentPlanOutcome(planId, {
-        ...outcomeForm,
-        goals_achieved: Number(outcomeForm.goals_achieved) || 0,
-        goals_partially_achieved:
-          Number(outcomeForm.goals_partially_achieved) || 0,
-        goals_not_achieved: Number(outcomeForm.goals_not_achieved) || 0,
-        treatment_adherence: Number(outcomeForm.treatment_adherence) || 0,
-        patient_satisfaction_score:
-          Number(outcomeForm.patient_satisfaction_score) || 0,
-        quality_of_life_score: Number(outcomeForm.quality_of_life_score) || 0,
-        complications: parseJsonArray(
-          outcomeForm.complications,
-          "Complications",
-        ),
-        future_recommendations: parseJsonArray(
-          outcomeForm.future_recommendations,
-          "Future recommendations",
-        ),
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        toast.error(doctorAppointmentErrorMessage(payload));
-        return;
-      }
-      toast.success(payload?.message || "Outcome recorded successfully.");
-      setShowOutcomeModal(false);
-      await loadPlans();
-      await handleOpenPlan(selectedPlan);
-    } catch (error) {
-      toast.error(error.message || "Could not record treatment outcome.");
-    } finally {
-      setSubmitLoading(false);
-    }
+
+    setPatients((prevPatients) =>
+      prevPatients.map((p) => {
+        if (p.id === selectedPatient.id) {
+          const existingPrescriptions = p.prescriptions || [];
+          return {
+            ...p,
+            prescriptions: [...existingPrescriptions, ...medications]
+          };
+        }
+        return p;
+      })
+    );
+
+    toast.success(
+      `Forwarded ${medications.length} prescription(s) to Pharmacy for ${selectedPatient.name}`
+    );
+    setActiveModal(null);
   };
 
-  const handleLoadTemplates = async () => {
-    setTemplatesLoading(true);
-    try {
-      const response = await getDoctorTreatmentPlanTemplates({
-        diagnosis: templateForm.diagnosis,
-        specialty: templateForm.specialty,
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        toast.error(doctorAppointmentErrorMessage(payload));
-        setTemplates([]);
-        return;
-      }
-      setTemplates(payload?.templates || payload?.data?.templates || []);
-    } catch {
-      toast.error("Could not load templates.");
-      setTemplates([]);
-    } finally {
-      setTemplatesLoading(false);
-    }
+  // Open Edit Single Medication modal
+  const handleOpenEditPrescription = (patient, index) => {
+    setSelectedPatient(patient);
+    setEditingIndex(index);
+    const presc = patient.prescriptions[index];
+    setEditMedicationForm({
+      medication: presc.medication,
+      dosage: presc.dosage,
+      frequency: presc.frequency || "Once daily",
+      duration: presc.duration || ""
+    });
+    setActiveModal("edit_prescription");
   };
 
-  const handleCreateFromTemplate = async () => {
-    if (!templateForm.template_id || !templateForm.patient_ref) {
-      toast.info("Template ID and patient ref are required.");
+  // Submit Edit Medication action
+  const handleSaveEditedPrescription = (e) => {
+    e.preventDefault();
+    const { medication, dosage, frequency, duration } = editMedicationForm;
+    if (!medication.trim() || !dosage.trim() || !duration.trim()) {
+      toast.warning("Please fill out the Medication Name, Dosage, and Duration fields.");
       return;
     }
-    setSubmitLoading(true);
-    try {
-      const response = await createDoctorTreatmentPlanFromTemplate({
-        template_id: templateForm.template_id,
-        patient_ref: templateForm.patient_ref,
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        toast.error(doctorAppointmentErrorMessage(payload));
-        return;
-      }
-      toast.success(
-        payload?.message || "Treatment plan created from template.",
-      );
-      await loadPlans();
-    } catch {
-      toast.error("Could not create plan from template.");
-    } finally {
-      setSubmitLoading(false);
-    }
+
+    setPatients((prevPatients) =>
+      prevPatients.map((p) => {
+        if (p.id === selectedPatient.id) {
+          const updatedMeds = p.prescriptions.map((m, idx) => {
+            if (idx === editingIndex) {
+              return { medication, dosage, frequency, duration };
+            }
+            return m;
+          });
+          return { ...p, prescriptions: updatedMeds };
+        }
+        return p;
+      })
+    );
+
+    toast.success(`Updated medication details for ${medication}`);
+    setActiveModal(null);
   };
 
-  const handleLoadAnalytics = async () => {
-    setAnalyticsLoading(true);
-    try {
-      const response = await getDoctorTreatmentPlanAnalytics(analyticsFilters);
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        toast.error(doctorAppointmentErrorMessage(payload));
-        setAnalytics(null);
-        return;
-      }
-      setAnalytics(payload?.data || payload);
-    } catch {
-      toast.error("Could not load treatment analytics.");
-      setAnalytics(null);
-    } finally {
-      setAnalyticsLoading(false);
-    }
+  // Delete Single Medication from Patient Card
+  const handleDeletePrescription = (patient, index) => {
+    const medicationName = patient.prescriptions[index].medication;
+
+    setPatients((prevPatients) =>
+      prevPatients.map((p) => {
+        if (p.id === patient.id) {
+          const updated = p.prescriptions.filter((_, idx) => idx !== index);
+          return { ...p, prescriptions: updated };
+        }
+        return p;
+      })
+    );
+
+    toast.success(`Removed prescription for ${medicationName}`);
   };
 
-  const handleCleanupDates = async () => {
-    setSubmitLoading(true);
-    try {
-      const response = await cleanupDoctorTreatmentPlanDates();
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        toast.error(doctorAppointmentErrorMessage(payload));
-        return;
-      }
-      toast.success(payload?.message || "Cleanup completed successfully.");
-      await loadPlans();
-    } catch {
-      toast.error("Could not run cleanup.");
-    } finally {
-      setSubmitLoading(false);
-    }
+  // Open Move to IPD modal
+  const handleOpenIpdModal = (patient) => {
+    setSelectedPatient(patient);
+    setTransferForm({
+      department: "IPD Admission",
+      ward: "General Ward",
+      reason: ""
+    });
+    setActiveModal("transfer");
   };
 
-  if (loading && plans.length === 0) return <LoadingSpinner />;
+  // Submit IPD/Emergency transfer action
+  const handleMoveToIPD = (e) => {
+    e.preventDefault();
+    const { department, ward, reason } = transferForm;
+    if (!reason.trim()) {
+      toast.warning("Please provide a clinical reasoning for the transfer.");
+      return;
+    }
+
+    setPatients((prevPatients) =>
+      prevPatients.map((p) => {
+        if (p.id === selectedPatient.id) {
+          // If transferring to Emergency or Critical Care, raise status to Critical and priority to Emergency
+          let updatedStatus = p.treatmentStatus;
+          let updatedPriority = p.priority;
+
+          if (department === "Emergency Department" || department === "Critical Care") {
+            updatedStatus = "Critical";
+            updatedPriority = "Emergency";
+          } else if (department === "IPD Admission") {
+            updatedStatus = "Active";
+            if (p.priority === "Low") {
+              updatedPriority = "Medium";
+            }
+          }
+
+          return {
+            ...p,
+            treatmentStatus: updatedStatus,
+            priority: updatedPriority,
+            ipdTransfer: { department, ward, reason }
+          };
+        }
+        return p;
+      })
+    );
+
+    toast.success(
+      `Transferred ${selectedPatient.name} to ${department} (${ward}) successfully.`
+    );
+    setActiveModal(null);
+  };
+
+  // Open Edit Transfer modal (pre-fills existing transfer details)
+  const handleOpenEditTransferModal = (patient) => {
+    setSelectedPatient(patient);
+    setTransferForm({
+      department: patient.ipdTransfer.department || "IPD Admission",
+      ward: patient.ipdTransfer.ward || "General Ward",
+      reason: patient.ipdTransfer.reason || ""
+    });
+    setActiveModal("transfer");
+  };
+
+  // Cancel / Delete Department Transfer
+  const handleDeleteTransfer = (patient) => {
+    setPatients((prevPatients) =>
+      prevPatients.map((p) => {
+        if (p.id === patient.id) {
+          return {
+            ...p,
+            ipdTransfer: null,
+            treatmentStatus: p.treatmentStatus === "Critical" ? "Active" : p.treatmentStatus,
+            priority: p.priority === "Emergency" ? "Medium" : p.priority
+          };
+        }
+        return p;
+      })
+    );
+    toast.success(`Cancelled department transfer for ${patient.name}`);
+  };
+
+  // Open Add Patient modal
+  const handleOpenAddPatientModal = () => {
+    setNewPatientForm({
+      name: "",
+      age: "",
+      gender: "Male",
+      doctor: doctorName,
+      diagnosis: "",
+      treatmentStatus: "Active",
+      priority: "Medium"
+    });
+    setActiveModal("add_patient");
+  };
+
+  // Submit New Patient form
+  const handleAddPatient = (e) => {
+    e.preventDefault();
+    const { name, age, gender, doctor, diagnosis, treatmentStatus, priority } = newPatientForm;
+    if (!name.trim() || !age || !diagnosis.trim() || !doctor.trim()) {
+      toast.warning("Please fill in all patient details before submitting.");
+      return;
+    }
+
+    const nextIdNum = Math.max(...patients.map((p) => parseInt(p.id.split("-")[1]))) + 1;
+    const newId = `PAT-${nextIdNum}`;
+    const today = new Date().toISOString().split("T")[0];
+
+    const newPatient = {
+      id: newId,
+      name,
+      age: parseInt(age),
+      gender,
+      doctor,
+      diagnosis,
+      treatmentStatus,
+      priority,
+      lastVisit: today,
+      labTests: [],
+      prescriptions: [],
+      ipdTransfer: null
+    };
+
+    setPatients((prev) => [newPatient, ...prev]);
+    toast.success(`Successfully registered new patient: ${name} (${newId})`);
+    setActiveModal(null);
+  };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+    <div className="space-y-6 animate-fade-in text-slate-800">
+      
+      {/* ==========================================
+          Header Section
+          ========================================== */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
-            Treatment Plan Management
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+            <Stethoscope className="text-blue-600 w-8 h-8" />
+            Treatment Plans Management
           </h2>
-          <p className="text-sm text-gray-500">
-            Create, monitor, update outcomes, templates and analytics for
-            treatment plans
+          <p className="text-sm text-slate-500 mt-1">
+            Overview clinic and ward admissions, assign laboratory tests, write pharmacy prescriptions, and dispatch transfers.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 ">
+        <div>
           <button
-            className="btn-secondary"
-            onClick={handleCleanupDates}
-            disabled={submitLoading}
-            style={{
-              backgroundColor: "#007bff",
-              color: "white",
-              border: "none",
-              borderRadius: "8px",
-              padding: "10px 20px",
-              cursor: "pointer",
-            }}
+            onClick={handleOpenAddPatientModal}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all duration-200"
           >
-            Cleanup Invalid Dates
-          </button>
-          <button
-            className="btn-primary"
-            onClick={() => setShowCreateModal(true)}
-            style={{
-              backgroundColor: "#007bff",
-              color: "white",
-              border: "none",
-              borderRadius: "8px",
-              padding: "10px 20px",
-              cursor: "pointer",
-            }}
-          >
-            <i className="fas fa-plus mr-2"></i> New Treatment Plan
+            <Plus className="w-5 h-5" />
+            Add New Patient
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-xl p-4 text-white bg-gradient-to-br from-blue-500 to-blue-700">
-          <p className="text-xs opacity-90">Total Plans</p>
-          <p className="text-2xl font-bold">{stats.total}</p>
+      {/* ==========================================
+          Statistics Cards Section
+          ========================================== */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Total Patients Card */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm flex items-center justify-between hover:shadow-md transition-all duration-300">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Patients</p>
+            <h3 className="text-3xl font-extrabold text-slate-900 mt-1">{stats.total}</h3>
+            <p className="text-xs text-slate-400 mt-1.5">Registered in dashboard</p>
+          </div>
+          <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+            <Users className="w-8 h-8" />
+          </div>
         </div>
-        <div className="rounded-xl p-4 text-white bg-gradient-to-br from-emerald-500 to-emerald-700">
-          <p className="text-xs opacity-90">Active Plans</p>
-          <p className="text-2xl font-bold">{stats.active}</p>
+
+        {/* Active Treatments Card */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm flex items-center justify-between hover:shadow-md transition-all duration-300">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Active Treatments</p>
+            <h3 className="text-3xl font-extrabold text-emerald-600 mt-1">{stats.active}</h3>
+            <p className="text-xs text-slate-400 mt-1.5">Ongoing active cycles</p>
+          </div>
+          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+            <Activity className="w-8 h-8" />
+          </div>
         </div>
-        <div className="rounded-xl p-4 text-white bg-gradient-to-br from-indigo-500 to-indigo-700">
-          <p className="text-xs opacity-90">Completed Plans</p>
-          <p className="text-2xl font-bold">{stats.completed}</p>
-        </div>
-        <div className="rounded-xl p-4 text-white bg-gradient-to-br from-purple-500 to-purple-700">
-          <p className="text-xs opacity-90">Average Progress</p>
-          <p className="text-2xl font-bold">{stats.avgProgress}%</p>
+
+        {/* Critical Cases Card */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm flex items-center justify-between hover:shadow-md transition-all duration-300">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Critical / Emergency</p>
+            <h3 className="text-3xl font-extrabold text-rose-600 mt-1">{stats.critical}</h3>
+            <p className="text-xs text-rose-400 mt-1.5">Require immediate attention</p>
+          </div>
+          <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl">
+            <AlertTriangle className="w-8 h-8" />
+          </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border p-5 space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-end gap-3">
-          <div className="flex-1">
-            <label className="block text-sm text-gray-700 mb-1">Status</label>
+      {/* ==========================================
+          Filters Panel Section
+          ========================================== */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm space-y-4">
+        <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+          <Filter className="w-4 h-4 text-blue-500" />
+          <h4 className="font-semibold text-slate-800 text-sm">Filter & Search Database</h4>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          
+          {/* Text Search input */}
+          <div className="relative">
+            <Search className="absolute left-3.5 top-3.5 w-4.5 h-4.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search Name, ID, Diagnosis..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
+            />
+          </div>
+
+          {/* Status filter dropdown */}
+          <div>
             <select
-              className="form-input"
-              value={filters.status}
-              onChange={(e) =>
-                setFilters((prev) => ({ ...prev, status: e.target.value }))
-              }
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
             >
-              {PLAN_STATUS_OPTIONS.map((status) => (
-                <option key={status || "ALL"} value={status}>
-                  {status || "All"}
-                </option>
-              ))}
+              <option value="">All Statuses</option>
+              <option value="Active">Active</option>
+              <option value="Under Review">Under Review</option>
+              <option value="Completed">Completed</option>
+              <option value="Critical">Critical</option>
             </select>
           </div>
-          <div className="flex-1">
-            <label className="block text-sm text-gray-700 mb-1">
-              Patient Ref
-            </label>
-            <input
-              className="form-input"
-              value={filters.patient_ref}
-              onChange={(e) =>
-                setFilters((prev) => ({ ...prev, patient_ref: e.target.value }))
-              }
-              placeholder="PT-0001"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-700 mb-1">Limit</label>
-            <input
-              className="form-input"
-              type="number"
-              min="1"
-              max="200"
-              value={filters.limit}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  limit: Number(e.target.value) || 50,
-                }))
-              }
-            />
-          </div>
-          <button
-            className="btn-primary"
-            onClick={loadPlans}
-            style={{
-              backgroundColor: "#007bff",
-              color: "white",
-              border: "none",
-              borderRadius: "8px",
-              padding: "10px 20px",
-              cursor: "pointer",
-            }}
-          >
-            Apply Filters
-          </button>
-        </div>
-        <DataTable
-          columns={[
-            { key: "plan_id", title: "Plan ID", sortable: false },
-            { key: "plan_name", title: "Plan Name", sortable: true },
-            { key: "patient_name", title: "Patient", sortable: true },
-            { key: "patient_ref", title: "Patient Ref", sortable: true },
-            { key: "primary_diagnosis", title: "Diagnosis", sortable: false },
-            {
-              key: "progress_percentage",
-              title: "Progress",
-              render: (value) => `${Number(value || 0)}%`,
-            },
-            {
-              key: "status",
-              title: "Status",
-              render: (value) => (
-                <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
-                  {value || "-"}
-                </span>
-              ),
-            },
-            {
-              key: "created_date",
-              title: "Created",
-              render: (value) => formatDate(value),
-            },
-            {
-              key: "actions",
-              title: "Actions",
-              render: (_, row) => (
-                <div className="flex items-center gap-2">
-                  <button
-                    className="icon-btn text-blue-600"
-                    title="View details"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenPlan(row);
-                    }}
-                  >
-                    <i className="fas fa-eye"></i>
-                  </button>
-                  <button
-                    className="icon-btn text-green-600 disabled:opacity-50"
-                    title="Mark completed"
-                    disabled={
-                      String(row?.status || "").toUpperCase() === "COMPLETED" ||
-                      submitLoading
-                    }
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleMarkCompleted(row);
-                    }}
-                  >
-                    <i className="fas fa-check"></i>
-                  </button>
-                </div>
-              ),
-            },
-          ]}
-          data={plans}
-        />
-      </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border p-5 space-y-4">
-          <h3 className="text-lg font-semibold text-gray-800">
-            Plan Templates
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <input
-              className="form-input"
-              placeholder="Filter diagnosis"
-              value={templateForm.diagnosis}
-              onChange={(e) =>
-                setTemplateForm((prev) => ({
-                  ...prev,
-                  diagnosis: e.target.value,
-                }))
-              }
-            />
-            <input
-              className="form-input"
-              placeholder="Filter specialty"
-              value={templateForm.specialty}
-              onChange={(e) =>
-                setTemplateForm((prev) => ({
-                  ...prev,
-                  specialty: e.target.value,
-                }))
-              }
-            />
-            <input
-              className="form-input"
-              placeholder="Template ID"
-              value={templateForm.template_id}
-              onChange={(e) =>
-                setTemplateForm((prev) => ({
-                  ...prev,
-                  template_id: e.target.value,
-                }))
-              }
-            />
-            <input
-              className="form-input"
-              placeholder="Patient Ref for template create"
-              value={templateForm.patient_ref}
-              onChange={(e) =>
-                setTemplateForm((prev) => ({
-                  ...prev,
-                  patient_ref: e.target.value,
-                }))
-              }
-            />
+          {/* Priority filter dropdown */}
+          <div>
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+            >
+              <option value="">All Priorities</option>
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+              <option value="Emergency">Emergency</option>
+            </select>
           </div>
+
+          {/* Action buttons */}
           <div className="flex gap-2">
             <button
-              className="btn-secondary"
-              onClick={handleLoadTemplates}
-              style={{
-                backgroundColor: "#D3D3D3",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                padding: "10px 20px",
-                cursor: "pointer",
-              }}
+              onClick={handleResetFilters}
+              disabled={!searchQuery && !statusFilter && !priorityFilter}
+              className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-transparent rounded-xl text-sm font-semibold transition-all"
             >
-              {templatesLoading ? "Loading..." : "Load Templates"}
+              <RefreshCw className="w-4 h-4" />
+              Reset
             </button>
-            <button
-              className="btn-primary"
-              onClick={handleCreateFromTemplate}
-              disabled={submitLoading}
-              style={{
-                backgroundColor: "#007bff",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                padding: "10px 20px",
-                cursor: "pointer",
-              }}
-            >
-              Create From Template
-            </button>
-          </div>
-          <div className="max-h-64 overflow-auto border rounded-lg divide-y">
-            {templates.length === 0 ? (
-              <p className="text-sm text-gray-500 p-3">No templates loaded.</p>
-            ) : (
-              templates.map((item) => (
-                <div key={item.template_id} className="p-3">
-                  <p className="font-semibold text-sm">{item.template_name}</p>
-                  <p className="text-xs text-gray-500">
-                    {item.template_id} | {item.specialty}
-                  </p>
-                  <p className="text-sm mt-1 text-gray-700">
-                    {item.description}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border p-5 space-y-4">
-          <h3 className="text-lg font-semibold text-gray-800">
-            Treatment Analytics
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <input
-              className="form-input"
-              type="date"
-              value={analyticsFilters.date_from}
-              onChange={(e) =>
-                setAnalyticsFilters((prev) => ({
-                  ...prev,
-                  date_from: e.target.value,
-                }))
-              }
-            />
-            <input
-              className="form-input"
-              type="date"
-              value={analyticsFilters.date_to}
-              onChange={(e) =>
-                setAnalyticsFilters((prev) => ({
-                  ...prev,
-                  date_to: e.target.value,
-                }))
-              }
-            />
-          </div>
-          <button
-            className="btn-primary"
-            onClick={handleLoadAnalytics}
-            style={{
-              backgroundColor: "#007bff",
-              color: "white",
-              border: "none",
-              borderRadius: "8px",
-              padding: "10px 20px",
-              cursor: "pointer",
-            }}
-          >
-            {analyticsLoading ? "Loading..." : "Load Analytics"}
-          </button>
-          <div className="bg-gray-50 rounded-lg p-4 text-sm space-y-1">
-            <p>
-              <strong>Doctor:</strong> {analytics?.doctor_name || "-"}
-            </p>
-            <p>
-              <strong>Period:</strong> {analytics?.analysis_period || "-"}
-            </p>
-            <p>
-              <strong>Total Plans:</strong>{" "}
-              {analytics?.summary_statistics?.total_plans ?? "-"}
-            </p>
-            <p>
-              <strong>Success Rate:</strong>{" "}
-              {analytics?.summary_statistics?.success_rate ?? "-"}%
-            </p>
-            <p>
-              <strong>Avg Completion:</strong>{" "}
-              {analytics?.summary_statistics?.average_completion_time_days ??
-                "-"}{" "}
-              days
-            </p>
           </div>
         </div>
       </div>
 
-      <Modal
-        isOpen={Boolean(selectedPlan)}
-        onClose={() => {
-          setSelectedPlan(null);
-          setPlanDetails(null);
-          setPlanStatus(null);
-          setPlanOutcome(null);
-        }}
-        title={`Treatment Plan Details - ${selectedPlan?.plan_name || ""}`}
-        size="xl"
-      >
-        {detailLoading ? (
-          <LoadingSpinner />
-        ) : (
-          <div className="space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p>
-                  <strong>Plan ID:</strong>{" "}
-                  {planDetails?.plan_id || selectedPlan?.plan_id || "-"}
-                </p>
-                <p>
-                  <strong>Status:</strong>{" "}
-                  {planDetails?.status || selectedPlan?.status || "-"}
-                </p>
-                <p>
-                  <strong>Patient:</strong>{" "}
-                  {planDetails?.patient_name ||
-                    selectedPlan?.patient_name ||
-                    "-"}
-                </p>
-                <p>
-                  <strong>Patient Ref:</strong>{" "}
-                  {planDetails?.patient_ref || selectedPlan?.patient_ref || "-"}
-                </p>
-                <p>
-                  <strong>Primary Diagnosis:</strong>{" "}
-                  {planDetails?.primary_diagnosis ||
-                    selectedPlan?.primary_diagnosis ||
-                    "-"}
-                </p>
-                <p>
-                  <strong>Progress:</strong>{" "}
-                  {planDetails?.progress_percentage ??
-                    selectedPlan?.progress_percentage ??
-                    0}
-                  %
-                </p>
+      {/* ==========================================
+          Patient Cards Grid
+          ========================================== */}
+      {filteredPatients.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-12 text-center shadow-sm">
+          <User className="w-12 h-12 text-slate-300 mx-auto" />
+          <h3 className="text-base font-bold text-slate-700 mt-4">No Patients Found</h3>
+          <p className="text-sm text-slate-400 mt-1">Try expanding your filter criteria or register a new patient profile.</p>
+          {(searchQuery || statusFilter || priorityFilter) && (
+            <button
+              onClick={handleResetFilters}
+              className="mt-4 px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl text-xs font-semibold transition-all"
+            >
+              Clear Current Filters
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredPatients.map((patient) => (
+            <div
+              key={patient.id}
+              className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between overflow-hidden"
+            >
+              
+              {/* Card Header */}
+              <div className="px-5 py-4 border-b border-slate-50 bg-slate-50/50 flex items-center justify-between">
+                <span className="text-[11px] font-extrabold text-blue-600 bg-blue-50/80 border border-blue-100 px-2 py-0.5 rounded-md tracking-wider">
+                  {patient.id}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${getStatusBadgeClass(patient.treatmentStatus)}`}>
+                    {patient.treatmentStatus}
+                  </span>
+                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${getPriorityBadgeClass(patient.priority)}`}>
+                    {patient.priority}
+                  </span>
+                </div>
               </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p>
-                  <strong>Total Goals:</strong> {planStatus?.total_goals ?? "-"}
-                </p>
-                <p>
-                  <strong>Total Milestones:</strong>{" "}
-                  {planStatus?.total_milestones ?? "-"}
-                </p>
-                <p>
-                  <strong>Progress Notes:</strong>{" "}
-                  {planStatus?.total_progress_notes ?? "-"}
-                </p>
-                <p>
-                  <strong>Has Outcome:</strong>{" "}
-                  {planStatus?.has_outcome_assessment ? "Yes" : "No"}
-                </p>
-                <p>
-                  <strong>Outcome Date:</strong>{" "}
-                  {planStatus?.outcome_assessment_date || "-"}
-                </p>
-              </div>
-            </div>
 
-            <div>
-              <h4 className="text-base font-semibold text-gray-800 mb-2">
-                Goals & Milestones
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                <div className="border rounded-lg p-3">
-                  <p className="font-medium mb-2">Short-Term Goals</p>
-                  <ul className="list-disc pl-5">
-                    {(planDetails?.short_term_goals || [])
-                      .slice(0, 5)
-                      .map((goal) => (
-                        <li key={goal.goal_id || goal.description}>
-                          {goal.description || "-"}
-                        </li>
+              {/* Card Body */}
+              <div className="p-5 flex-1 space-y-4">
+                
+                {/* Basic Demographics */}
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">{patient.name}</h3>
+                  <p className="text-xs text-slate-400 font-semibold mt-0.5">
+                    {patient.age} Yrs • {patient.gender}
+                  </p>
+                </div>
+
+                {/* Medical Details */}
+                <div className="grid grid-cols-2 gap-4 border-t border-slate-50 pt-3.5 text-xs">
+                  <div>
+                    <span className="text-slate-400 font-semibold block text-[10px] uppercase tracking-wider">Assigned Doctor</span>
+                    <span className="text-slate-700 font-bold mt-1 flex items-center gap-1">
+                      <Stethoscope className="w-3.5 h-3.5 text-blue-500" />
+                      {doctorName}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-semibold block text-[10px] uppercase tracking-wider">Diagnosis</span>
+                    <span className="text-slate-700 font-bold mt-1 block truncate" title={patient.diagnosis}>
+                      {patient.diagnosis}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Last Visit */}
+                <div className="border-t border-slate-50 pt-3.5 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5 text-slate-400 font-semibold">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Last Visit Date:</span>
+                  </div>
+                  <span className="font-bold text-slate-700">{patient.lastVisit}</span>
+                </div>
+
+                {/* Dynamic Lab Tests Assigned */}
+                {patient.labTests && patient.labTests.length > 0 && (
+                  <div className="bg-slate-50/50 rounded-xl p-3 border border-slate-100 text-xs">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <FlaskConical className="w-3.5 h-3.5 text-emerald-500" /> Lab Assignments
+                      </p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditLabModal(patient);
+                        }}
+                        title="Edit Lab Assignments"
+                        className="text-slate-400 hover:text-emerald-600 p-0.5 hover:bg-slate-200/50 rounded transition-all"
+                      >
+                        <Edit className="w-3 h-3 text-slate-400 hover:text-emerald-600" />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {patient.labTests.map((test, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-md pl-2 pr-1 py-0.5 text-[10px] font-bold"
+                        >
+                          {test}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteLabTest(patient, test);
+                            }}
+                            title={`Remove ${test}`}
+                            className="p-0.5 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-800 rounded transition-all"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </span>
                       ))}
-                  </ul>
-                </div>
-                <div className="border rounded-lg p-3">
-                  <p className="font-medium mb-2">Milestones</p>
-                  <ul className="list-disc pl-5">
-                    {(planDetails?.milestones || []).slice(0, 5).map((item) => (
-                      <li key={item.milestone_id || item.title}>
-                        {item.title || "-"} ({item.status || "PENDING"})
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Dynamic Pharmacy Prescriptions */}
+                {patient.prescriptions && patient.prescriptions.length > 0 && (
+                  <div className="bg-slate-50/50 rounded-xl p-3 border border-slate-100 text-xs">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-1.5">
+                      <FileText className="w-3.5 h-3.5 text-blue-500" /> Pharmacy Prescriptions
+                    </p>
+                    <div className="space-y-2">
+                      {patient.prescriptions.map((presc, index) => (
+                        <div
+                          key={index}
+                          className="flex justify-between items-center text-[10px] border-b border-dashed border-slate-200 last:border-0 pb-2 last:pb-0 group"
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-700">
+                              {presc.medication} <span className="font-semibold text-slate-500">({presc.dosage})</span>
+                            </span>
+                            <span className="text-[9px] text-slate-400 font-semibold mt-0.5">
+                              {presc.frequency} {presc.duration ? `• ${presc.duration}` : ""}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0 ml-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenEditPrescription(patient, index);
+                              }}
+                              title="Edit Medication"
+                              className="p-1 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded transition-all"
+                            >
+                              <Edit className="w-3 h-3 text-slate-400 hover:text-blue-600" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeletePrescription(patient, index);
+                              }}
+                              title="Delete Medication"
+                              className="p-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded transition-all"
+                            >
+                              <Trash2 className="w-3 h-3 text-slate-400 hover:text-red-500" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Dynamic IPD / Emergency Transfers */}
+                {patient.ipdTransfer && (
+                  <div className="bg-rose-50/50 rounded-xl p-3 border border-rose-100 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-rose-500 flex items-center gap-1.5">
+                        <ArrowRightLeft className="w-3.5 h-3.5" /> Department Transfer
+                      </p>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditTransferModal(patient);
+                          }}
+                          title="Edit Transfer"
+                          className="p-1 hover:bg-rose-100 text-slate-400 hover:text-rose-600 rounded transition-all"
+                        >
+                          <Edit className="w-3 h-3 text-slate-400 hover:text-rose-600" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTransfer(patient);
+                          }}
+                          title="Cancel Transfer"
+                          className="p-1 hover:bg-rose-100 text-slate-400 hover:text-rose-600 rounded transition-all"
+                        >
+                          <Trash2 className="w-3 h-3 text-slate-400 hover:text-rose-600" />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="font-bold text-slate-800 text-[10px]">
+                      Destination: <span className="text-rose-700">{patient.ipdTransfer.department}</span>
+                    </p>
+                    <p className="text-[10px] text-slate-600 font-semibold">
+                      Ward: {patient.ipdTransfer.ward}
+                    </p>
+                    <p className="text-[9px] text-slate-400 italic">
+                      Reason: `{patient.ipdTransfer.reason}`
+                    </p>
+                  </div>
+                )}
               </div>
+
+              {/* Card Footer: Quick Actions Section */}
+              <div className="bg-slate-50/50 px-5 py-4 border-t border-slate-100 grid grid-cols-3 gap-2">
+                
+                {/* Button 1: Assign Lab Test */}
+                <button
+                  onClick={() => handleOpenLabModal(patient)}
+                  title="Assign laboratory investigations"
+                  className="flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl bg-white hover:bg-emerald-50 text-emerald-600 hover:text-emerald-700 border border-slate-200 hover:border-emerald-200 shadow-sm hover:shadow transition-all duration-200 text-[10px] font-bold"
+                >
+                  <FlaskConical className="w-4 h-4 text-emerald-500" />
+                  <span>Assign Lab</span>
+                </button>
+
+                {/* Button 2: Send Prescription */}
+                <button
+                  onClick={() => handleOpenPrescriptionModal(patient)}
+                  title="Forward prescription to Pharmacy"
+                  className="flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl bg-white hover:bg-blue-50 text-blue-600 hover:text-blue-700 border border-slate-200 hover:border-blue-200 shadow-sm hover:shadow transition-all duration-200 text-[10px] font-bold"
+                >
+                  <FileText className="w-4 h-4 text-blue-500" />
+                  <span>Prescribe</span>
+                </button>
+
+                {/* Button 3: Move to IPD / Emergency */}
+                <button
+                  onClick={() => handleOpenIpdModal(patient)}
+                  title="Transfer patient from OPD to IPD/Emergency"
+                  className="flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-slate-200 hover:border-rose-200 shadow-sm hover:shadow transition-all duration-200 text-[10px] font-bold"
+                >
+                  <ArrowRightLeft className="w-4 h-4 text-rose-500" />
+                  <span>Transfer</span>
+                </button>
+              </div>
+
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ==========================================
+          4. Quick Action Modal Dialogs (Overlay)
+          ========================================== */}
+      {activeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-md max-h-[90vh] overflow-y-auto flex flex-col justify-between animate-in fade-in duration-200">
+            
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">
+                  {activeModal === "lab" && "Assign Lab Test"}
+                  {activeModal === "prescription" && "Send Prescription"}
+                  {activeModal === "transfer" && "Transfer Department"}
+                  {activeModal === "add_patient" && "Register New Patient"}
+                </h3>
+                {selectedPatient && activeModal !== "add_patient" && (
+                  <p className="text-xs text-slate-400 font-semibold mt-0.5">
+                    Patient: {selectedPatient.name} ({selectedPatient.id})
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setActiveModal(null)}
+                className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <div className="bg-gray-50 rounded-lg p-4 text-sm">
-              <h4 className="text-base font-semibold text-gray-800 mb-2">
-                Outcome Summary
-              </h4>
-              {planOutcome ? (
-                <div className="space-y-1">
-                  <p>
-                    <strong>Overall Outcome:</strong>{" "}
-                    {planOutcome?.overall_outcome || "-"}
-                  </p>
-                  <p>
-                    <strong>Clinical Effectiveness:</strong>{" "}
-                    {planOutcome?.clinical_effectiveness || "-"}
-                  </p>
-                  <p>
-                    <strong>Patient Satisfaction:</strong>{" "}
-                    {planOutcome?.patient_satisfaction_score ?? "-"}
-                  </p>
-                  <p>
-                    <strong>Summary:</strong>{" "}
-                    {planOutcome?.outcome_summary || "-"}
-                  </p>
-                </div>
-              ) : (
-                <p className="text-gray-500">
-                  No outcome assessment recorded yet.
-                </p>
+            {/* Modal Body / Forms */}
+            <div className="p-6">
+              
+              {/* Form A: Assign Lab Test */}
+              {activeModal === "lab" && (
+                <form onSubmit={handleAssignLabTest} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                      Select Laboratory Investigations
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {LAB_TEST_OPTIONS.map((test) => (
+                        <label
+                          key={test}
+                          className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
+                            labForm.tests.includes(test)
+                              ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                              : "bg-white border-slate-200 hover:bg-slate-50 text-slate-600"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={labForm.tests.includes(test)}
+                            onChange={() => handleToggleLabTest(test)}
+                            className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500/20 border-slate-300"
+                          />
+                          {test}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                      Clinical notes / Instructions
+                    </label>
+                    <textarea
+                      placeholder="Enter special directives, symptoms, or precautions..."
+                      value={labForm.notes}
+                      onChange={(e) => setLabForm((prev) => ({ ...prev, notes: e.target.value }))}
+                      rows={3}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+                    />
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveModal(null)}
+                      className="flex-1 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-500 transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm hover:shadow transition-all"
+                    >
+                      Assign Lab Test
+                    </button>
+                  </div>
+                </form>
               )}
+
+              {/* Form B: Send Prescription */}
+              {activeModal === "prescription" && (
+                <form onSubmit={handleSendPrescription} className="space-y-4">
+                  <div className="max-h-[45vh] overflow-y-auto pr-1 space-y-4 border-b border-slate-100 pb-4">
+                    {prescriptionForm.medications.map((med, index) => (
+                      <div key={index} className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-3 relative">
+                        {prescriptionForm.medications.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMedicationRow(index)}
+                            className="absolute top-2.5 right-2.5 text-slate-400 hover:text-red-500 p-1 rounded-lg hover:bg-slate-200/50 transition-all"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        <h4 className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
+                          Medication #{index + 1}
+                        </h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                              Medication Name *
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Metformin"
+                              value={med.medication}
+                              onChange={(e) =>
+                                handleMedicationFieldChange(index, "medication", e.target.value)
+                              }
+                              required
+                              className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                              Dosage / Strength *
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 500mg"
+                              value={med.dosage}
+                              onChange={(e) =>
+                                handleMedicationFieldChange(index, "dosage", e.target.value)
+                              }
+                              required
+                              className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                              Frequency
+                            </label>
+                            <select
+                              value={med.frequency}
+                              onChange={(e) =>
+                                handleMedicationFieldChange(index, "frequency", e.target.value)
+                              }
+                              className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+                            >
+                              <option value="Once daily">Once daily</option>
+                              <option value="Twice daily">Twice daily</option>
+                              <option value="Three times daily">Three times daily</option>
+                              <option value="Four times daily">Four times daily</option>
+                              <option value="Every 4 hours">Every 4 hours</option>
+                              <option value="Every 8 hours">Every 8 hours</option>
+                              <option value="As needed">As needed</option>
+                              <option value="At bedtime">At bedtime</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                              Duration *
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 7 days"
+                              value={med.duration}
+                              onChange={(e) =>
+                                handleMedicationFieldChange(index, "duration", e.target.value)
+                              }
+                              required
+                              className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddMedicationRow}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 border border-dashed border-blue-200 hover:border-blue-400 text-blue-600 hover:text-blue-700 bg-blue-50/20 hover:bg-blue-50/50 rounded-xl text-xs font-bold transition-all"
+                  >
+                    <Plus className="w-4 h-4 animate-bounce" />
+                    Add Another Tablet / Medication
+                  </button>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Pharmacy Notes / Instructions
+                    </label>
+                    <textarea
+                      placeholder="e.g. Take after meals, dissolve in water..."
+                      value={prescriptionForm.notes}
+                      onChange={(e) =>
+                        setPrescriptionForm((prev) => ({ ...prev, notes: e.target.value }))
+                      }
+                      rows={2}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+                    />
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveModal(null)}
+                      className="flex-1 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-500 transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm hover:shadow transition-all"
+                    >
+                      Send Prescription
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Form E: Edit Single Prescription */}
+              {activeModal === "edit_prescription" && (
+                <form onSubmit={handleSaveEditedPrescription} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Medication Name *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Metformin"
+                        value={editMedicationForm.medication}
+                        onChange={(e) =>
+                          setEditMedicationForm((prev) => ({ ...prev, medication: e.target.value }))
+                        }
+                        required
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Dosage / Strength *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 500mg"
+                        value={editMedicationForm.dosage}
+                        onChange={(e) =>
+                          setEditMedicationForm((prev) => ({ ...prev, dosage: e.target.value }))
+                        }
+                        required
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Frequency
+                      </label>
+                      <select
+                        value={editMedicationForm.frequency}
+                        onChange={(e) =>
+                          setEditMedicationForm((prev) => ({ ...prev, frequency: e.target.value }))
+                        }
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+                      >
+                        <option value="Once daily">Once daily</option>
+                        <option value="Twice daily">Twice daily</option>
+                        <option value="Three times daily">Three times daily</option>
+                        <option value="Four times daily">Four times daily</option>
+                        <option value="Every 4 hours">Every 4 hours</option>
+                        <option value="Every 8 hours">Every 8 hours</option>
+                        <option value="As needed">As needed</option>
+                        <option value="At bedtime">At bedtime</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Duration *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 7 days"
+                        value={editMedicationForm.duration}
+                        onChange={(e) =>
+                          setEditMedicationForm((prev) => ({ ...prev, duration: e.target.value }))
+                        }
+                        required
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveModal(null)}
+                      className="flex-1 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-500 transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm hover:shadow transition-all"
+                    >
+                      Save Changes
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Form C: Transfer Ward (IPD/Emergency) */}
+              {activeModal === "transfer" && (
+                <form onSubmit={handleMoveToIPD} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Target Department
+                      </label>
+                      <select
+                        value={transferForm.department}
+                        onChange={(e) =>
+                          setTransferForm((prev) => ({ ...prev, department: e.target.value }))
+                        }
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+                      >
+                        <option value="IPD Admission">IPD Admission</option>
+                        <option value="Emergency Department">Emergency Department</option>
+                        <option value="Critical Care">Critical Care</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Ward Room Type
+                      </label>
+                      <select
+                        value={transferForm.ward}
+                        onChange={(e) =>
+                          setTransferForm((prev) => ({ ...prev, ward: e.target.value }))
+                        }
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+                      >
+                        <option value="General Ward">General Ward</option>
+                        <option value="Semi-Private Room">Semi-Private Room</option>
+                        <option value="Private Suite">Private Suite</option>
+                        <option value="ICU Bed">ICU Bed</option>
+                        <option value="Emergency Bed">Emergency Bed</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Clinical Reason for Transfer *
+                    </label>
+                    <textarea
+                      placeholder="Document justification, status changes, or immediate surgical needs..."
+                      value={transferForm.reason}
+                      onChange={(e) =>
+                        setTransferForm((prev) => ({ ...prev, reason: e.target.value }))
+                      }
+                      rows={3}
+                      required
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+                    />
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveModal(null)}
+                      className="flex-1 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-500 transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-sm hover:shadow transition-all"
+                    >
+                      Confirm Transfer
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Form D: Add New Patient */}
+              {activeModal === "add_patient" && (
+                <form onSubmit={handleAddPatient} className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Patient Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Harish Chandra"
+                      value={newPatientForm.name}
+                      onChange={(e) =>
+                        setNewPatientForm((prev) => ({ ...prev, name: e.target.value }))
+                      }
+                      required
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Age *
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="Age"
+                        value={newPatientForm.age}
+                        onChange={(e) =>
+                          setNewPatientForm((prev) => ({ ...prev, age: e.target.value }))
+                        }
+                        required
+                        min="1"
+                        max="120"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Gender
+                      </label>
+                      <select
+                        value={newPatientForm.gender}
+                        onChange={(e) =>
+                          setNewPatientForm((prev) => ({ ...prev, gender: e.target.value }))
+                        }
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+                      >
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Assigned Doctor
+                      </label>
+                      <input
+                        type="text"
+                        value={newPatientForm.doctor}
+                        disabled
+                        className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs text-slate-500 cursor-not-allowed font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Diagnosis / Issue *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Pneumonia"
+                        value={newPatientForm.diagnosis}
+                        onChange={(e) =>
+                          setNewPatientForm((prev) => ({ ...prev, diagnosis: e.target.value }))
+                        }
+                        required
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Status
+                      </label>
+                      <select
+                        value={newPatientForm.treatmentStatus}
+                        onChange={(e) =>
+                          setNewPatientForm((prev) => ({ ...prev, treatmentStatus: e.target.value }))
+                        }
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Under Review">Under Review</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Critical">Critical</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Priority
+                      </label>
+                      <select
+                        value={newPatientForm.priority}
+                        onChange={(e) =>
+                          setNewPatientForm((prev) => ({ ...prev, priority: e.target.value }))
+                        }
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
+                      >
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                        <option value="Emergency">Emergency</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveModal(null)}
+                      className="flex-1 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-500 transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm hover:shadow transition-all"
+                    >
+                      Register Patient
+                    </button>
+                  </div>
+                </form>
+              )}
+
             </div>
-
-            <div className="flex flex-wrap justify-end gap-2">
-              <button
-                className="btn-secondary"
-                onClick={() => setShowProgressModal(true)}
-              >
-                Update Progress
-              </button>
-              <button
-                className="btn-secondary"
-                onClick={() => setShowOutcomeModal(true)}
-              >
-                Record Outcome
-              </button>
-              <button
-                className="btn-primary"
-                onClick={() => handleMarkCompleted(selectedPlan)}
-                disabled={submitLoading}
-              >
-                Mark Completed
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      <Modal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        title="Create Treatment Plan"
-        size="xl"
-      >
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <input
-              className="form-input"
-              placeholder="Patient Ref *"
-              value={createForm.patient_ref}
-              onChange={(e) =>
-                setCreateForm((prev) => ({
-                  ...prev,
-                  patient_ref: e.target.value,
-                }))
-              }
-            />
-            <input
-              className="form-input"
-              placeholder="Plan Name *"
-              value={createForm.plan_name}
-              onChange={(e) =>
-                setCreateForm((prev) => ({
-                  ...prev,
-                  plan_name: e.target.value,
-                }))
-              }
-            />
-            <input
-              className="form-input md:col-span-2"
-              placeholder="Primary Diagnosis *"
-              value={createForm.primary_diagnosis}
-              onChange={(e) =>
-                setCreateForm((prev) => ({
-                  ...prev,
-                  primary_diagnosis: e.target.value,
-                }))
-              }
-            />
-          </div>
-          <textarea
-            className="form-input"
-            rows={2}
-            placeholder="Initial notes"
-            value={createForm.initial_notes}
-            onChange={(e) =>
-              setCreateForm((prev) => ({
-                ...prev,
-                initial_notes: e.target.value,
-              }))
-            }
-          />
-          <textarea
-            className="form-input"
-            rows={3}
-            placeholder='Short term goals JSON array, e.g. [{"description":"Pain control","target_date":"2026-05-01"}]'
-            value={createForm.short_term_goals}
-            onChange={(e) =>
-              setCreateForm((prev) => ({
-                ...prev,
-                short_term_goals: e.target.value,
-              }))
-            }
-          />
-          <textarea
-            className="form-input"
-            rows={3}
-            placeholder="Long term goals JSON array"
-            value={createForm.long_term_goals}
-            onChange={(e) =>
-              setCreateForm((prev) => ({
-                ...prev,
-                long_term_goals: e.target.value,
-              }))
-            }
-          />
-          <textarea
-            className="form-input"
-            rows={3}
-            placeholder="Interventions JSON array"
-            value={createForm.interventions}
-            onChange={(e) =>
-              setCreateForm((prev) => ({
-                ...prev,
-                interventions: e.target.value,
-              }))
-            }
-          />
-          <textarea
-            className="form-input"
-            rows={3}
-            placeholder="Milestones JSON array"
-            value={createForm.milestones}
-            onChange={(e) =>
-              setCreateForm((prev) => ({ ...prev, milestones: e.target.value }))
-            }
-          />
-          <div className="flex justify-end gap-2">
-            <button
-              className="btn-secondary"
-              onClick={() => setShowCreateModal(false)}
-            >
-              Cancel
-            </button>
-            <button
-              className="btn-primary"
-              onClick={handleCreatePlan}
-              disabled={submitLoading}
-            >
-              {submitLoading ? "Creating..." : "Create Plan"}
-            </button>
           </div>
         </div>
-      </Modal>
+      )}
 
-      <Modal
-        isOpen={showProgressModal}
-        onClose={() => setShowProgressModal(false)}
-        title="Update Treatment Progress"
-        size="lg"
-      >
-        <div className="space-y-4">
-          <textarea
-            className="form-input"
-            rows={4}
-            placeholder="Progress note"
-            value={progressForm.progress_note}
-            onChange={(e) =>
-              setProgressForm((prev) => ({
-                ...prev,
-                progress_note: e.target.value,
-              }))
-            }
-          />
-          <input
-            className="form-input"
-            type="date"
-            value={progressForm.next_review_date}
-            onChange={(e) =>
-              setProgressForm((prev) => ({
-                ...prev,
-                next_review_date: e.target.value,
-              }))
-            }
-          />
-          <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={progressForm.significant_change}
-              onChange={(e) =>
-                setProgressForm((prev) => ({
-                  ...prev,
-                  significant_change: e.target.checked,
-                }))
-              }
-            />
-            Significant change
-          </label>
-          <div className="flex justify-end gap-2">
-            <button
-              className="btn-secondary"
-              onClick={() => setShowProgressModal(false)}
-            >
-              Cancel
-            </button>
-            <button
-              className="btn-primary"
-              onClick={handleSaveProgress}
-              disabled={submitLoading}
-            >
-              {submitLoading ? "Saving..." : "Save Progress"}
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={showOutcomeModal}
-        onClose={() => setShowOutcomeModal(false)}
-        title="Record Treatment Outcome"
-        size="xl"
-      >
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <input
-              className="form-input"
-              type="date"
-              value={outcomeForm.outcome_date}
-              onChange={(e) =>
-                setOutcomeForm((prev) => ({
-                  ...prev,
-                  outcome_date: e.target.value,
-                }))
-              }
-            />
-            <select
-              className="form-input"
-              value={outcomeForm.overall_outcome}
-              onChange={(e) =>
-                setOutcomeForm((prev) => ({
-                  ...prev,
-                  overall_outcome: e.target.value,
-                }))
-              }
-            >
-              <option value="EXCELLENT">EXCELLENT</option>
-              <option value="GOOD">GOOD</option>
-              <option value="FAIR">FAIR</option>
-              <option value="POOR">POOR</option>
-              <option value="UNKNOWN">UNKNOWN</option>
-            </select>
-            <input
-              className="form-input"
-              type="number"
-              min="0"
-              placeholder="Goals achieved"
-              value={outcomeForm.goals_achieved}
-              onChange={(e) =>
-                setOutcomeForm((prev) => ({
-                  ...prev,
-                  goals_achieved: e.target.value,
-                }))
-              }
-            />
-            <input
-              className="form-input"
-              type="number"
-              min="0"
-              placeholder="Goals partially achieved"
-              value={outcomeForm.goals_partially_achieved}
-              onChange={(e) =>
-                setOutcomeForm((prev) => ({
-                  ...prev,
-                  goals_partially_achieved: e.target.value,
-                }))
-              }
-            />
-            <input
-              className="form-input"
-              type="number"
-              min="0"
-              placeholder="Goals not achieved"
-              value={outcomeForm.goals_not_achieved}
-              onChange={(e) =>
-                setOutcomeForm((prev) => ({
-                  ...prev,
-                  goals_not_achieved: e.target.value,
-                }))
-              }
-            />
-            <input
-              className="form-input"
-              type="number"
-              min="0"
-              step="0.1"
-              placeholder="Treatment adherence"
-              value={outcomeForm.treatment_adherence}
-              onChange={(e) =>
-                setOutcomeForm((prev) => ({
-                  ...prev,
-                  treatment_adherence: e.target.value,
-                }))
-              }
-            />
-          </div>
-          <textarea
-            className="form-input"
-            rows={3}
-            placeholder="Outcome summary *"
-            value={outcomeForm.outcome_summary}
-            onChange={(e) =>
-              setOutcomeForm((prev) => ({
-                ...prev,
-                outcome_summary: e.target.value,
-              }))
-            }
-          />
-          <textarea
-            className="form-input"
-            rows={2}
-            placeholder='Complications JSON array, e.g. ["none"]'
-            value={outcomeForm.complications}
-            onChange={(e) =>
-              setOutcomeForm((prev) => ({
-                ...prev,
-                complications: e.target.value,
-              }))
-            }
-          />
-          <textarea
-            className="form-input"
-            rows={2}
-            placeholder="Future recommendations JSON array"
-            value={outcomeForm.future_recommendations}
-            onChange={(e) =>
-              setOutcomeForm((prev) => ({
-                ...prev,
-                future_recommendations: e.target.value,
-              }))
-            }
-          />
-          <input
-            className="form-input"
-            placeholder="Follow-up plan"
-            value={outcomeForm.follow_up_plan}
-            onChange={(e) =>
-              setOutcomeForm((prev) => ({
-                ...prev,
-                follow_up_plan: e.target.value,
-              }))
-            }
-          />
-          <textarea
-            className="form-input"
-            rows={2}
-            placeholder="Lessons learned"
-            value={outcomeForm.lessons_learned}
-            onChange={(e) =>
-              setOutcomeForm((prev) => ({
-                ...prev,
-                lessons_learned: e.target.value,
-              }))
-            }
-          />
-          <div className="flex justify-end gap-2">
-            <button
-              className="btn-secondary"
-              onClick={() => setShowOutcomeModal(false)}
-            >
-              Cancel
-            </button>
-            <button
-              className="btn-primary"
-              onClick={handleSaveOutcome}
-              disabled={submitLoading}
-            >
-              {submitLoading ? "Saving..." : "Record Outcome"}
-            </button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 };
