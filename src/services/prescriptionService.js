@@ -60,8 +60,9 @@ export const createPrescription = async (prescriptionData) => {
 // Get doctor's prescriptions
 export const getDoctorPrescriptions = async (filters = {}) => {
   try {
+    const params = { limit: 50, ...filters };
     const response = await prescriptionApi.get('/api/v1/simple-prescription/doctor/prescriptions', {
-      params: filters
+      params
     });
     return response.data;
   } catch (error) {
@@ -90,6 +91,28 @@ export const getPatientPrescriptions = async () => {
     return response.data;
   } catch (error) {
     console.error('Error fetching patient prescriptions:', error);
+    throw error;
+  }
+};
+
+// Get doctor prescription details (own only)
+export const getDoctorPrescriptionDetails = async (prescriptionId) => {
+  try {
+    const response = await prescriptionApi.get(`/api/v1/simple-prescription/doctor/prescriptions/${prescriptionId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching doctor prescription details:', error);
+    throw error;
+  }
+};
+
+// Edit prescription (doctor, before dispense)
+export const editPrescription = async (prescriptionId, prescriptionData) => {
+  try {
+    const response = await prescriptionApi.patch(`/api/v1/simple-prescription/doctor/prescriptions/${prescriptionId}`, prescriptionData);
+    return response.data;
+  } catch (error) {
+    console.error('Error editing prescription:', error);
     throw error;
   }
 };
@@ -160,6 +183,8 @@ export default {
   getDoctorPrescriptions,
   getPharmacistPrescriptions,
   getPatientPrescriptions,
+  getDoctorPrescriptionDetails,
+  editPrescription,
   getPrescriptionDetails,
   dispensePrescription,
   downloadPrescriptionPDF

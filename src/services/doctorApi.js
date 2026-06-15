@@ -17,9 +17,9 @@ const DOCTOR_APPOINTMENT_TRACKING_BASE_CANDIDATES = [
 ]
 
 const DOCTOR_PATIENT_RECORDS_BASE_CANDIDATES = [
+  '/api/v1/doctor-patient-records',
   '/api/v1/doctor-management',
   '/api/v1/doctor-dashboard',
-  '/api/v1/doctor-patient-records',
   '/api/v1/doctor',
   '/api/v1/doctors',
 ]
@@ -357,6 +357,10 @@ export function getDoctorNotificationSettings() {
 }
 
 export function searchDoctorPatients(filters = {}) {
+  if (!filters.query || filters.query.length < 2) {
+    // If no valid query is provided, fallback to recent patients to avoid 422 error
+    return getDoctorRecentPatients({ limit: filters.limit })
+  }
   const query = {
     query: filters.query,
     search_scope: filters.search_scope,
@@ -364,6 +368,16 @@ export function searchDoctorPatients(filters = {}) {
     limit: filters.limit ?? 20,
   }
   return doctorApiFetchWithFallback(buildPatientRecordPaths({ action: 'search', query }))
+}
+
+export function getDoctorRecentPatients(filters = {}) {
+  const query = { limit: filters.limit ?? 20 }
+  const paths = [
+    withQuery('/api/v1/doctor-dashboard/patients/recent', query),
+    withQuery('/api/v1/doctor-management/patients/recent', query),
+    withQuery('/api/v1/doctor/patients/recent', query)
+  ]
+  return doctorApiFetchWithFallback(paths)
 }
 
 export function advancedSearchDoctorPatients(searchRequest = {}, filters = {}) {

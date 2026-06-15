@@ -9,7 +9,7 @@ import PatientRecords from './pages/PatientRecords'
 import ReceptionProfile from './pages/ReceptionProfile'
 // Import new components
 import OPDManagement from './pages/OPDManagement'
-import IPDManagement from './pages/IPDManagement'
+
 import DocumentManagement from './pages/DocumentManagement'
 import DischargeSummary from './pages/DischargeSummary'
 import RaiseticketRecepetionst from './pages/RaiseticketReceptionst'
@@ -70,8 +70,7 @@ const ReceptionistDashboard = () => {
       return <Departments />
     case 'opd':
       return <OPDManagement />
-    case 'ipd':
-      return <IPDManagement />
+
     case 'documents':
       return <DocumentManagement />
     case 'discharge':

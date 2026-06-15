@@ -35,6 +35,8 @@ export function loginKindMatchesApiUser(loginKind, user) {
       return roles.has('NURSE')
     case 'RECEPTIONIST':
       return roles.has('RECEPTIONIST')
+    case 'TELEMEDICINE':
+      return roles.has('TELEMEDICINE')
     default:
       return false
   }

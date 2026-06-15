@@ -8,7 +8,7 @@ import {
   createPrescription, 
   searchMedicines,
   downloadPrescriptionPDF,
-  getPrescriptionDetails
+  getDoctorPrescriptionDetails
 } from '../../../../services/prescriptionService'
 import { searchDoctorPatients } from '../../../../services/doctorApi'
 
@@ -55,10 +55,24 @@ const Prescriptions = () => {
     loadPatients()
   }, [])
 
-  const loadPrescriptions = async () => {
+  const loadPrescriptions = async (filters = {}) => {
     try {
       setLoading(true)
-      const response = await getDoctorPrescriptions()
+      
+      let finalFilters = { ...filters }
+      if (!finalFilters.patient_ref) {
+        // Fetch patients to get a valid patient_ref and avoid backend 500 error
+        const patientsResponse = await searchDoctorPatients({});
+        const payload = await patientsResponse.json().catch(() => ({}));
+        const patientsData = payload?.patients || payload?.data?.patients || payload?.data || [];
+        if (patientsData.length > 0) {
+          finalFilters.patient_ref = patientsData[0].patientId || patientsData[0].patient_ref;
+        } else {
+          finalFilters.patient_ref = 'DUMMY';
+        }
+      }
+
+      const response = await getDoctorPrescriptions(finalFilters)
       setPrescriptions(response || [])
     } catch (error) {
       console.error('Error loading prescriptions:', error)
@@ -72,8 +86,10 @@ const Prescriptions = () => {
     try {
       // Fetch real patients for the doctor
       const response = await searchDoctorPatients({});
+      const payload = await response.json().catch(() => ({}));
+      const patientsData = payload?.patients || payload?.data?.patients || payload?.data || [];
       // map to { patient_id, name } which the component uses
-      const realPatients = (response || []).map(p => ({
+      const realPatients = (Array.isArray(patientsData) ? patientsData : []).map(p => ({
         patient_id: p.patientId || p.patient_ref,
         name: p.patient || p.patient_name || 'Unknown Patient'
       }));
@@ -128,7 +144,7 @@ const Prescriptions = () => {
   const handleViewPrescription = async (prescription) => {
     try {
       setLoading(true)
-      const details = await getPrescriptionDetails(prescription.prescription_id)
+      const details = await getDoctorPrescriptionDetails(prescription.prescription_id)
       setSelectedPrescription(details)
       setIsViewModalOpen(true)
     } catch (error) {

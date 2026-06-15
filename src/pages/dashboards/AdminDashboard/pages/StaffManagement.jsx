@@ -9,7 +9,7 @@ import {
 } from '../../../../config/api'
 import { apiFetch } from '../../../../services/apiClient'
 
-const ROLE_OPTIONS = ['DOCTOR', 'NURSE', 'RECEPTIONIST', 'LAB_TECH', 'PHARMACIST']
+const ROLE_OPTIONS = ['DOCTOR', 'NURSE', 'RECEPTIONIST', 'LAB_TECH', 'PHARMACIST', 'TELEMEDICINE']
 const SHIFT_OPTIONS = ['Morning (7AM-3PM)', 'Evening (3PM-11PM)', 'Night (11PM-7AM)', 'Flexible', 'Part-time']
 
 // ========== ROLE CONFIGURATION - Scalable & Dynamic ==========
@@ -51,6 +51,13 @@ const ROLE_CONFIG = {
     description: 'Pharmacy staff'
   },
 
+  TELEMEDICINE: {
+    label: 'Telemedicine',
+    pluralLabel: 'Telemedicine team',
+    color: 'indigo',
+    icon: 'fas fa-laptop-medical',
+    description: 'Telemedicine staff'
+  },
   CLEANER: {
     label: 'Cleaners',
     pluralLabel: 'Housekeeping',
@@ -231,7 +238,8 @@ const StaffManagement = () => {
       const res = await apiFetch(HOSPITAL_ADMIN_STAFF, { method: 'POST', body: payload })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        window.alert(data?.message || data?.detail?.message || `Failed to create staff (${res.status})`)
+        const errorDetails = data?.errors ? JSON.stringify(data.errors) : (data?.detail ? JSON.stringify(data.detail) : '');
+        window.alert(`${data?.message || 'Failed to create staff'} ${errorDetails}`);
         return
       }
       closeModal()
@@ -562,7 +570,8 @@ const StaffCard = ({ staffMember, onDetails, onToggleStatus, onResetPassword, ac
     NURSE: { bg: 'bg-teal-50', text: 'text-teal-600', icon: 'fas fa-user-nurse' },
     RECEPTIONIST: { bg: 'bg-rose-50', text: 'text-rose-600', icon: 'fas fa-hospital-user' },
     LAB_TECH: { bg: 'bg-green-50', text: 'text-green-600', icon: 'fas fa-microscope' },
-    PHARMACIST: { bg: 'bg-orange-50', text: 'text-orange-600', icon: 'fas fa-pills' }
+    PHARMACIST: { bg: 'bg-orange-50', text: 'text-orange-600', icon: 'fas fa-pills' },
+    TELEMEDICINE: { bg: 'bg-indigo-50', text: 'text-indigo-600', icon: 'fas fa-laptop-medical' }
   }
 
   const roleStyle = roleConfig[staffMember.role] || { bg: 'bg-gray-50', text: 'text-gray-600', icon: 'fas fa-user' }

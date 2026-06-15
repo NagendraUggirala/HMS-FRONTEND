@@ -11,7 +11,7 @@ import Billing from './pages/Billing'
 import Profile from './pages/Profile'
 import Messages from './pages/Messages'
 import DocumentStorage from './pages/DocumentStorage'
-
+import IPDManagement from './pages/IPDManagement'
 const PatientDashboard = () => {
   const [activePage, setActivePage] = useState('dashboard')
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
@@ -66,6 +66,8 @@ const PatientDashboard = () => {
         return <Messages />
       case 'documentstorage':
         return <DocumentStorage />
+      case 'ipd':
+        return <IPDManagement />
       default:
         return <PatientOverview setActivePage={setActivePage} />
     }

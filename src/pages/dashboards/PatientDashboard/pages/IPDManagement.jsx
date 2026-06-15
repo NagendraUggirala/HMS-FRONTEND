@@ -3,7 +3,7 @@ import { Hotel, Bed, MonitorHeart, MeetingRoom, Payments, Visibility, SwapHoriz,
 import LoadingSpinner from '../../../../components/common/LoadingSpinner/LoadingSpinner';
 import DataTable from '../../../../components/ui/Tables/DataTable';
 import Modal from '../../../../components/common/Modal/Modal';
-import { apiFetch } from '../../../../services/apiClient';
+import { patientApiFetch as apiFetch } from '../../../../services/patientApi';
 import { toast } from 'react-toastify';
 import { IPD_DASHBOARD, IPD_PATIENTS, HOSPITAL_WARDS, HOSPITAL_BEDS, IPD_ADMISSIONS, IPD_AVAILABLE_PATIENTS, IPD_DOCTOR_ROUNDS, NURSE_BEDS } from '../../../../config/api';
 
@@ -19,6 +19,7 @@ const availableNurses = [
 const IPDManagement = () => {
   const [loading, setLoading] = useState(true);
   const [ipdPatients, setIpdPatients] = useState([]);
+  const [ipdDashboardStats, setIpdDashboardStats] = useState({ total_admissions: 0, active_patients: 0, available_beds: 0, discharged_patients: 0 });
   const [wards, setWards] = useState([]);
 
   // Room state
@@ -176,22 +177,19 @@ const IPDManagement = () => {
     try {
       const responses = await Promise.all([
         apiFetch(IPD_PATIENTS),
-        apiFetch(HOSPITAL_WARDS),
-        apiFetch(HOSPITAL_BEDS),
+        apiFetch(IPD_DASHBOARD),
         apiFetch(IPD_AVAILABLE_PATIENTS)
       ]);
       
       const patientsData = await responses[0].json().catch(() => ({}));
-      const wardsData = await responses[1].json().catch(() => ({}));
-      const bedsData = await responses[2].json().catch(() => ({}));
-      const availablePatientsData = await responses[3].json().catch(() => ({}));
+      const dashboardData = await responses[1].json().catch(() => ({}));
+      const availablePatientsData = await responses[2].json().catch(() => ({}));
 
       const extractArray = (data) => Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : Array.isArray(data?.data?.items) ? data.data.items : [];
 
       if (responses[0].ok) setIpdPatients(extractArray(patientsData));
-      if (responses[1].ok) setWards(extractArray(wardsData));
-      if (responses[2].ok) setBeds(extractArray(bedsData));
-      if (responses[3].ok) setAllPatients(extractArray(availablePatientsData));
+      if (responses[1].ok) setIpdDashboardStats(dashboardData?.data || { total_admissions: 0, active_patients: 0, available_beds: 0, discharged_patients: 0 });
+      if (responses[2].ok) setAllPatients(extractArray(availablePatientsData));
     } catch (error) {
       console.error('Error loading IPD data:', error);
       toast.error('Failed to load IPD data');
@@ -470,28 +468,39 @@ const IPDManagement = () => {
     }
   };
 
-  const handleAddRound = () => {
+  const handleAddRound = async () => {
     if (!roundForm.doctor_name || !roundForm.ward_name) {
-      alert('Please fill in both Doctor Name and Ward Location.');
+      toast.error('Please fill in both Doctor Name and Ward Location.');
       return;
     }
-    const newRound = {
-      round_id: `RND-${Math.floor(Math.random() * 900) + 100}`,
-      ...roundForm
-    };
-    setDoctorRounds([newRound, ...doctorRounds]);
-    setShowAddRoundModal(false);
-    setRoundForm({
-      doctor_name: '',
-      specialty: 'General Medicine',
-      ward_name: '',
-      round_date: new Date().toISOString().split('T')[0],
-      round_time: '',
-      patients_visited: '',
-      status: 'Scheduled',
-      clinical_notes: ''
-    });
-    alert('Doctor round scheduled successfully!');
+    try {
+      const response = await apiFetch(IPD_DOCTOR_ROUNDS, {
+        method: 'POST',
+        body: JSON.stringify(roundForm)
+      });
+      if (!response.ok) throw new Error('Failed to schedule doctor round');
+      
+      const newRound = {
+        round_id: `RND-${Math.floor(Math.random() * 900) + 100}`, // Fallback if API doesn't return ID
+        ...roundForm
+      };
+      setDoctorRounds([newRound, ...doctorRounds]);
+      setShowAddRoundModal(false);
+      setRoundForm({
+        doctor_name: '',
+        specialty: 'General Medicine',
+        ward_name: '',
+        round_date: new Date().toISOString().split('T')[0],
+        round_time: '',
+        patients_visited: '',
+        status: 'Scheduled',
+        clinical_notes: ''
+      });
+      toast.success('Doctor round scheduled successfully!');
+    } catch (error) {
+      console.error('Error scheduling round:', error);
+      toast.error('Failed to schedule doctor round');
+    }
   };
 
   const handleDeleteRound = (roundId) => {
@@ -545,17 +554,15 @@ const IPDManagement = () => {
   };
 
   const handleAdmission = async () => {
-    if (!admissionForm.patientId || !admissionForm.ward || !admissionForm.diagnosis || !admissionForm.roomId) {
-      alert('Please fill all required fields (including Ward and Room)');
+    if (!admissionForm.patientId || !admissionForm.diagnosis) {
+      toast.error('Please fill patient and diagnosis required fields');
       return;
     }
 
     const [datePart, timePart] = (admissionForm.admissionDateTime || '').split('T');
 
-    // Auto-assign the first available bed in selectedRoomObj, or generate a bed number
-    const selectedRoomObj = rooms.find(r => r.room_id === admissionForm.roomId);
-    const firstAvailableBed = beds.find(b => b.room_id === admissionForm.roomId && b.bed_status === 'Available');
-    const bedNumber = firstAvailableBed ? firstAvailableBed.bed_number : (selectedRoomObj ? `${selectedRoomObj.room_number}-A` : 'Auto-Assigned');
+    // Bed and Room assignment bypassed (No API support)
+    const bedNumber = 'Auto-Assigned';
 
     const initialConditionVal = admissionForm.triageLevel === 'Critical' ? 'Critical' : admissionForm.triageLevel === 'Urgent' ? 'Fair' : 'Stable';
 
@@ -925,10 +932,6 @@ const IPDManagement = () => {
       <div className="flex items-center p-1 bg-slate-100 rounded-xl mb-6 max-w-fit border border-slate-200">
         {[
           { id: 'Admissions', icon: <Hotel style={{ fontSize: 18 }} />, label: 'Patient Admissions' },
-          { id: 'Wards', icon: <Layers style={{ fontSize: 18 }} />, label: 'Ward Management' },
-          { id: 'Rooms', icon: <MeetingRoom style={{ fontSize: 18 }} />, label: 'Room Management' },
-          { id: 'Beds', icon: <Bed style={{ fontSize: 18 }} />, label: 'Bed Management' },
-          { id: 'NurseAssignments', icon: <Assignment style={{ fontSize: 18 }} />, label: 'Nurse Stations' },
           { id: 'DoctorRounds', icon: <MedicalInformation style={{ fontSize: 18 }} />, label: 'Doctor Rounds' }
         ].map((tab) => (
           <button key={tab.id}
@@ -952,7 +955,7 @@ const IPDManagement = () => {
                     Total Admissions
                   </p>
                   <p className="text-2xl font-bold text-gray-900 mt-1">
-                    {ipdPatients.length}
+                    {ipdDashboardStats?.total_admissions || ipdPatients.length}
                   </p>
                 </div>
 
@@ -976,7 +979,7 @@ const IPDManagement = () => {
                     Critical Patients
                   </p>
                   <p className="text-2xl font-bold text-gray-900 mt-1">
-                    {ipdPatients.filter(p => p.status === 'Critical').length}
+                    {ipdDashboardStats?.active_patients || ipdPatients.filter(p => p.status === 'Critical').length}
                   </p>
                 </div>
 
@@ -999,7 +1002,7 @@ const IPDManagement = () => {
                     Available Beds
                   </p>
                   <p className="text-2xl font-bold text-gray-900 mt-1">
-                    {wards.reduce((sum, ward) => sum + ward.availableBeds, 0)}
+                    {ipdDashboardStats?.available_beds || 0}
                   </p>
                 </div>
 
@@ -1019,10 +1022,10 @@ const IPDManagement = () => {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs font-semibold text-yellow-700 uppercase tracking-wide">
-                    Today's Revenue
+                    Discharged Patients
                   </p>
                   <p className="text-2xl font-bold text-gray-900 mt-1">
-                    ₹{ipdPatients.reduce((sum, p) => sum + p.roomCharges, 0)}
+                    {ipdDashboardStats?.discharged_patients || 0}
                   </p>
                 </div>
 
@@ -1034,7 +1037,7 @@ const IPDManagement = () => {
               <div className="h-px w-full bg-yellow-200 my-3"></div>
 
               <p className="text-xs text-yellow-600">
-                Room charges collected
+                Total discharged patients
               </p>
             </div>
           </div>

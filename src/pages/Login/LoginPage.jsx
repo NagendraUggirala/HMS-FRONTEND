@@ -20,6 +20,7 @@ const LOGIN_KIND_OPTIONS = [
   { value: 'LAB_TECH', label: 'Lab technician (staff)', useStaffApi: true },
   { value: 'NURSE', label: 'Nurse (staff)', useStaffApi: true },
   { value: 'RECEPTIONIST', label: 'Receptionist (staff)', useStaffApi: true },
+  { value: 'TELEMEDICINE', label: 'Telemedicine (staff)', useStaffApi: true },
 ]
 
 const LoginPage = () => {
