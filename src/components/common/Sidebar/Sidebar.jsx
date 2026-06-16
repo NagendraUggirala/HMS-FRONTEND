@@ -88,6 +88,7 @@ const Sidebar = ({ activePage, onPageChange, isOpen = false, onClose }) => {
     { id: "Doctors", label: "Doctors", icon: "fa-user-md" },
     { id: "Departments", label: "Departments", icon: "fa-building" },
     { id: 'opd', label: 'OPD Management', icon: 'fas fa-stethoscope' },
+    { id: 'ipd', label: 'IPD Management', icon: 'fas fa-procedures' },
     { id: 'documents', label: 'Document Management', icon: 'fas fa-file-upload' },
     { id: 'billing', label: 'Billing', icon: 'fa-receipt' },
     { id: 'discharge', label: 'Discharge Summary', icon: 'fas fa-file-contract' },
