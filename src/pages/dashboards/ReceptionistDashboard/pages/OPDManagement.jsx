@@ -556,7 +556,7 @@ const OPDManagement = () => {
       const tokensList = tokenData.data?.items || tokenData.items || tokenData.data || tokenData || [];
 
       const initialPatients = Array.isArray(tokensList) ? tokensList.map((t, idx) => {
-        const rawStatus = t.status || t.tokenStatus || 'WAITING';
+        const rawStatus = String(t.status || t.tokenStatus || 'WAITING');
         const formattedStatus = rawStatus === 'IN_CONSULTATION' ? 'In Consultation' : (rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1).toLowerCase());
         
         const assignedDocId = t.doctorId || t.doctor_id || t.doctor_user_id || 'Unknown';
