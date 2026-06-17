@@ -1,224 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Hotel, Bed, MonitorHeart, MeetingRoom, Payments, Visibility, SwapHoriz,
-  ReceiptLong, History, Search, Add, Layers, LocalHospital,
-  Check, Info, Print, AddAlert, Edit, Delete
-} from '@mui/icons-material';
+import React, { useState, useEffect, useRef } from 'react';
+import { Hotel, Bed, MonitorHeart, MeetingRoom, Payments, Visibility, SwapHoriz, Logout, ReceiptLong, MedicalInformation, Assignment, History, KeyboardArrowDown, Search, Close, Add, Edit, Delete, Layers, Shield, CheckCircle, LocalHospital } from '@mui/icons-material';
 import LoadingSpinner from '../../../../components/common/LoadingSpinner/LoadingSpinner';
 import DataTable from '../../../../components/ui/Tables/DataTable';
 import Modal from '../../../../components/common/Modal/Modal';
 import { apiFetch } from '../../../../services/apiClient';
 import { IPD_PATIENTS, IPD_AVAILABLE_PATIENTS, IPD_ADMISSIONS, IPD_DOCTOR_ROUNDS } from '../../../../config/api';
 
-// Static Configurations for pricing and templates
-const PRICING_CONFIG_DEFAULT = {
-  wardCharges: {
-    "General Ward": 1000,
-    "Semi Private Ward": 2000,
-    "Private Ward": 3500,
-    "Deluxe Room": 5000,
-    "ICU": 8000,
-    "NICU": 7500,
-    "PICU": 7500,
-    "Emergency Ward": 1500
-  },
-  doctorVisitCharges: 500,
-  nursingChargesPerDay: 400,
-  procedures: {
-    "Suturing": 1500,
-    "Intubation": 4500,
-    "Catheterization": 1200,
-    "Ventilation Setup": 6000,
-    "IV Cannulation": 300,
-    "Nebulization": 250
-  },
-  labTests: {
-    "CBC (Complete Blood Count)": 450,
-    "LFT (Liver Function Test)": 900,
-    "KFT (Kidney Function Test)": 1000,
-    "Lipid Profile": 1200,
-    "Blood Sugar Fasting": 150,
-    "Urine Routine": 200
-  },
-  radiologyTests: {
-    "Chest X-Ray": 800,
-    "Ultrasound Abdomen": 1800,
-    "CT Scan Brain": 4500,
-    "MRI Spine": 7500
-  }
-};
-
-const INITIAL_DOCTORS = [
-  { id: "DOC-01", name: "Dr. Anil Mehta", specialty: "General Medicine", dept: "General Medicine" },
-  { id: "DOC-02", name: "Dr. Rajesh Patel", specialty: "Cardiology", dept: "Cardiology" },
-  { id: "DOC-03", name: "Dr. Seema Sen", specialty: "Pulmonology", dept: "Pulmonology" },
-  { id: "DOC-04", name: "Dr. Vijay Kumar", specialty: "Orthopedics", dept: "Orthopedics" }
-];
-
-const INITIAL_NURSES = [
-  { id: "NUR-01", name: "Nurse Priyanka", specialty: "General Care", shift: "Morning" },
-  { id: "NUR-02", name: "Nurse Joseph", specialty: "ICU Specialist", shift: "Evening" },
-  { id: "NUR-03", name: "Nurse Shalini", specialty: "Pediatrics", shift: "Night" }
-];
-
-const INITIAL_OPD_PATIENTS = [
-  { id: "PAT-101", name: "Rahul Sharma", age: 34, gender: "Male", diagnosis: "Acute Appendicitis", consultant: "Dr. Anil Mehta", recommendedWard: "Semi Private Ward", date: "2026-06-16", status: "Recommended" },
-  { id: "PAT-102", name: "Sunita Rao", age: 52, gender: "Female", diagnosis: "Congestive Heart Failure", consultant: "Dr. Rajesh Patel", recommendedWard: "ICU", date: "2026-06-15", status: "Recommended" },
-  { id: "PAT-103", name: "John Smith", age: 45, gender: "Male", diagnosis: "Pneumonia with Pleural Effusion", consultant: "Dr. Seema Sen", recommendedWard: "Private Ward", date: "2026-06-16", status: "Recommended" },
-  { id: "PAT-104", name: "Amit Verma", age: 28, gender: "Male", diagnosis: "Fracture Tibia", consultant: "Dr. Vijay Kumar", recommendedWard: "General Ward", date: "2026-06-16", status: "Recommended" }
-];
-
-const INITIAL_WARDS = [
-  { ward_id: "WARD-1", ward_name: "General Ward", ward_type: "General Ward", floor: "1st Floor", capacity: 20, status: "Active" },
-  { ward_id: "WARD-2", ward_name: "Semi Private Ward", ward_type: "Semi Private Ward", floor: "2nd Floor", capacity: 10, status: "Active" },
-  { ward_id: "WARD-3", ward_name: "Private Ward", ward_type: "Private Ward", floor: "3rd Floor", capacity: 8, status: "Active" },
-  { ward_id: "WARD-4", ward_name: "Deluxe Room", ward_type: "Deluxe Room", floor: "4th Floor", capacity: 5, status: "Active" },
-  { ward_id: "WARD-5", ward_name: "ICU", ward_type: "ICU", floor: "5th Floor", capacity: 8, status: "Active" },
-  { ward_id: "WARD-6", ward_name: "Emergency Ward", ward_type: "Emergency Ward", floor: "Ground Floor", capacity: 12, status: "Active" }
-];
-
-const INITIAL_ROOMS = [
-  { room_id: "RM-101", room_number: "101", ward_id: "WARD-1", room_type: "General Ward", daily_price: 1000, status: "Available" },
-  { room_id: "RM-102", room_number: "102", ward_id: "WARD-1", room_type: "General Ward", daily_price: 1000, status: "Available" },
-  { room_id: "RM-201", room_number: "201", ward_id: "WARD-2", room_type: "Semi Private Ward", daily_price: 2000, status: "Available" },
-  { room_id: "RM-202", room_number: "202", ward_id: "WARD-2", room_type: "Semi Private Ward", daily_price: 2000, status: "Available" },
-  { room_id: "RM-301", room_number: "301", ward_id: "WARD-3", room_type: "Private Ward", daily_price: 3500, status: "Available" },
-  { room_id: "RM-401", room_number: "401", ward_id: "WARD-4", room_type: "Deluxe Room", daily_price: 5000, status: "Available" },
-  { room_id: "RM-501", room_number: "501", ward_id: "WARD-5", room_type: "ICU", daily_price: 8000, status: "Available" },
-  { room_id: "RM-601", room_number: "601", ward_id: "WARD-6", room_type: "Emergency Ward", daily_price: 1500, status: "Available" }
-];
-
-const INITIAL_BEDS = [
-  { bed_id: "BED-101A", bed_number: "101-A", room_id: "RM-101", ward_id: "WARD-1", bed_type: "General", daily_price: 0, status: "Available", is_oxygen_available: true, ventilator_available: false, cleaning_status: "Clean" },
-  { bed_id: "BED-101B", bed_number: "101-B", room_id: "RM-101", ward_id: "WARD-1", bed_type: "General", daily_price: 0, status: "Available", is_oxygen_available: false, ventilator_available: false, cleaning_status: "Clean" },
-  { bed_id: "BED-102A", bed_number: "102-A", room_id: "RM-102", ward_id: "WARD-1", bed_type: "General", daily_price: 0, status: "Available", is_oxygen_available: true, ventilator_available: false, cleaning_status: "Clean" },
-  { bed_id: "BED-201A", bed_number: "201-A", room_id: "RM-201", ward_id: "WARD-2", bed_type: "Semi Private", daily_price: 0, status: "Available", is_oxygen_available: true, ventilator_available: false, cleaning_status: "Clean" },
-  { bed_id: "BED-201B", bed_number: "201-B", room_id: "RM-201", ward_id: "WARD-2", bed_type: "Semi Private", daily_price: 0, status: "Available", is_oxygen_available: true, ventilator_available: false, cleaning_status: "Clean" },
-  { bed_id: "BED-301A", bed_number: "301-A", room_id: "RM-301", ward_id: "WARD-3", bed_type: "Private", daily_price: 0, status: "Available", is_oxygen_available: true, ventilator_available: false, cleaning_status: "Clean" },
-  { bed_id: "BED-401A", bed_number: "401-A", room_id: "RM-401", ward_id: "WARD-4", bed_type: "Deluxe", daily_price: 0, status: "Available", is_oxygen_available: true, ventilator_available: false, cleaning_status: "Clean" },
-  { bed_id: "BED-501A", bed_number: "501-A", room_id: "RM-501", ward_id: "WARD-5", bed_type: "ICU", daily_price: 0, status: "Occupied", is_oxygen_available: true, ventilator_available: true, cleaning_status: "Clean" },
-  { bed_id: "BED-501B", bed_number: "501-B", room_id: "RM-501", ward_id: "WARD-5", bed_type: "ICU", daily_price: 0, status: "Available", is_oxygen_available: true, ventilator_available: true, cleaning_status: "Clean" },
-  { bed_id: "BED-601A", bed_number: "601-A", room_id: "RM-601", ward_id: "WARD-6", bed_type: "Emergency", daily_price: 0, status: "Available", is_oxygen_available: true, ventilator_available: false, cleaning_status: "Clean" }
-];
-
-const INITIAL_ADMITTED_PATIENTS = [
-  {
-    admissionNo: "ADM-0045",
-    patientId: "PAT-201",
-    patientName: "Aarav Patel",
-    age: 29,
-    gender: "Male",
-    diagnosis: "Dengue Fever with Severe Thrombocytopenia",
-    ward_id: "WARD-1",
-    room_id: "RM-101",
-    bed_id: "BED-101A",
-    consultant_id: "DOC-01",
-    nurse_id: "NUR-01",
-    admissionDate: "2026-06-12",
-    admissionTime: "10:30 AM",
-    status: "Admitted",
-    advancePaid: 5000,
-    insurance: {
-      provider: "Star Health",
-      policyNo: "SH-99081-A",
-      approvalLimit: 100000,
-      copayPercent: 10,
-      isTpaEnabled: true
-    },
-    daysStayed: 4,
-    readmission: false
-  },
-  {
-    admissionNo: "ADM-0048",
-    patientId: "PAT-202",
-    patientName: "Meera Deshmukh",
-    age: 67,
-    gender: "Female",
-    diagnosis: "Unstable Angina",
-    ward_id: "WARD-5",
-    room_id: "RM-501",
-    bed_id: "BED-501A",
-    consultant_id: "DOC-02",
-    nurse_id: "NUR-02",
-    admissionDate: "2026-06-14",
-    admissionTime: "08:15 PM",
-    status: "Critical",
-    advancePaid: 15000,
-    insurance: {
-      provider: "HDFC Ergo",
-      policyNo: "HE-77165-C",
-      approvalLimit: 300000,
-      copayPercent: 0,
-      isTpaEnabled: true
-    },
-    daysStayed: 2,
-    readmission: false
-  }
-];
-
-const INITIAL_BILLING = {
-  "ADM-0045": [
-    { id: 1, date: "2026-06-12", category: "Room Charges", description: "General Ward Rent (4 days)", amount: 4000 },
-    { id: 2, date: "2026-06-12", category: "Nursing Charges", description: "Nursing Service (4 days)", amount: 1600 },
-    { id: 3, date: "2026-06-13", category: "Doctor Visit Charges", description: "Dr. Anil Mehta - Daily Visit", amount: 500 },
-    { id: 4, date: "2026-06-13", category: "Pharmacy Charges", description: "Paracetamol IV & Saline Infusion", amount: 1200 },
-    { id: 5, date: "2026-06-14", category: "Lab Charges", description: "Platelet Count Test & CBC", amount: 450 }
-  ],
-  "ADM-0048": [
-    { id: 1, date: "2026-06-14", category: "Room Charges", description: "ICU Rent (2 days)", amount: 16000 },
-    { id: 2, date: "2026-06-14", category: "Nursing Charges", description: "ICU Nursing Service (2 days)", amount: 800 },
-    { id: 3, date: "2026-06-14", category: "Doctor Visit Charges", description: "Dr. Rajesh Patel - ICU Round", amount: 1000 },
-    { id: 4, date: "2026-06-14", category: "Procedure Charges", description: "ECG Monitoring Setup", amount: 1200 },
-    { id: 5, date: "2026-06-15", category: "Pharmacy Charges", description: "Clopidogrel & Atorvastatin Dose", amount: 3500 }
-  ]
-};
-
-const INITIAL_VITALS = {
-  "ADM-0045": [
-    { timestamp: "2026-06-12 11:00 AM", bp: "110/70", pulse: "78", spo2: "97", temp: "101.2", nurse: "Nurse Priyanka" },
-    { timestamp: "2026-06-13 09:00 AM", bp: "115/75", pulse: "76", spo2: "98", temp: "99.8", nurse: "Nurse Priyanka" },
-    { timestamp: "2026-06-14 02:00 PM", bp: "120/80", pulse: "72", spo2: "99", temp: "98.6", nurse: "Nurse Priyanka" }
-  ],
-  "ADM-0048": [
-    { timestamp: "2026-06-14 09:00 PM", bp: "145/95", pulse: "92", spo2: "93", temp: "98.4", nurse: "Nurse Joseph" },
-    { timestamp: "2026-06-15 08:00 AM", bp: "135/88", pulse: "88", spo2: "95", temp: "98.6", nurse: "Nurse Joseph" }
-  ]
-};
-
-const INITIAL_MEDICATIONS = {
-  "ADM-0045": [
-    { id: 1, medicine: "Paracetamol 650mg", dosage: "1 Tablet", frequency: "TID (Thrice Daily)", status: "Administered", time: "02:00 PM", nurse: "Nurse Priyanka" },
-    { id: 2, medicine: "Ceftriaxone 1g IV", dosage: "IV Injection", frequency: "BD (Twice Daily)", status: "Pending", time: "", nurse: "" }
-  ],
-  "ADM-0048": [
-    { id: 1, medicine: "Clopidogrel 75mg", dosage: "1 Tablet", frequency: "OD (Once Daily)", status: "Administered", time: "09:00 AM", nurse: "Nurse Joseph" },
-    { id: 2, medicine: "Atorvastatin 40mg", dosage: "1 Tablet", frequency: "HS (At Bedtime)", status: "Administered", time: "09:30 PM", nurse: "Nurse Joseph" },
-    { id: 3, medicine: "Nitroglycerin Drip", dosage: "5 mcg/min IV", frequency: "Continuous", status: "Administered", time: "Continuous", nurse: "Nurse Joseph" }
-  ]
-};
-
-const INITIAL_CLINICAL_NOTES = {
-  "ADM-0045": [
-    { timestamp: "2026-06-13 10:00 AM", type: "Doctor Round", author: "Dr. Anil Mehta", notes: "Patient responsive. Temperature is stabilizing. Thrombocytopenia under watch. Advised CBC platelet check tomorrow." },
-    { timestamp: "2026-06-14 08:00 AM", type: "Nurse Note", author: "Nurse Priyanka", notes: "Drip running smoothly. Intake-Output logged. Patient reports mild headache, pain scale 2/10." }
-  ],
-  "ADM-0048": [
-    { timestamp: "2026-06-14 10:00 PM", type: "Doctor Round", author: "Dr. Rajesh Patel", notes: "Admitted through Emergency. Angina chest pain under control. NTG drip running. EKG shows ST depression. Monitor closely." },
-    { timestamp: "2026-06-15 09:30 AM", type: "Doctor Round", author: "Dr. Rajesh Patel", notes: "No recurring chest pain. Vitals stable. Plan for Troponin-T test in the evening. Keep patient in ICU." }
-  ]
-};
-
-const INITIAL_AUDIT_LOGS = [
-  { timestamp: "2026-06-12 10:30 AM", action: "Admission", user: "Receptionist", detail: "Admitted patient Rahul Sharma to General Ward bed 101-A (ADM-0045)." },
-  { timestamp: "2026-06-14 08:15 PM", action: "Emergency Admission", user: "Receptionist", detail: "Emergency Admitted Meera Deshmukh to ICU bed 501-A (ADM-0048)." },
-  { timestamp: "2026-06-15 09:30 AM", action: "Clinical Update", user: "Dr. Rajesh Patel", detail: "Recorded round notes and updated prescriptions for ADM-0048." }
-];
+const availableNurses = [];
 
 const IPDManagement = () => {
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("Dashboard");
+  const [ipdPatients, setIpdPatients] = useState([]);
+  const [wards, setWards] = useState([]);
 
-<<<<<<< Updated upstream
   // Room state
   const [rooms, setRooms] = useState([]);
 
@@ -233,13 +27,8 @@ const IPDManagement = () => {
 
   // Ward search and filters
   const [wardSearchQuery, setWardSearchQuery] = useState('');
-  const [wardTypeFilter, setWardTypeFilter] = useState('');
-  const [wardStatusFilter, setWardStatusFilter] = useState('');
 
   // Room search and filters
-  const [roomSearchQuery, setRoomSearchQuery] = useState('');
-  const [roomTypeFilter, setRoomTypeFilter] = useState('');
-  const [roomStatusFilter, setRoomStatusFilter] = useState('');
 
   // Ward & Room Modal Forms
   const [showAddWardModal, setShowAddWardModal] = useState(false);
@@ -254,13 +43,6 @@ const IPDManagement = () => {
 
   // bed_id, bed_number, room_id, ward_id, bed_type, bed_status, patient_id, assigned_date, assigned_time, vacant_date, is_oxygen_available, ventilator_available, bed_charges, cleaning_required
   const [beds, setBeds] = useState([]);
-
-  // Bed search and filters
-  const [bedSearchQuery, setBedSearchQuery] = useState('');
-  const [bedStatusFilter, setBedStatusFilter] = useState('');
-  const [bedTypeFilter, setBedTypeFilter] = useState('');
-  const [bedOxygenFilter, setBedOxygenFilter] = useState('');
-  const [bedVentilatorFilter, setBedVentilatorFilter] = useState('');
 
   // Bed Modals
   const [showAddBedModal, setShowAddBedModal] = useState(false);
@@ -293,7 +75,6 @@ const IPDManagement = () => {
 
   // Nurse Assignment Modals
   const [showAddNurseModal, setShowAddNurseModal] = useState(false);
-  const [showEditNurseModal, setShowEditNurseModal] = useState(false);
   const [selectedNurseAssignment, setSelectedNurseAssignment] = useState(null);
   const [showViewNurseModal, setShowViewNurseModal] = useState(false);
 
@@ -307,7 +88,6 @@ const IPDManagement = () => {
   const [patientNameSearch, setPatientNameSearch] = useState('');
   const [showPatientDropdown, setShowPatientDropdown] = useState(false);
   const [showPlanPatientDropdown, setShowPlanPatientDropdown] = useState(false);
-  const [showPlanPatientIdDropdown, setShowPlanPatientIdDropdown] = useState(false);
   const [showPlanDoctorDropdown, setShowPlanDoctorDropdown] = useState(false);
   const patientNameRef = useRef(null);
 
@@ -345,153 +125,31 @@ const IPDManagement = () => {
     const matchesWard = admissionWardFilter ? patient.ward === admissionWardFilter : true;
 
     return matchesSearch && matchesStatus && matchesWard;
-=======
-  // Core Data States (only Receptionist actions, but holds states dynamically)
-  const [recommendedList, setRecommendedList] = useState(() => {
-    const saved = localStorage.getItem("ipd_reco_receptionist");
-    return saved ? JSON.parse(saved) : INITIAL_OPD_PATIENTS;
-  });
-  const [admissions, setAdmissions] = useState(() => {
-    const saved = localStorage.getItem("ipd_adm_receptionist");
-    return saved ? JSON.parse(saved) : INITIAL_ADMITTED_PATIENTS;
-  });
-  const [wards, setWards] = useState(() => {
-    const saved = localStorage.getItem("ipd_wards_receptionist");
-    return saved ? JSON.parse(saved) : INITIAL_WARDS;
-  });
-  const [rooms, setRooms] = useState(() => {
-    const saved = localStorage.getItem("ipd_rooms_receptionist");
-    return saved ? JSON.parse(saved) : INITIAL_ROOMS;
-  });
-  const [beds, setBeds] = useState(() => {
-    const saved = localStorage.getItem("ipd_beds_receptionist");
-    return saved ? JSON.parse(saved) : INITIAL_BEDS;
->>>>>>> Stashed changes
   });
 
-  const [billing, setBilling] = useState(() => {
-    const saved = localStorage.getItem("ipd_bill_receptionist");
-    return saved ? JSON.parse(saved) : INITIAL_BILLING;
-  });
-  const [vitals, setVitals] = useState(() => {
-    const saved = localStorage.getItem("ipd_vit_receptionist");
-    return saved ? JSON.parse(saved) : INITIAL_VITALS;
-  });
-  const [medications, setMedications] = useState(() => {
-    const saved = localStorage.getItem("ipd_meds_receptionist");
-    return saved ? JSON.parse(saved) : INITIAL_MEDICATIONS;
-  });
-  const [clinicalNotes, setClinicalNotes] = useState(() => {
-    const saved = localStorage.getItem("ipd_notes_receptionist");
-    return saved ? JSON.parse(saved) : INITIAL_CLINICAL_NOTES;
-  });
-  const [auditLogs, setAuditLogs] = useState(() => {
-    const saved = localStorage.getItem("ipd_aud_receptionist");
-    return saved ? JSON.parse(saved) : INITIAL_AUDIT_LOGS;
-  });
+  const selectPatient = (patient) => {
+    setPatientNameSearch(patient.name);
+    setAdmissionForm(prev => ({
+      ...prev,
+      patientId: patient.id,
+      patientAge: patient.age || '',
+      gender: patient.gender || 'Male',
+      bloodGroup: patient.bloodGroup || ''
+    }));
+    setShowPatientDropdown(false);
+  };
 
-  const [pricingConfig, setPricingConfig] = useState(PRICING_CONFIG_DEFAULT);
-  const [notifications, setNotifications] = useState([
-    { id: 1, type: "Urgent", message: "Patient Meera Deshmukh (ICU) requires immediate Doctor review", time: "5 mins ago", read: false },
-    { id: 2, type: "Info", message: "Bed 102-B cleaning requested", time: "15 mins ago", read: true }
-  ]);
+  const [admissionForm, setAdmissionForm] = useState({ patientId: '', patientAge: '', gender: 'Male', bloodGroup: '', admissionDateTime: new Date().toISOString().slice(0, 16), caseType: 'Medical', triageLevel: 'Routine', diagnosis: '', ward: '', roomId: '', consultant: '', department: '', emergencyContact: '', estimatedStay: '', admissionType: 'Emergency', admissionNotes: '' });
 
-  // Modals & Forms States
-  const [showAdmitForm, setShowAdmitForm] = useState(false);
-  const [admitPatientData, setAdmitPatientData] = useState(null); // Selected patient from OPD
-  const [showRegretModal, setShowRegretModal] = useState(false);
-  const [regretForm, setRegretForm] = useState({ patientId: "", reason: "Financial issue", notes: "" });
+  const [dischargeForm, setDischargeForm] = useState({ dischargeDate: new Date().toISOString().split('T')[0], dischargeTime: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }), dischargeType: 'Normal', dischargeCondition: 'Stable', dischargeMode: 'Walk', finalDiagnosis: '', treatmentSummary: '', dischargeMedications: '', dosageInstructions: '', medicationDuration: '', dietInstructions: '', followUpDate: '', vitalsAtDischarge: { bp: '', pulse: '', temp: '', spo2: '' }, totalBillAmount: '', paidAmount: '', pendingAmount: '', paymentMode: 'Cash', billingStatus: 'Pending', handoverTo: '', handoverRelationship: '', attendantSignature: false, dischargeNotes: '' });
 
-  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
-  const [emergencyForm, setEmergencyForm] = useState({ name: "", age: "", gender: "Male", diagnosis: "", consultant_id: "", ward_id: "", room_id: "", bed_id: "", advancePaid: "", tpaProvider: "", tpaLimit: "", copay: "" });
-
-  const [showTransferModal, setShowTransferModal] = useState(false);
-  const [transferForm, setTransferForm] = useState({ admissionNo: "", currentWard: "", currentRoom: "", currentBed: "", newWardId: "", newRoomId: "", newBedId: "", reason: "Clinical recommendation" });
-
-
-
-  const [selectedAdmission, setSelectedAdmission] = useState(null);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-
-  const [showBillViewModal, setShowBillViewModal] = useState(false);
-  const [billingAuditNo, setBillingAuditNo] = useState("");
-  const [paymentForm, setPaymentForm] = useState({ amount: "", paymentMode: "Cash", referenceNo: "" });
-  const [depositAmount, setDepositAmount] = useState("");
-
-  const [showPrintModal, setShowPrintModal] = useState(false);
-  const [printSummaryData, setPrintSummaryData] = useState(null);
-
-  // Wards, Rooms, and Beds addition modals and forms
-  const [showAddWardModal, setShowAddWardModal] = useState(false);
-  const [addWardForm, setAddWardForm] = useState({ ward_name: "", ward_type: "General Ward", floor: "1st Floor", capacity: 10, daily_price: 1500 });
-  const [showAddRoomModal, setShowAddRoomModal] = useState(false);
-  const [addRoomForm, setAddRoomForm] = useState({ room_number: "", ward_id: "", daily_price: 1500 });
-  const [showAddBedModal, setShowAddBedModal] = useState(false);
-  const [addBedForm, setAddBedForm] = useState({ bed_number: "", ward_id: "", room_id: "", is_oxygen_available: true, ventilator_available: false });
-
-  // Ward editing states
-  const [showEditWardModal, setShowEditWardModal] = useState(false);
-  const [editWardForm, setEditWardForm] = useState({ ward_id: "", ward_name: "", ward_type: "General Ward", floor: "1st Floor", capacity: 10, daily_price: 1500 });
-
-  // Filters State
-  const [searchQuery, setSearchQuery] = useState("");
-  const [wardFilter, setWardFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-
-  // Populate dynamic dropdowns based on selections in forms
-  const [availableRooms, setAvailableRooms] = useState([]);
-  const [availableBeds, setAvailableBeds] = useState([]);
-
-  // Auto-save to LocalStorage
-  useEffect(() => {
-    localStorage.setItem("ipd_reco_receptionist", JSON.stringify(recommendedList));
-  }, [recommendedList]);
-
-  useEffect(() => {
-    localStorage.setItem("ipd_adm_receptionist", JSON.stringify(admissions));
-  }, [admissions]);
-
-  useEffect(() => {
-    localStorage.setItem("ipd_wards_receptionist", JSON.stringify(wards));
-  }, [wards]);
-
-  useEffect(() => {
-    localStorage.setItem("ipd_rooms_receptionist", JSON.stringify(rooms));
-  }, [rooms]);
-
-  useEffect(() => {
-    localStorage.setItem("ipd_beds_receptionist", JSON.stringify(beds));
-  }, [beds]);
-
+  const [transferForm, setTransferForm] = useState({ newWard: '', transferDate: new Date().toISOString().split('T')[0], priority: 'Routine', reason: '' });
 
 
   useEffect(() => {
-    localStorage.setItem("ipd_bill_receptionist", JSON.stringify(billing));
-  }, [billing]);
-
-  useEffect(() => {
-    localStorage.setItem("ipd_vit_receptionist", JSON.stringify(vitals));
-  }, [vitals]);
-
-  useEffect(() => {
-    localStorage.setItem("ipd_meds_receptionist", JSON.stringify(medications));
-  }, [medications]);
-
-  useEffect(() => {
-    localStorage.setItem("ipd_notes_receptionist", JSON.stringify(clinicalNotes));
-  }, [clinicalNotes]);
-
-  useEffect(() => {
-    localStorage.setItem("ipd_aud_receptionist", JSON.stringify(auditLogs));
-  }, [auditLogs]);
-
-  // Loading timer
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(timer);
+    loadIPDData();
   }, []);
 
-<<<<<<< Updated upstream
   const loadIPDData = async () => {
     setLoading(true);
     try {
@@ -537,508 +195,87 @@ const IPDManagement = () => {
     } finally {
       setLoading(false);
     }
-=======
-  // Logger helper
-  const logActivity = (action, detail) => {
-    const timestamp = new Date().toLocaleString();
-    setAuditLogs(prev => [{ timestamp, action, user: "Receptionist", detail }, ...prev]);
->>>>>>> Stashed changes
   };
 
-  const handlePrintDischarge = (adm) => {
-    setPrintSummaryData(adm);
-    setShowPrintModal(true);
-  };
-
-  // Helper for billing calculations
-  const getBillingSummary = (admissionNo) => {
-    const txs = billing[admissionNo] || [];
-    const total = txs.reduce((sum, item) => sum + item.amount, 0);
-    const adm = admissions.find(a => a.admissionNo === admissionNo);
-    const advance = adm ? adm.advancePaid || 0 : 0;
-    const insuranceLimit = adm && adm.insurance?.isTpaEnabled ? adm.insurance.approvalLimit : 0;
-    const copay = adm && adm.insurance?.isTpaEnabled ? adm.insurance.copayPercent : 0;
-
-    let insuranceAmt = 0;
-    let pendingAmt = total - advance;
-
-    if (insuranceLimit > 0) {
-      const billableToInsurance = Math.min(total, insuranceLimit);
-      const copayAmt = (billableToInsurance * copay) / 100;
-      insuranceAmt = billableToInsurance - copayAmt;
-      pendingAmt = total - advance - insuranceAmt;
+  // WARD MANAGEMENT ACTIONS
+  const handleAddWard = () => {
+    if (!wardForm.ward_name || !wardForm.floor_number) {
+      alert('Please fill ward name and floor number');
+      return;
     }
 
-    return {
-      total,
-      advance,
-      insuranceAmt,
-      pendingAmt: pendingAmt < 0 ? 0 : pendingAmt,
-      excessRefund: pendingAmt < 0 ? Math.abs(pendingAmt) : 0
-    };
-  };
-
-  // Keep daily room charges up-to-date
-  useEffect(() => {
-    const interval = setTimeout(() => {
-      setAdmissions(prevAdmissions => {
-        let changed = false;
-        const updated = prevAdmissions.map(adm => {
-          if (adm.status === "Discharged") return adm;
-          const start = new Date(adm.admissionDate);
-          const now = new Date();
-          const diffMs = now - start;
-          const days = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
-
-          if (adm.daysStayed !== days) {
-            changed = true;
-            const ward = wards.find(w => w.ward_id === adm.ward_id);
-            const wardRate = pricingConfig.wardCharges[ward?.ward_name] || 1000;
-            const newRoomRent = wardRate * days;
-            const nursingRent = pricingConfig.nursingChargesPerDay * days;
-
-            setBilling(prevBilling => {
-              const patientBilling = prevBilling[adm.admissionNo] || [];
-              let roomChargeExists = false;
-              let nursingChargeExists = false;
-
-              const updatedTxs = patientBilling.map(tx => {
-                if (tx.category === "Room Charges") {
-                  roomChargeExists = true;
-                  return { ...tx, amount: newRoomRent, description: `${ward?.ward_name} Rent (${days} days)` };
-                }
-                if (tx.category === "Nursing Charges") {
-                  nursingChargeExists = true;
-                  return { ...tx, amount: nursingRent, description: `Nursing Service (${days} days)` };
-                }
-                return tx;
-              });
-
-              if (!roomChargeExists) {
-                updatedTxs.push({
-                  id: Date.now() + 1,
-                  date: new Date().toISOString().split("T")[0],
-                  category: "Room Charges",
-                  description: `${ward?.ward_name} Rent (${days} days)`,
-                  amount: newRoomRent
-                });
-              }
-
-              if (!nursingChargeExists) {
-                updatedTxs.push({
-                  id: Date.now() + 2,
-                  date: new Date().toISOString().split("T")[0],
-                  category: "Nursing Charges",
-                  description: `Nursing Service (${days} days)`,
-                  amount: nursingRent
-                });
-              }
-
-              return { ...prevBilling, [adm.admissionNo]: updatedTxs };
-            });
-
-            return { ...adm, daysStayed: days };
-          }
-          return adm;
-        });
-
-        return changed ? updated : prevAdmissions;
-      });
-    }, 3000);
-    return () => clearTimeout(interval);
-  }, [admissions, wards, pricingConfig]);
-
-  // Synchronized dropdowns
-  const handleWardChangeInForm = (wardId) => {
-    const filteredRooms = rooms.filter(r => r.ward_id === wardId && r.status === "Available");
-    setAvailableRooms(filteredRooms);
-    setAvailableBeds([]);
-  };
-
-  const handleRoomChangeInForm = (roomId) => {
-    const filteredBeds = beds.filter(b => b.room_id === roomId && b.status === "Available");
-    setAvailableBeds(filteredBeds);
-  };
-
-  // ADMISSION METHODS
-  const handleSelectAdmit = (patient) => {
-    setAdmitPatientData(patient);
-    setAvailableRooms(rooms.filter(r => r.ward_id === wards.find(w => w.ward_name === patient.recommendedWard)?.ward_id));
-    setAvailableBeds([]);
-    setShowAdmitForm(true);
-  };
-
-  const handleConfirmAdmission = (e) => {
-    e.preventDefault();
-    const data = new FormData(e.target);
-    const selectedWardId = data.get("ward_id");
-    const selectedRoomId = data.get("room_id");
-    const selectedBedId = data.get("bed_id");
-    const docId = data.get("consultant_id");
-    const nurseId = data.get("nurse_id");
-    const advance = parseFloat(data.get("advancePaid")) || 0;
-
-    const insuranceProvider = data.get("insuranceProvider");
-    const insuranceLimit = parseFloat(data.get("approvalLimit")) || 0;
-    const copay = parseInt(data.get("copayPercent")) || 0;
-
-    const admNo = `ADM-00${Math.floor(100 + Math.random() * 900)}`;
-    const dateStr = new Date().toISOString().split("T")[0];
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    // Check for readmission tracking (30 days since previous discharge)
-    const isReadmission = auditLogs.some(log =>
-      log.action === "Discharge Completion" &&
-      log.detail.includes(admitPatientData.id) &&
-      (new Date() - new Date(log.timestamp) < 30 * 24 * 60 * 60 * 1000)
-    );
-
-    const newAdmission = {
-      admissionNo: admNo,
-      patientId: admitPatientData.id,
-      patientName: admitPatientData.name,
-      age: admitPatientData.age,
-      gender: admitPatientData.gender,
-      diagnosis: admitPatientData.diagnosis,
-      ward_id: selectedWardId,
-      room_id: selectedRoomId,
-      bed_id: selectedBedId,
-      consultant_id: docId,
-      nurse_id: nurseId,
-      admissionDate: dateStr,
-      admissionTime: timeStr,
-      status: "Admitted",
-      advancePaid: advance,
-      insurance: {
-        provider: insuranceProvider,
-        policyNo: data.get("policyNo") || `INS-${Math.floor(10000 + Math.random() * 90000)}`,
-        approvalLimit: insuranceLimit,
-        copayPercent: copay,
-        isTpaEnabled: !!insuranceProvider
-      },
-      daysStayed: 1,
-      readmission: isReadmission
+    const newWardId = `WARD-0${wards.length + 1}`;
+    const newWard = {
+      ...wardForm,
+      ward_id: newWardId,
+      id: newWardId,
+      name: wardForm.ward_name,
+      totalBeds: parseInt(wardForm.total_beds) || 0,
+      availableBeds: parseInt(wardForm.total_beds) || 0,
+      occupied_beds: 0,
+      available_beds: parseInt(wardForm.total_beds) || 0,
+      rate: parseFloat(wardForm.rate) || 2000
     };
 
-    const ward = wards.find(w => w.ward_id === selectedWardId);
-    const roomRent = pricingConfig.wardCharges[ward?.ward_name] || 1000;
-    const nurseFee = pricingConfig.nursingChargesPerDay;
-
-    setAdmissions(prev => [newAdmission, ...prev]);
-    setRecommendedList(prev => prev.filter(p => p.id !== admitPatientData.id));
-    setBeds(prev => prev.map(b => b.bed_id === selectedBedId ? { ...b, status: "Occupied" } : b));
-
-    setBilling(prev => ({
-      ...prev,
-      [admNo]: [
-        { id: Date.now(), date: dateStr, category: "Room Charges", description: `${ward?.ward_name} Rent (1 day)`, amount: roomRent },
-        { id: Date.now() + 1, date: dateStr, category: "Nursing Charges", description: `Nursing Service (1 day)`, amount: nurseFee }
-      ]
-    }));
-
-    logActivity("Admission", `Admitted patient ${newAdmission.patientName} (${newAdmission.patientId}) to ${ward?.ward_name} Bed ${beds.find(b => b.bed_id === selectedBedId)?.bed_number}. Admission ID: ${admNo}`);
-
-    setShowAdmitForm(false);
-    setAdmitPatientData(null);
-  };
-
-  const handleRegretAdmission = (patient) => {
-    setRegretForm({ patientId: patient.id, reason: "Financial issue", notes: "" });
-    setShowRegretModal(true);
-  };
-
-  const submitRegretAdmission = (e) => {
-    e.preventDefault();
-    const patient = recommendedList.find(p => p.id === regretForm.patientId);
-    if (!patient) return;
-
-    setRecommendedList(prev => prev.filter(p => p.id !== regretForm.patientId));
-    logActivity("Regret Admission", `Patient ${patient.name} (${patient.id}) refused admission. Reason: ${regretForm.reason}. Comments: ${regretForm.notes}`);
-    setShowRegretModal(false);
-    alert("Refusal logs recorded successfully.");
-  };
-
-  // DIRECT EMERGENCY ADMISSION
-  const handleEmergencyAdmissionSubmit = (e) => {
-    e.preventDefault();
-    const ward = wards.find(w => w.ward_id === emergencyForm.ward_id);
-    const bed = beds.find(b => b.bed_id === emergencyForm.bed_id);
-
-    const admNo = `ADM-EMG${Math.floor(100 + Math.random() * 900)}`;
-    const patId = `PAT-EMG${Math.floor(100 + Math.random() * 900)}`;
-    const dateStr = new Date().toISOString().split("T")[0];
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    const newAdmission = {
-      admissionNo: admNo,
-      patientId: patId,
-      patientName: emergencyForm.name,
-      age: parseInt(emergencyForm.age) || 30,
-      gender: emergencyForm.gender,
-      diagnosis: emergencyForm.diagnosis || "Acute Trauma / Chest Pain",
-      ward_id: emergencyForm.ward_id,
-      room_id: emergencyForm.room_id,
-      bed_id: emergencyForm.bed_id,
-      consultant_id: emergencyForm.consultant_id,
-      nurse_id: INITIAL_NURSES[0].id,
-      admissionDate: dateStr,
-      admissionTime: timeStr,
-      status: "Critical",
-      advancePaid: parseFloat(emergencyForm.advancePaid) || 0,
-      insurance: {
-        provider: emergencyForm.tpaProvider || "",
-        policyNo: `INS-EMG-${Math.floor(1000 + Math.random() * 9000)}`,
-        approvalLimit: parseFloat(emergencyForm.tpaLimit) || 0,
-        copayPercent: parseInt(emergencyForm.copay) || 0,
-        isTpaEnabled: !!emergencyForm.tpaProvider
-      },
-      daysStayed: 1,
-      readmission: false
-    };
-
-    const roomRent = pricingConfig.wardCharges[ward?.ward_name] || 1500;
-    const nurseFee = pricingConfig.nursingChargesPerDay;
-
-    setAdmissions(prev => [newAdmission, ...prev]);
-    setBeds(prev => prev.map(b => b.bed_id === emergencyForm.bed_id ? { ...b, status: "Occupied" } : b));
-    setBilling(prev => ({
-      ...prev,
-      [admNo]: [
-        { id: Date.now(), date: dateStr, category: "Room Charges", description: `${ward?.ward_name} Rent (1 day)`, amount: roomRent },
-        { id: Date.now() + 1, date: dateStr, category: "Nursing Charges", description: `Nursing Service (1 day)`, amount: nurseFee }
-      ]
-    }));
-
-    logActivity("Emergency Admission", `CRITICAL direct emergency admission: ${newAdmission.patientName} allocated to ICU/Emergency Bed ${bed?.bed_number}. ID: ${admNo}`);
-    setShowEmergencyModal(false);
-    setEmergencyForm({ name: "", age: "", gender: "Male", diagnosis: "", consultant_id: "", ward_id: "", room_id: "", bed_id: "", advancePaid: "", tpaProvider: "", tpaLimit: "", copay: "" });
-  };
-
-
-  // ROOM / BED TRANSFERS
-  const handleInitiateTransfer = (adm) => {
-    setTransferForm({
-      admissionNo: adm.admissionNo,
-      currentWard: wards.find(w => w.ward_id === adm.ward_id)?.ward_name || "Unknown",
-      currentRoom: rooms.find(r => r.room_id === adm.room_id)?.room_number || "Unknown",
-      currentBed: beds.find(b => b.bed_id === adm.bed_id)?.bed_number || "Unknown",
-      newWardId: "",
-      newRoomId: "",
-      newBedId: "",
-      reason: "Clinical preference"
-    });
-    setAvailableRooms([]);
-    setAvailableBeds([]);
-    setShowTransferModal(true);
-  };
-
-  const handleConfirmTransfer = (e) => {
-    e.preventDefault();
-    const adm = admissions.find(a => a.admissionNo === transferForm.admissionNo);
-    if (!adm) return;
-
-    const oldBedId = adm.bed_id;
-    const newBedId = transferForm.newBedId;
-    const newWardId = transferForm.newWardId;
-    const newRoomId = transferForm.newRoomId;
-
-    const oldBed = beds.find(b => b.bed_id === oldBedId);
-    const newBed = beds.find(b => b.bed_id === newBedId);
-    const oldWard = wards.find(w => w.ward_id === adm.ward_id);
-    const newWard = wards.find(w => w.ward_id === newWardId);
-
-    setAdmissions(prev => prev.map(a => {
-      if (a.admissionNo === transferForm.admissionNo) {
-        return {
-          ...a,
-          ward_id: newWardId,
-          room_id: newRoomId,
-          bed_id: newBedId
-        };
-      }
-      return a;
-    }));
-
-    setBeds(prev => prev.map(b => {
-      if (b.bed_id === oldBedId) return { ...b, status: "Available", cleaning_status: "Needs Cleaning" };
-      if (b.bed_id === newBedId) return { ...b, status: "Occupied" };
-      return b;
-    }));
-
-    const txDate = new Date().toISOString().split("T")[0];
-    setBilling(prev => {
-      const patientBilling = prev[adm.admissionNo] || [];
-      return {
-        ...prev,
-        [adm.admissionNo]: [
-          ...patientBilling,
-          {
-            id: Date.now(),
-            date: txDate,
-            category: "Procedure Charges",
-            description: `Inter-ward Transfer: ${oldWard?.ward_name} (Bed ${oldBed?.bed_number}) ➔ ${newWard?.ward_name} (Bed ${newBed?.bed_number}). Reason: ${transferForm.reason}`,
-            amount: 500
-          }
-        ]
-      };
-    });
-
-    logActivity("Transfer", `Transferred patient ${adm.patientName} from ${oldWard?.ward_name} to ${newWard?.ward_name} (Bed ${newBed?.bed_number})`);
-    setShowTransferModal(false);
-  };
-
-  // ROOM CLEANING WORKFLOW (Receptionist can clear cleaned beds)
-  const handleMarkBedClean = (bedId) => {
-    setBeds(prev => prev.map(b => b.bed_id === bedId ? { ...b, cleaning_status: "Clean" } : b));
-    logActivity("Maintenance", `Marked Bed ${beds.find(b => b.bed_id === bedId)?.bed_number} as clean and ready for admissions.`);
-  };
-
-  // DYNAMIC INFRASTRUCTURE CREATION HANDLERS
-  const handleCreateWard = (e) => {
-    e.preventDefault();
-    const newId = `WARD-${Date.now()}`;
-    const newWardObj = {
-      ward_id: newId,
-      ward_name: addWardForm.ward_name,
-      ward_type: addWardForm.ward_type,
-      floor: addWardForm.floor,
-      capacity: parseInt(addWardForm.capacity) || 10,
-      status: "Active"
-    };
-
-    if (addWardForm.daily_price) {
-      setPricingConfig(prev => ({
-        ...prev,
-        wardCharges: {
-          ...prev.wardCharges,
-          [addWardForm.ward_name]: parseFloat(addWardForm.daily_price)
-        }
-      }));
-    }
-
-    setWards(prev => [...prev, newWardObj]);
-    logActivity("Infrastructure Creation", `Created new Ward: ${newWardObj.ward_name} (${newWardObj.floor}) with capacity of ${newWardObj.capacity} beds.`);
+    setWards([...wards, newWard]);
     setShowAddWardModal(false);
-    setAddWardForm({ ward_name: "", ward_type: "General Ward", floor: "1st Floor", capacity: 10, daily_price: 1500 });
-  };
-
-  const handleCreateRoom = (e) => {
-    e.preventDefault();
-    if (!addRoomForm.ward_id) {
-      alert("Please select a ward first.");
-      return;
-    }
-    const newId = `RM-${Date.now()}`;
-    const selectedWard = wards.find(w => w.ward_id === addRoomForm.ward_id);
-    const newRoomObj = {
-      room_id: newId,
-      room_number: addRoomForm.room_number,
-      ward_id: addRoomForm.ward_id,
-      room_type: selectedWard ? selectedWard.ward_type : "General Ward",
-      daily_price: parseFloat(addRoomForm.daily_price) || 1500,
-      status: "Available"
-    };
-
-    setRooms(prev => [...prev, newRoomObj]);
-    logActivity("Infrastructure Creation", `Created new Room ${newRoomObj.room_number} in Ward: ${selectedWard?.ward_name || "Unknown"}.`);
-    setShowAddRoomModal(false);
-    setAddRoomForm({ room_number: "", ward_id: "", daily_price: 1500 });
-  };
-
-  const handleCreateBed = (e) => {
-    e.preventDefault();
-    if (!addBedForm.ward_id || !addBedForm.room_id) {
-      alert("Please select a ward and a room first.");
-      return;
-    }
-    const newId = `BED-${Date.now()}`;
-    const selectedWard = wards.find(w => w.ward_id === addBedForm.ward_id);
-    const newBedObj = {
-      bed_id: newId,
-      bed_number: addBedForm.bed_number,
-      room_id: addBedForm.room_id,
-      ward_id: addBedForm.ward_id,
-      bed_type: selectedWard ? selectedWard.ward_type.replace(" Ward", "") : "General",
-      daily_price: 0,
-      status: "Available",
-      is_oxygen_available: addBedForm.is_oxygen_available,
-      ventilator_available: addBedForm.ventilator_available,
-      cleaning_status: "Clean"
-    };
-
-    setBeds(prev => [...prev, newBedObj]);
-    logActivity("Infrastructure Creation", `Created new Bed ${newBedObj.bed_number} in Room ${rooms.find(r => r.room_id === addBedForm.room_id)?.room_number || "Unknown"}.`);
-    setShowAddBedModal(false);
-    setAddBedForm({ bed_number: "", ward_id: "", room_id: "", is_oxygen_available: true, ventilator_available: false });
-  };
-
-  const handleOpenEditWard = (ward) => {
-    const currentPrice = pricingConfig.wardCharges[ward.ward_name] || 1500;
-    setEditWardForm({
-      ward_id: ward.ward_id,
-      ward_name: ward.ward_name,
-      ward_type: ward.ward_type,
-      floor: ward.floor,
-      capacity: ward.capacity,
-      daily_price: currentPrice
+    setWardForm({
+      ward_id: '',
+      ward_name: '',
+      ward_type: 'General',
+      floor_number: '',
+      department_id: 'Cardiology',
+      total_rooms: 0,
+      total_beds: 0,
+      occupied_beds: 0,
+      available_beds: 0,
+      ward_status: 'Active',
+      rate: 2000
     });
-    setShowEditWardModal(true);
+    alert('Ward added successfully!');
   };
 
-  const handleUpdateWard = (e) => {
-    e.preventDefault();
-    const oldWard = wards.find(w => w.ward_id === editWardForm.ward_id);
-    if (!oldWard) return;
+  const handleEditWard = () => {
+    if (!wardForm.ward_name || !wardForm.floor_number) {
+      alert('Please fill ward name and floor number');
+      return;
+    }
 
-    setWards(prev => prev.map(w => {
-      if (w.ward_id === editWardForm.ward_id) {
+    setWards(wards.map(w => {
+      if (w.ward_id === selectedWard.ward_id) {
         return {
           ...w,
-          ward_name: editWardForm.ward_name,
-          ward_type: editWardForm.ward_type,
-          floor: editWardForm.floor,
-          capacity: parseInt(editWardForm.capacity) || 10
+          ...wardForm,
+          name: wardForm.ward_name,
+          totalBeds: parseInt(wardForm.total_beds) || 0,
+          rate: parseFloat(wardForm.rate) || 2000,
+          // Re-calculate available beds
+          availableBeds: (parseInt(wardForm.total_beds) || 0) - (w.occupied_beds || 0),
+          available_beds: (parseInt(wardForm.total_beds) || 0) - (w.occupied_beds || 0)
         };
       }
       return w;
     }));
 
-    // Update pricing config
-    setPricingConfig(prev => {
-      const updatedCharges = { ...prev.wardCharges };
-      if (oldWard.ward_name !== editWardForm.ward_name) {
-        delete updatedCharges[oldWard.ward_name];
-      }
-      updatedCharges[editWardForm.ward_name] = parseFloat(editWardForm.daily_price);
-      return {
-        ...prev,
-        wardCharges: updatedCharges
-      };
-    });
-
-    logActivity("Infrastructure Update", `Updated Ward: ${oldWard.ward_name} -> ${editWardForm.ward_name}.`);
     setShowEditWardModal(false);
+    setSelectedWard(null);
+    alert('Ward details updated successfully!');
   };
 
   const handleDeleteWard = (wardId) => {
-    const ward = wards.find(w => w.ward_id === wardId);
-    if (!ward) return;
-
-    if (window.confirm(`Are you sure you want to delete the ward "${ward.ward_name}"? This will also remove all associated rooms and beds.`)) {
-      setWards(prev => prev.filter(w => w.ward_id !== wardId));
-      setRooms(prev => prev.filter(r => r.ward_id !== wardId));
-      setBeds(prev => prev.filter(b => b.ward_id !== wardId));
-      logActivity("Infrastructure Deletion", `Deleted Ward: ${ward.ward_name} along with its rooms and beds.`);
+    if (confirm('Are you sure you want to delete this ward?')) {
+      setWards(wards.filter(w => w.ward_id !== wardId));
+      alert('Ward deleted successfully!');
     }
   };
 
-  // SIMULATE DOCTOR & NURSE EVENTS (Clinical JSON states simulation helper)
-  const handleSimulateDoctorRound = (adm) => {
-    const timestamp = new Date().toLocaleString();
-    const doc = INITIAL_DOCTORS.find(d => d.id === adm.consultant_id);
-    const chargeDate = new Date().toISOString().split("T")[0];
+  // ROOM MANAGEMENT ACTIONS
+  const handleAddRoom = () => {
+    if (!roomForm.room_number || !roomForm.ward_id) {
+      alert('Please fill room number and select a ward');
+      return;
+    }
 
-<<<<<<< Updated upstream
     const newRoomId = `RM-${roomForm.room_number}`;
     const newRoom = {
       ...roomForm,
@@ -1199,25 +436,7 @@ const IPDManagement = () => {
     alert('Nurse assignment saved successfully!');
   };
 
-  const handleEditNurseAssignment = () => {
-    if (!nurseForm.nurse_id || !nurseForm.patient_id || !nurseForm.ward_id) {
-      alert('Please fill nurse ID, select a patient, and select a ward');
-      return;
-    }
-    setNurseAssignments(nurseAssignments.map(nas => {
-      if (nas.nurse_assignment_id === selectedNurseAssignment.nurse_assignment_id) {
-        return {
-          ...nas,
-          ...nurseForm
-        };
-      }
-      return nas;
-    }));
 
-    setShowEditNurseModal(false);
-    setSelectedNurseAssignment(null);
-    alert('Nurse assignment details updated successfully!');
-  };
 
   const handleDeleteNurseAssignment = (assignmentId) => {
     if (confirm('Are you sure you want to delete this nurse assignment?')) {
@@ -1319,14 +538,7 @@ const IPDManagement = () => {
     }
   };
 
-  const toggleResponsibility = (nasId, field) => {
-    setNurseAssignments(prev => prev.map(nas => {
-      if (nas.nurse_assignment_id === nasId) {
-        return { ...nas, [field]: !nas[field] };
-      }
-      return nas;
-    }));
-  };
+
 
   const handleAdmission = async () => {
     if (!admissionForm.patientId || !admissionForm.ward || !admissionForm.diagnosis || !admissionForm.roomId) {
@@ -1512,2345 +724,4205 @@ const IPDManagement = () => {
     }
     const newCharge = {
       ...billingForm,
-=======
-    // Prescribe random medicine
-    const medList = ["Inj Ceftriaxone 1g IV", "Tab Clopidogrel 75mg", "Inj Pantoprazole 40mg", "Tab Multivitamin OD"];
-    const randomMedName = medList[Math.floor(Math.random() * medList.length)];
-    const newMed = {
->>>>>>> Stashed changes
       id: Date.now(),
-      medicine: randomMedName,
-      dosage: "1 dose",
-      frequency: "BD (Twice Daily)",
-      status: "Administered",
-      time: "10:00 AM",
-      nurse: "Nurse Priyanka"
+      date: new Date().toISOString().split('T')[0]
     };
-
-    // Add round note
-    const roundNote = {
-      timestamp,
-      type: "Doctor Round",
-      author: doc?.name || "Consultant",
-      notes: `SIMULATED ROUND: Patient prognosis stable. Administered meds & ordered Lab check.`
-    };
-
-    // Update state
-    setClinicalNotes(prev => ({ ...prev, [adm.admissionNo]: [roundNote, ...(prev[adm.admissionNo] || [])] }));
-    setMedications(prev => ({ ...prev, [adm.admissionNo]: [newMed, ...(prev[adm.admissionNo] || [])] }));
-
-    // Add charges
-    setBilling(prev => {
-      const patientBilling = prev[adm.admissionNo] || [];
-      return {
-        ...prev,
-        [adm.admissionNo]: [
-          ...patientBilling,
-          { id: Date.now() + 10, date: chargeDate, category: "Doctor Visit Charges", description: `Consultation round visit by ${doc?.name}`, amount: pricingConfig.doctorVisitCharges },
-          { id: Date.now() + 11, date: chargeDate, category: "Pharmacy Charges", description: `Prescription: ${randomMedName}`, amount: 350 },
-          { id: Date.now() + 12, date: chargeDate, category: "Lab Charges", description: "Diagnostics: CBC Panel", amount: 450 }
-        ]
-      };
+    setPendingCharges([...pendingCharges, newCharge]);
+    setBillingForm({
+      category: 'Pharmacy / Medications',
+      amount: '',
+      description: ''
     });
-
-    logActivity("Clinical Simulation", `Simulated clinical doctor round & prescriptions for patient ${adm.patientName}`);
-    alert(`Doctor round simulation completed. Invoice updated with visit, medication, and CBC lab charges!`);
   };
 
-  const handleSimulateNurseVitals = (adm) => {
-    const timestamp = new Date().toLocaleString();
-    const nurse = INITIAL_NURSES.find(n => n.id === adm.nurse_id);
-
-    const randomBP = ["120/80", "118/76", "124/82", "115/70"][Math.floor(Math.random() * 4)];
-    const randomPulse = ["72", "76", "80", "68"][Math.floor(Math.random() * 4)];
-    const randomSpo2 = ["98", "99", "97", "96"][Math.floor(Math.random() * 4)];
-    const randomTemp = ["98.6", "98.8", "99.0", "98.2"][Math.floor(Math.random() * 4)];
-
-    const newReading = {
-      timestamp,
-      bp: randomBP,
-      pulse: randomPulse,
-      spo2: randomSpo2,
-      temp: randomTemp,
-      nurse: nurse?.name || "Shift Nurse"
-    };
-
-    setVitals(prev => ({ ...prev, [adm.admissionNo]: [newReading, ...(prev[adm.admissionNo] || [])] }));
-    logActivity("Clinical Simulation", `Simulated nurse vitals check for patient ${adm.patientName}: BP: ${randomBP}, Pulse: ${randomPulse}, SPO2: ${randomSpo2}%`);
-    alert(`Simulated Vitals Recorded: BP: ${randomBP}, Pulse: ${randomPulse}, Temp: ${randomTemp}°F.`);
+  const removePendingCharge = (id) => {
+    setPendingCharges(pendingCharges.filter(c => c.id !== id));
   };
 
-  const handleSimulateDoctorDischarge = (adm) => {
-    // Propose Discharge Summary details automatically
-    const summary = {
-      dischargeDate: new Date().toISOString().split("T")[0],
-      dischargeTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      finalDiagnosis: adm.diagnosis,
-      summary: "Patient treated for clinical conditions and shows stable vital stats. Released on normal clearance.",
-      followUpInstructions: "Review OPD consult in 7 days.",
-      medications: "Tab Paracetamol 650mg TDS x 3 days, Tab Multivitamin OD x 10 days",
-      dischargeType: "Normal"
-    };
+  const handleUpdateBill = (patientId) => {
+    const totalNewCharges = pendingCharges.reduce((sum, c) => sum + parseFloat(c.amount), 0);
 
-    setAdmissions(prev => prev.map(a => {
-      if (a.admissionNo === adm.admissionNo) {
-        return {
-          ...a,
-          status: "Discharge Pending",
-          dischargeSummary: summary
-        };
-      }
-      return a;
-    }));
-
-    logActivity("Discharge Proposed", `Dr. round proposed discharge summary for patient ${adm.patientName}. Billing validation pending.`);
-    alert(`Discharge summary generated. Inpatient status set to 'Discharge Pending'.`);
-  };
-
-  // BILLING PROCEDURES
-  const handleCollectDeposit = (e) => {
-    e.preventDefault();
-    const amt = parseFloat(depositAmount);
-    if (!billingAuditNo || !amt || amt <= 0) return;
-
-    setAdmissions(prev => prev.map(a => {
-      if (a.admissionNo === billingAuditNo) {
-        return { ...a, advancePaid: (a.advancePaid || 0) + amt };
-      }
-      return a;
-    }));
-
-    logActivity("Billing Update", `Collected advance billing deposit payment of ₹${amt} for ADM: ${billingAuditNo}`);
-    setDepositAmount("");
-    alert("Inpatient billing account credited successfully!");
-  };
-
-  const handleProcessPayment = (e) => {
-    e.preventDefault();
-    const billSummary = getBillingSummary(billingAuditNo);
-    const payingAmt = parseFloat(paymentForm.amount);
-    if (!payingAmt || payingAmt <= 0) return;
-
-    setAdmissions(prev => prev.map(a => {
-      if (a.admissionNo === billingAuditNo) {
-        const totalPaid = (a.advancePaid || 0) + payingAmt;
-        const totalInvoice = billSummary.total;
-
-        let newStatus = a.status;
-        if (totalPaid >= totalInvoice) {
-          newStatus = "Ready for Exit";
-        }
-
-        return {
-          ...a,
-          advancePaid: totalPaid,
-          status: newStatus
-        };
-      }
-      return a;
-    }));
-
-    const txDate = new Date().toISOString().split("T")[0];
-    const receiptTx = {
-      id: Date.now(),
-      date: txDate,
-      category: "Miscellaneous Charges",
-      description: `Discharge Ledger Receipt (${paymentForm.paymentMode}) - Ref: ${paymentForm.referenceNo || "N/A"}`,
-      amount: -payingAmt
-    };
-
-    setBilling(prev => ({
-      ...prev,
-      [billingAuditNo]: [...(prev[billingAuditNo] || []), receiptTx]
-    }));
-
-    logActivity("Payment Collection", `Cleared invoice balance payment of ₹${payingAmt} via ${paymentForm.paymentMode} for ADM: ${billingAuditNo}`);
-    setPaymentForm({ amount: "", paymentMode: "Cash", referenceNo: "" });
-    alert("Receipt logged! Balance invoice cleared.");
-  };
-
-  const handleFinalizeExit = (admNo) => {
-    const adm = admissions.find(a => a.admissionNo === admNo);
-    if (!adm) return;
-
-    const billingSum = getBillingSummary(admNo);
-    if (billingSum.pendingAmt > 0) {
-      alert(`Cannot close exit. Remaining invoice balance of ₹${billingSum.pendingAmt} is due.`);
+    if (totalNewCharges === 0 && (!billingForm.amount || billingForm.amount === '')) {
+      alert('No charges to add');
       return;
     }
 
-    // Release Bed and set cleaning status
-    setBeds(prev => prev.map(b => b.bed_id === adm.bed_id ? { ...b, status: "Available", cleaning_status: "Needs Cleaning" } : b));
+    // If there's something in the form but not added to pending, add it automatically
+    let finalCharges = totalNewCharges;
+    if (billingForm.amount && parseFloat(billingForm.amount) > 0) {
+      finalCharges += parseFloat(billingForm.amount);
+    }
 
-    // Set admission status to Discharged
-    setAdmissions(prev => prev.map(a => {
-      if (a.admissionNo === admNo) return { ...a, status: "Discharged" };
-      return a;
-    }));
+    setIpdPatients(ipdPatients.map(patient =>
+      patient.id === patientId
+        ? { ...patient, totalBill: patient.totalBill + finalCharges }
+        : patient
+    ));
 
-    logActivity("Discharge Completion", `Completed discharge exit for patient ${adm.patientName}. Bed ${beds.find(b => b.bed_id === adm.bed_id)?.bed_number} sent for room cleaning.`);
-
-    // Clear OPD queue if matched
-    setRecommendedList(prev => prev.filter(p => p.id !== adm.patientId));
-    alert("Inpatient discharge closed. Room and bed released for cleaning.");
+    setShowBillingModal(false);
+    setSelectedPatient(null);
+    setPendingCharges([]);
+    alert(`Added ₹${finalCharges} to ${selectedPatient.patientName}'s bill`);
   };
 
-  // Filter admissions based on search inputs
-  const filteredPatients = admissions.filter(pat => {
-    const matchedSearch =
-      pat.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pat.patientId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pat.admissionNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pat.diagnosis.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchedWard = wardFilter ? pat.ward_id === wardFilter : true;
-    const matchedStatus = statusFilter ? pat.status === statusFilter : true;
-
-    return matchedSearch && matchedWard && matchedStatus;
-  });
-
-  // KPI Calculations
-  const stats = {
-    totalAdmissions: admissions.length,
-    currentPatients: admissions.filter(a => a.status === "Admitted" || a.status === "Critical" || a.status === "Discharge Pending" || a.status === "Ready for Exit").length,
-    criticalPatients: admissions.filter(a => a.status === "Critical").length,
-    totalBeds: beds.length,
-    occupiedBeds: beds.filter(b => b.status === "Occupied").length,
-    availableBeds: beds.filter(b => b.status === "Available" && b.cleaning_status === "Clean").length,
-    cleaningBeds: beds.filter(b => b.cleaning_status === "Needs Cleaning").length,
-    revenueToday: Object.values(billing).flat().reduce((sum, tx) => sum + (tx.amount > 0 ? tx.amount : 0), 0),
-    pendingBills: admissions.reduce((sum, a) => sum + getBillingSummary(a.admissionNo).pendingAmt, 0),
-    dischargesToday: admissions.filter(a => a.status === "Discharged").length
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Admitted': return 'status-confirmed';
+      case 'Critical': return 'status-urgent';
+      case 'Discharge Pending': return 'status-processing';
+      case 'Discharged': return 'status-completed';
+      default: return 'status-pending';
+    }
   };
+
+  if (loading) return <LoadingSpinner />;
 
   return (
-    <div className="bg-slate-50 min-h-screen text-slate-800 p-2 md:p-6 font-sans">
-
-      {/* HEADER SECTION */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="p-1.5 bg-blue-600 text-white rounded-lg flex items-center justify-center">
-              <LocalHospital fontSize="medium" />
-            </span>
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">IPD Management Desk</h1>
-          </div>
-          <p className="text-xs text-slate-500 mt-1">Receptionist Desk • Inpatient Admissions, Room/Bed Allocations, Billing Invoices & Exit Clearances</p>
+    <div className="animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <h2 className="text-xl md:text-2xl font-semibold text-gray-700">IPD Management System</h2>
+        <div className="flex gap-2">
+          {mainTab === 'Facility' && (
+            <>
+            <button
+              onClick={() => {
+                setWardForm({
+                  ward_id: '',
+                  ward_name: '',
+                  ward_type: 'General',
+                  floor_number: '',
+                  department_id: 'Cardiology',
+                  total_rooms: 0,
+                  total_beds: 0,
+                  occupied_beds: 0,
+                  available_beds: 0,
+                  ward_status: 'Active',
+                  nursing_station: '',
+                  oxygen_supported: true,
+                  icu_supported: false,
+                  rate: 2000
+                });
+                setShowAddWardModal(true);
+              }}
+              className="btn bg-blue-600 hover:bg-blue-700 text-white flex items-center shadow-lg shadow-blue-100"
+            >
+              <Add className="mr-2" fontSize="small" /> Add New Ward
+            </button>
+            <button
+              onClick={() => {
+                setRoomForm({
+                  room_id: '',
+                  room_number: '',
+                  ward_id: wards[0]?.ward_id || '',
+                  room_type: 'General',
+                  floor_number: '',
+                  room_status: 'Available',
+                  cleaning_status: 'Clean',
+                  infection_status: 'Standard',
+                  ac_available: true,
+                  private_room: false,
+                  daily_charge: 2000
+                });
+                setShowAddRoomModal(true);
+              }}
+              className="btn bg-blue-600 hover:bg-blue-700 text-white flex items-center shadow-lg shadow-blue-100"
+            >
+              <Add className="mr-2" fontSize="small" /> Add New Room
+            </button>
+            <button
+              onClick={() => {
+                setBedForm({
+                  bed_id: '',
+                  bed_number: '',
+                  room_id: rooms[0]?.room_id || '',
+                  ward_id: wards[0]?.ward_id || '',
+                  bed_type: 'General',
+                  bed_status: 'Available',
+                  patient_id: '',
+                  assigned_date: '',
+                  assigned_time: '',
+                  vacant_date: '',
+                  is_oxygen_available: true,
+                  ventilator_available: false,
+                  bed_charges: 1000,
+                  cleaning_required: false,
+                  bed_category: 'Standard',
+                  bed_priority: 'Normal',
+                  bed_cleaning_status: 'Clean',
+                  last_cleaned_at: '',
+                  bed_maintenance_status: 'Operational',
+                  monitor_attached: false,
+                  ecg_available: false,
+                  suction_available: false,
+                  oxygen_flow_meter: false,
+                  nurse_call_system: true,
+                  smart_bed_enabled: false
+                });
+                setShowAddBedModal(true);
+              }}
+              className="btn bg-blue-600 hover:bg-blue-700 text-white flex items-center shadow-lg shadow-blue-100"
+            >
+              <Add className="mr-2" fontSize="small" /> Add New Bed
+            </button>
+            </>
+          )}
+          {mainTab === 'NurseAssignments' && (
+            <button
+              onClick={() => {
+                setNurseForm({
+                  nurse_assignment_id: '',
+                  nurse_id: '',
+                  patient_id: allPatients[0]?.id || '',
+                  ward_id: wards[0]?.ward_id || '',
+                  shift_type: 'Morning',
+                  assigned_date: new Date().toISOString().split('T')[0],
+                  vitals_monitoring_frequency: 'Every 4 Hours',
+                  special_instructions: ''
+                });
+                setShowAddNurseModal(true);
+              }}
+              className="btn bg-blue-600 hover:bg-blue-700 text-white flex items-center shadow-lg shadow-blue-100"
+            >
+              <Add className="mr-2" fontSize="small" /> Assign Nurse
+            </button>
+          )}
+          {mainTab === 'Admissions' && (
+            <button
+              onClick={() => setShowAdmissionForm(true)}
+              className="btn bg-blue-600 hover:bg-blue-700 text-white flex items-center shadow-lg shadow-blue-100"
+            >
+              <Hotel className="mr-2" fontSize="small" /> New Admission
+            </button>
+          )}
         </div>
-
-        <span className="bg-blue-50 text-blue-700 text-xs font-black px-4 py-2 rounded-xl flex items-center gap-1.5 border border-blue-100">
-          <span className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse"></span>
-          Receptionist Active Desk
-        </span>
       </div>
-
-      {/* Real-time Notifications Bar */}
-      {notifications.some(n => !n.read) && (
-        <div className="bg-amber-50 border border-amber-200 p-3 rounded-2xl mb-6 flex items-start justify-between gap-3 shadow-sm">
-          <div className="flex items-start gap-2.5">
-            <AddAlert className="text-amber-600 mt-0.5 animate-bounce" fontSize="small" />
-            <div>
-              <p className="text-xs font-bold text-amber-800">Critical Admission Alerts</p>
-              <p className="text-xs text-amber-700 font-semibold mt-0.5">
-                {notifications.filter(n => !n.read).map(n => n.message).join(" | ")}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))}
-            className="text-amber-500 hover:text-amber-800 text-[10px] font-bold uppercase underline"
-          >
-            Clear Alerts
-          </button>
-        </div>
-      )}
-
-      {/* DASHBOARD TABS NAVIGATION */}
-      <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 mb-6 bg-white p-1 rounded-xl shadow-sm">
+      {/* Main Tabs Navigation */}
+      <div className="flex items-center p-1 bg-slate-100 rounded-xl mb-6 max-w-fit border border-slate-200">
         {[
-          { id: "Dashboard", label: "Dashboard Overview", icon: <Layers fontSize="small" /> },
-          { id: "Admissions", label: "OPD Admission Queue", icon: <Hotel fontSize="small" /> },
-          { id: "Infrastructure", label: "Wards & Rooms Map", icon: <Bed fontSize="small" /> },
-          { id: "Inpatients", label: "Active Inpatients", icon: <MeetingRoom fontSize="small" /> },
-          { id: "Billing Cycles", label: "Invoices & Payments", icon: <Payments fontSize="small" /> },
-
-          { id: "Audit Trail", label: "Desk Audit Trails", icon: <History fontSize="small" /> }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold transition-all rounded-lg ${activeTab === tab.id
-              ? "bg-slate-100 text-blue-600 border-b-2 border-blue-600 rounded-b-none"
-              : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
-          >
+          { id: 'Admissions', icon: <Hotel style={{ fontSize: 18 }} />, label: 'Patient Admissions' },
+          { id: 'Facility', icon: <Layers style={{ fontSize: 18 }} />, label: 'Facility Management' },
+          { id: 'NurseAssignments', icon: <Assignment style={{ fontSize: 18 }} />, label: 'Nurse Stations' },
+          { id: 'DoctorRounds', icon: <MedicalInformation style={{ fontSize: 18 }} />, label: 'Doctor Rounds' }
+        ].map((tab) => (
+          <button key={tab.id}
+            onClick={() => setMainTab(tab.id)}
+            className={`flex items-center gap-2 px-5 py-2 text-xs font-bold tracking-wider rounded-lg transition-all duration-200 ${mainTab === tab.id ? 'bg-white text-blue-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-800'}`} >
             {tab.icon}
             {tab.label}
           </button>
         ))}
       </div>
-
-      {loading ? <LoadingSpinner /> : (
+      {/* Main Tab Content */}
+      {mainTab === 'Admissions' && (
         <>
-          {/* ========================================================================= */}
-          {/* TAB 1: DASHBOARD OVERVIEW                                                */}
-          {/* ========================================================================= */}
-          {activeTab === "Dashboard" && (
-            <div className="space-y-6">
-
-              {/* STATS CARDS */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow text-left">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">Total Admissions</p>
-                      <h3 className="text-2xl font-black text-slate-800 mt-1">{stats.totalAdmissions}</h3>
-                    </div>
-                    <span className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
-                      <Hotel fontSize="medium" />
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 font-bold border-t pt-2 mt-3">Overall hospital cases</p>
-                </div>
-
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow text-left">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">Admitted Inpatients</p>
-                      <h3 className="text-2xl font-black text-slate-800 mt-1">{stats.currentPatients}</h3>
-                    </div>
-                    <span className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
-                      <MeetingRoom fontSize="medium" />
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 font-bold border-t pt-2 mt-3">{stats.criticalPatients} in ICU / Critical status</p>
-                </div>
-
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow text-left">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">Available Beds</p>
-                      <h3 className="text-2xl font-black text-slate-800 mt-1">{stats.availableBeds} / {stats.totalBeds}</h3>
-                    </div>
-                    <span className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
-                      <Bed fontSize="medium" />
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 font-bold border-t pt-2 mt-3">{stats.cleaningBeds} beds in Cleaning workflow</p>
-                </div>
-
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow text-left">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">Ledger Gross Revenue</p>
-                      <h3 className="text-2xl font-black text-slate-800 mt-1">₹{stats.revenueToday}</h3>
-                    </div>
-                    <span className="p-2.5 bg-yellow-50 text-yellow-600 rounded-xl">
-                      <Payments fontSize="medium" />
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 font-bold border-t pt-2 mt-3">Pending due: ₹{stats.pendingBills}</p>
-                </div>
-
-              </div>
-
-              {/* CHARTS CONTAINER */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-                {/* SVG Revenue Graph */}
-                <div className="lg:col-span-8 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                  <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <Payments className="text-blue-500" fontSize="small" /> Revenue Streams & Charge Invoices
-                  </h4>
-
-                  <div className="h-64 flex flex-col justify-between pt-6 border-b border-l border-slate-200 relative">
-                    <div className="absolute right-0 top-0 flex gap-4 text-[10px] font-bold text-slate-500">
-                      <div className="flex items-center gap-1.5"><span className="w-3 h-3 bg-blue-500 rounded-sm text-left"></span>Room rents</div>
-                      <div className="flex items-center gap-1.5"><span className="w-3 h-3 bg-indigo-500 rounded-sm text-left"></span>MD Visits</div>
-                      <div className="flex items-center gap-1.5"><span className="w-3 h-3 bg-purple-500 rounded-sm text-left"></span>Pharmacy</div>
-                      <div className="flex items-center gap-1.5"><span className="w-3 h-3 bg-emerald-500 rounded-sm text-left"></span>Lab / Scans</div>
-                    </div>
-
-                    <div className="flex items-end justify-around h-full pb-2 px-6">
-                      {[
-                        { day: "Room Rent", amt: Object.values(billing).flat().filter(t => t.category === "Room Charges").reduce((s, t) => s + t.amount, 0), color: "bg-blue-500" },
-                        { day: "Doctor Visits", amt: Object.values(billing).flat().filter(t => t.category === "Doctor Visit Charges").reduce((s, t) => s + t.amount, 0), color: "bg-indigo-500" },
-                        { day: "Pharmacy", amt: Object.values(billing).flat().filter(t => t.category === "Pharmacy Charges").reduce((s, t) => s + t.amount, 0), color: "bg-purple-500" },
-                        { day: "Lab / Scans", amt: Object.values(billing).flat().filter(t => t.category.includes("Lab") || t.category.includes("Radiology")).reduce((s, t) => s + t.amount, 0), color: "bg-emerald-500" },
-                        { day: "Procedures", amt: Object.values(billing).flat().filter(t => t.category === "Procedure Charges").reduce((s, t) => s + t.amount, 0), color: "bg-amber-500" }
-                      ].map((item, idx) => {
-                        const maxAmt = Math.max(1000, Object.values(billing).flat().reduce((sum, tx) => sum + (tx.amount > 0 ? tx.amount : 0), 0));
-                        const pct = Math.max(10, Math.min(100, (item.amt / maxAmt) * 100));
-                        return (
-                          <div key={idx} className="flex flex-col items-center gap-2 w-16 group relative">
-                            <div className="absolute -top-10 bg-slate-800 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                              ₹{item.amt}
-                            </div>
-                            <div className="w-8 bg-slate-100 rounded-t-lg h-44 flex items-end">
-                              <div className={`w-full ${item.color} rounded-t-lg transition-all duration-700`} style={{ height: `${pct}%` }}></div>
-                            </div>
-                            <span className="text-[10px] font-bold text-slate-500 text-center">{item.day}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* SVG Occupancy Distribution Donut */}
-                <div className="lg:col-span-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                  <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <Bed className="text-emerald-500" fontSize="small" /> Bed Status Distribution
-                  </h4>
-
-                  <div className="flex flex-col items-center justify-center pt-2">
-                    <svg width="150" height="150" viewBox="0 0 36 36" className="circular-chart">
-                      <path className="circle-bg" stroke="#f1f5f9" strokeWidth="3.5" fill="none"
-                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                      {(() => {
-                        const occupiedPct = stats.totalBeds > 0 ? (stats.occupiedBeds / stats.totalBeds) * 100 : 0;
-                        const availablePct = stats.totalBeds > 0 ? (stats.availableBeds / stats.totalBeds) * 100 : 0;
-                        const cleaningPct = stats.totalBeds > 0 ? (stats.cleaningBeds / stats.totalBeds) * 100 : 0;
-
-                        return (
-                          <>
-                            <path className="circle" stroke="#3b82f6" strokeWidth="3.5" strokeDasharray={`${occupiedPct}, 100`} fill="none"
-                              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                            <path className="circle" stroke="#10b981" strokeWidth="3.5" strokeDasharray={`${availablePct}, 100`} strokeDashoffset={-occupiedPct} fill="none"
-                              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                            <path className="circle" stroke="#f59e0b" strokeWidth="3.5" strokeDasharray={`${cleaningPct}, 100`} strokeDashoffset={-(occupiedPct + availablePct)} fill="none"
-                              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                          </>
-                        );
-                      })()}
-                      <text x="18" y="20.35" className="text-center font-black" style={{ fontSize: '7px', textAnchor: 'middle', fill: '#1e293b' }}>
-                        {stats.totalBeds > 0 ? Math.round((stats.occupiedBeds / stats.totalBeds) * 100) : 0}%
-                      </text>
-                    </svg>
-
-                    <div className="grid grid-cols-2 gap-3 mt-6 w-full text-xs text-left">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 bg-blue-500 rounded-full"></span>
-                        <span className="text-slate-500 font-medium">Occupied: <strong>{stats.occupiedBeds}</strong></span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></span>
-                        <span className="text-slate-500 font-medium">Available: <strong>{stats.availableBeds}</strong></span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 bg-yellow-500 rounded-full"></span>
-                        <span className="text-slate-500 font-medium">Cleaning: <strong>{stats.cleaningBeds}</strong></span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 bg-slate-300 rounded-full"></span>
-                        <span className="text-slate-500 font-medium">Maintenance: <strong>{beds.filter(b => b.status === "Maintenance").length}</strong></span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Ward occupancy utilization horizontal progress lines */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm text-left">
-                <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
-                  <Layers className="text-indigo-500" fontSize="small" /> Ward Allocation Utilizations
-                </h4>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {wards.map(ward => {
-                    const wardBeds = beds.filter(b => b.ward_id === ward.ward_id);
-                    const occupiedCount = wardBeds.filter(b => b.status === "Occupied").length;
-                    const pct = wardBeds.length > 0 ? (occupiedCount / wardBeds.length) * 100 : 0;
-
-                    return (
-                      <div key={ward.ward_id} className="border border-slate-100 rounded-xl p-4 bg-slate-50/50 hover:bg-white transition-all text-left">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-bold text-slate-700">{ward.ward_name}</span>
-                          <span className="text-[10px] font-black text-slate-500">{occupiedCount} / {wardBeds.length} Occupied</span>
-                        </div>
-                        <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full bg-blue-600 transition-all`} style={{ width: `${pct}%` }}></div>
-                        </div>
-                        <div className="flex justify-between items-center mt-2 text-[10px] text-slate-400 font-bold">
-                          <span>Base Charges: ₹{pricingConfig.wardCharges[ward.ward_name]}/day</span>
-                          <span className="text-blue-600">{Math.round(pct)}% Used</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {/* ========================================================================= */}
-          {/* TAB 2: OPD ADMISSIONS QUEUE                                              */}
-          {/* ========================================================================= */}
-          {activeTab === "Admissions" && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-              <div className="flex items-center justify-between mb-4 flex-wrap gap-2 text-left">
+          {/* IPD Dashboard */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+            {/* TOTAL ADMISSIONS */}
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5">
+              <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="text-lg font-bold text-slate-800">OPD Admission Recommendations</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Patients recommended for admission by OPD doctors. Action admissions or document refusals.</p>
+                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">
+                    Total Admissions
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {ipdPatients.length}
+                  </p>
+                </div>
+
+                <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center">
+                  <Bed className="text-white text-lg" fontSize="inherit" />
+                </div>
+              </div>
+
+              {/* FULL WIDTH LINE */}
+              <div className="h-px w-full bg-blue-200 my-3"></div>
+
+              <p className="text-xs text-blue-600">
+                Overall admitted patients
+              </p>
+            </div>
+            {/* CRITICAL PATIENTS */}
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-red-700 uppercase tracking-wide">
+                    Critical Patients
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {ipdPatients.filter(p => p.status === 'Critical').length}
+                  </p>
+                </div>
+
+                <div className="w-12 h-12 rounded-xl bg-red-500 flex items-center justify-center">
+                  <MonitorHeart className="text-white text-lg" fontSize="inherit" />
+                </div>
+              </div>
+
+              <div className="h-px w-full bg-red-200 my-3"></div>
+
+              <p className="text-xs text-red-600">
+                Requires immediate care
+              </p>
+            </div>
+            {/* AVAILABLE BEDS */}
+            <div className="bg-green-50 border border-green-200 rounded-2xl p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-green-700 uppercase tracking-wide">
+                    Available Beds
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {wards.reduce((sum, ward) => sum + ward.availableBeds, 0)}
+                  </p>
+                </div>
+
+                <div className="w-12 h-12 rounded-xl bg-green-500 flex items-center justify-center">
+                  <MeetingRoom className="text-white text-lg" fontSize="inherit" />
+                </div>
+              </div>
+
+              <div className="h-px w-full bg-green-200 my-3"></div>
+
+              <p className="text-xs text-green-600">
+                Ready for admission
+              </p>
+            </div>
+            {/* TODAY'S REVENUE */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-yellow-700 uppercase tracking-wide">
+                    Today&apos;s Revenue
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    ₹{ipdPatients.reduce((sum, p) => sum + p.roomCharges, 0)}
+                  </p>
+                </div>
+
+                <div className="w-12 h-12 rounded-xl bg-yellow-500 flex items-center justify-center">
+                  <Payments className="text-white text-lg" fontSize="inherit" />
+                </div>
+              </div>
+
+              <div className="h-px w-full bg-yellow-200 my-3"></div>
+
+              <p className="text-xs text-yellow-600">
+                Room charges collected
+              </p>
+            </div>
+          </div>
+
+          {/* Search & Filters Controls */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm mb-6">
+            <div className="relative w-full md:w-[480px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10" fontSize="small" />
+              <input
+                type="text"
+                placeholder="Search patient, ID, diagnosis, doctor..."
+                className="form-input w-full text-sm animate-fade-in py-2"
+                style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
+                value={admissionSearchQuery}
+                onChange={(e) => setAdmissionSearchQuery(e.target.value)}
+              />
+              {admissionSearchQuery && (
+                <button
+                  onClick={() => setAdmissionSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10 flex items-center justify-center"
+                >
+                  <Close fontSize="small" />
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-3 w-full md:w-auto">
+              <select
+                className="form-input text-sm py-2 px-4 w-full md:w-48"
+                value={admissionWardFilter}
+                onChange={(e) => setAdmissionWardFilter(e.target.value)}
+              >
+                <option value="">All Wards</option>
+                {wards.map(w => (
+                  <option key={w.id || w.ward_id} value={w.name || w.ward_name}>
+                    {w.name || w.ward_name}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="form-input text-sm py-2 px-4 w-full md:w-44"
+                value={admissionStatusFilter}
+                onChange={(e) => setAdmissionStatusFilter(e.target.value)}
+              >
+                <option value="">All Statuses</option>
+                <option value="Admitted">Admitted</option>
+                <option value="Critical">Critical</option>
+                <option value="Discharge Pending">Discharge Pending</option>
+                <option value="Discharged">Discharged</option>
+              </select>
+              {(admissionSearchQuery || admissionWardFilter || admissionStatusFilter) && (
+                <button
+                  onClick={() => {
+                    setAdmissionSearchQuery('');
+                    setAdmissionWardFilter('');
+                    setAdmissionStatusFilter('');
+                  }}
+                  className="text-xs font-semibold text-red-600 hover:text-red-800 flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          </div>
+          {/* IPD Patients Table */}
+          <div className="bg-white rounded-lg card-shadow border overflow-hidden mb-6">
+            <DataTable
+              columns={[
+                {
+                  key: 'patientName',
+                  title: 'Patient',
+                  sortable: true,
+                  render: (value, row) => (
+                    <div>
+                      <p className="font-medium">{value}</p>
+                      <p className="text-xs text-gray-500">ID: {row.patientId}</p>
+                      <p className="text-xs text-gray-500">Admission: {row.admissionDate}</p>
+                    </div>
+                  )
+                },
+                { key: 'ward', title: 'Ward', sortable: true },
+                { key: 'bed', title: 'Bed', sortable: true },
+                { key: 'diagnosis', title: 'Diagnosis', sortable: true },
+                { key: 'consultant', title: 'Consultant', sortable: true },
+                {
+                  key: 'status',
+                  title: 'Status',
+                  sortable: true,
+                  render: (value) => (
+                    <span className={`px-3 py-1 rounded-full text-xs  font-medium ${getStatusColor(value)}`}>
+                      {value}
+                    </span>
+                  )
+                },
+                { key: 'estimatedDischarge', title: 'Est. Discharge', sortable: true },
+                { key: 'roomCharges', title: 'Room Charges', sortable: true, render: (value) => `₹${value}` },
+                {
+                  key: 'actions',
+                  title: 'Actions',
+                  headerClassName: 'pl-6',
+                  render: (_, row) => (
+                    <div className="flex gap-0.5">
+                      <button
+                        className="text-blue-600 hover:text-blue-800 p-1 modal-touch-target flex items-center justify-center"
+                        title="View Details"
+                        onClick={() => setSelectedPatient(row)}
+                      >
+                        <Visibility fontSize="small" />
+                      </button>
+                      <button className={`p-1 modal-touch-target flex items-center justify-center ${row.status === 'Discharged' || row.status === 'Discharge Pending' ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-green-600 hover:text-green-800'}`} title={row.status === 'Discharged' || row.status === 'Discharge Pending' ? 'Patient Discharged' : 'Transfer'} onClick={() => row.status !== 'Discharged' && row.status !== 'Discharge Pending' && initiateTransfer(row)} disabled={row.status === 'Discharged' || row.status === 'Discharge Pending'}>
+                        <SwapHoriz fontSize="small" />
+                      </button>
+                      <button className={`p-1 modal-touch-target flex items-center justify-center ${row.status === 'Discharge Pending' || row.status === 'Discharged' ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-purple-600 hover:text-purple-800'}`} title={row.status === 'Discharge Pending' || row.status === 'Discharged' ? 'Discharge Initiated' : 'Initiate Discharge'} onClick={() => row.status !== 'Discharge Pending' && row.status !== 'Discharged' && initiateDischarge(row)} disabled={row.status === 'Discharge Pending' || row.status === 'Discharged'}>
+                        <Logout fontSize="small" />
+                      </button>
+                      <button
+                        className="text-yellow-600 hover:text-yellow-800 p-1 modal-touch-target flex items-center justify-center"
+                        title="Update Bill"
+                        onClick={() => updateBill(row)}
+                      >
+                        <ReceiptLong fontSize="small" />
+                      </button>
+                    </div>
+                  )
+                }
+              ]}
+              data={filteredAdmissions}
+            />
+          </div>
+          {/* Wards Overview */}
+          <div className="bg-white rounded-lg card-shadow border p-6 mb-6">
+            <h3 className="text-lg font-semibold mb-4"> Wards & Bed Availability</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {wards.map(ward => (
+                <div key={ward.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="font-bold">{ward.name}</h4>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${ward.availableBeds > 3 ? 'bg-green-100 text-green-800' :
+                      ward.availableBeds > 0 ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                      {ward.availableBeds} Available
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-3">Rate: ₹{ward.rate}/day</p>
+                  <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full"
+                      style={{ width: `${((ward.totalBeds - ward.availableBeds) / ward.totalBeds) * 100}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-gray-500 text-center">
+                    {ward.totalBeds - ward.availableBeds}/{ward.totalBeds} beds occupied
+                  </p>
+                  <div className="mt-3 pt-3 border-t">
+                    <button
+                      className="w-full btn border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white btn-sm"
+                      onClick={() => {
+                        setAdmissionForm({ ...admissionForm, ward: ward.name });
+                        setShowAdmissionForm(true);
+                      }}
+                      disabled={ward.availableBeds === 0}
+                    >
+                      {ward.availableBeds === 0 ? 'Full' : 'Admit Patient'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+      {/* Facility Management Tab Content */}
+      {mainTab === 'Facility' && (
+        <div className="space-y-12 animate-fade-in">
+          {/* Wards Section */}
+          <div className="space-y-6">
+          {/* Unified Facility Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-left">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Total Wards</p>
+                  <p className="text-xl font-bold text-gray-900 mt-1">{wards.length}</p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center">
+                  <Layers className="text-white text-md" fontSize="small" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 text-left">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">Total Rooms</p>
+                  <p className="text-xl font-bold text-gray-900 mt-1">{rooms.length}</p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center">
+                  <MeetingRoom className="text-white text-md" fontSize="small" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 text-left">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide">Total Beds</p>
+                  <p className="text-xl font-bold text-gray-900 mt-1">{beds.length}</p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center">
+                  <Bed className="text-white text-md" fontSize="small" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-left">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-green-700 uppercase tracking-wide">Available Beds</p>
+                  <p className="text-xl font-bold text-gray-900 mt-1">
+                    {beds.filter(b => b.bed_status === 'Available').length}
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-green-500 flex items-center justify-center">
+                  <CheckCircle className="text-white text-md" fontSize="small" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Facility Unified Search */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm mt-4">
+            <div className="relative w-full md:w-[480px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10" fontSize="small" />
+              <input
+                type="text"
+                placeholder="Search facility (wards, rooms, beds)..."
+                className="form-input w-full text-sm py-2"
+                style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
+                value={wardSearchQuery}
+                onChange={(e) => setWardSearchQuery(e.target.value)}
+              />
+              {wardSearchQuery && (
+                <button
+                  onClick={() => setWardSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10 flex items-center justify-center"
+                >
+                  <Close fontSize="small" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Hierarchical Facility Table */}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden mt-4">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-gray-500 uppercase bg-slate-100 border-b border-slate-200">
+                  <tr>
+                    <th className="px-4 py-3 font-bold">Entity Details</th>
+                    <th className="px-4 py-3 font-bold">Type / Department</th>
+                    <th className="px-4 py-3 font-bold">Status</th>
+                    <th className="px-4 py-3 font-bold">Capacity / Features</th>
+                    <th className="px-4 py-3 font-bold">Daily Rate</th>
+                    <th className="px-4 py-3 font-bold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {wards
+                    .filter(w => {
+                      const q = wardSearchQuery.toLowerCase();
+                      if (!q) return true;
+                      const matchesWard = (w.ward_name || w.name || '').toLowerCase().includes(q);
+                      const wardRooms = rooms.filter(r => r.ward_id === w.ward_id || r.ward_id === w.id);
+                      const matchesRooms = wardRooms.some(r => r.room_number?.toLowerCase().includes(q));
+                      const wardBeds = beds.filter(b => b.ward_id === w.ward_id || b.ward_id === w.id);
+                      const matchesBeds = wardBeds.some(b => b.bed_number?.toLowerCase().includes(q));
+                      return matchesWard || matchesRooms || matchesBeds;
+                    })
+                    .map(ward => {
+                      const wardRooms = rooms.filter(r => r.ward_id === ward.ward_id || r.ward_id === ward.id);
+                      const q = wardSearchQuery.toLowerCase();
+                      const wardMatches = (ward.ward_name || ward.name || '').toLowerCase().includes(q);
+                      
+                      return (
+                        <React.Fragment key={`ward-${ward.ward_id || ward.id}`}>
+                          {/* Ward Row */}
+                          <tr className="bg-slate-50 border-t-2 border-slate-300">
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-gray-900 text-base">{ward.ward_name || ward.name}</div>
+                              <div className="text-xs text-gray-500">Floor {ward.floor_number || '1'}</div>
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-gray-700">{ward.department_id || 'General Medicine'}</td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                ward.ward_status === 'Active' ? 'bg-emerald-100 text-emerald-800' :
+                                ward.ward_status === 'Maintenance' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                              }`}>
+                                {ward.ward_status || 'Active'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-semibold text-gray-700">
+                                {ward.availableBeds} / {ward.totalBeds} Beds Free
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 font-bold text-blue-600">₹{ward.rate || ward.daily_charge || 2000}</td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <button className="text-blue-600 hover:bg-blue-100 p-1.5 rounded transition-colors" onClick={() => {
+                                    setSelectedWard(ward);
+                                    setWardForm({
+                                      ward_id: ward.ward_id || ward.id, ward_name: ward.ward_name || ward.name,
+                                      ward_type: ward.ward_type || 'General', floor_number: ward.floor_number || '1',
+                                      department_id: ward.department_id || 'General Medicine', total_rooms: ward.total_rooms || 5,
+                                      total_beds: ward.totalBeds || 20, occupied_beds: ward.totalBeds - ward.availableBeds,
+                                      available_beds: ward.availableBeds, ward_status: ward.ward_status || 'Active',
+                                      rate: ward.rate || ward.daily_charge || 2000
+                                    });
+                                    setShowEditWardModal(true);
+                                }}>
+                                  <Edit fontSize="small" />
+                                </button>
+                                <button className="text-red-600 hover:bg-red-100 p-1.5 rounded transition-colors" onClick={() => handleDeleteWard(ward.ward_id || ward.id)}>
+                                  <Delete fontSize="small" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* Rooms & Beds */}
+                          {wardRooms.map(room => {
+                            const roomBeds = beds.filter(b => b.room_id === room.room_id);
+                            const roomMatches = room.room_number?.toLowerCase().includes(q);
+                            const roomBedsMatch = roomBeds.some(b => b.bed_number?.toLowerCase().includes(q));
+                            
+                            if (q && !wardMatches && !roomMatches && !roomBedsMatch) return null;
+
+                            return (
+                              <React.Fragment key={`room-${room.room_id}`}>
+                                {/* Room Row */}
+                                <tr className="bg-white border-t border-slate-200">
+                                  <td className="px-4 py-2 pl-10">
+                                    <div className="font-semibold text-gray-800 flex items-center gap-2">
+                                      <span className="text-slate-300">↳</span> Room {room.room_number}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-2 text-gray-600">{room.room_type}</td>
+                                  <td className="px-4 py-2">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${
+                                      room.room_status === 'Available' ? 'bg-emerald-50 text-emerald-700' :
+                                      room.room_status === 'Occupied' ? 'bg-blue-50 text-blue-700' :
+                                      room.room_status === 'Maintenance' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'
+                                    }`}>
+                                      {room.room_status}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-2 text-gray-500 text-xs font-medium">
+                                    {roomBeds.filter(b => b.bed_status === 'Available').length} / {roomBeds.length} Beds Free
+                                  </td>
+                                  <td className="px-4 py-2 font-medium text-blue-500">₹{room.daily_charge || room.rate || 2000}</td>
+                                  <td className="px-4 py-2 text-right">
+                                    <div className="flex items-center justify-end gap-1">
+                                      <button className="text-blue-500 hover:bg-blue-50 p-1 rounded transition-colors" onClick={() => {
+                                        setSelectedRoom(room);
+                                        setRoomForm(room);
+                                        setShowEditRoomModal(true);
+                                      }}>
+                                        <Edit style={{ fontSize: 16 }} />
+                                      </button>
+                                      <button className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors" onClick={() => handleDeleteRoom(room.room_id)}>
+                                        <Delete style={{ fontSize: 16 }} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+
+                                {/* Bed Rows */}
+                                {roomBeds.map(bed => {
+                                  const bedMatches = bed.bed_number?.toLowerCase().includes(q);
+                                  if (q && !wardMatches && !roomMatches && !bedMatches) return null;
+
+                                  return (
+                                    <tr key={`bed-${bed.bed_id}`} className="bg-white border-t border-slate-100 hover:bg-slate-50 transition-colors">
+                                      <td className="px-4 py-2 pl-16">
+                                        <div className="font-medium text-gray-700 flex items-center gap-2">
+                                          <span className="text-slate-200">↳</span> Bed {bed.bed_number}
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-2 text-gray-500 text-sm">
+                                        {bed.bed_category || 'Standard'}
+                                      </td>
+                                      <td className="px-4 py-2">
+                                        <div className="flex flex-col items-start gap-1">
+                                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                                            bed.bed_status === 'Available' ? 'bg-emerald-100 text-emerald-800' :
+                                            bed.bed_status === 'Occupied' ? 'bg-blue-100 text-blue-800' : 'bg-rose-100 text-rose-800'
+                                          }`}>
+                                            {bed.bed_status}
+                                          </span>
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-2">
+                                        <div className="flex flex-wrap gap-1 max-w-[140px]">
+                                          {bed.is_oxygen_available && <span className="bg-blue-50 text-blue-600 px-1 py-0.5 rounded text-[8px] font-bold uppercase">O2</span>}
+                                          {bed.ventilator_available && <span className="bg-rose-50 text-rose-600 px-1 py-0.5 rounded text-[8px] font-bold uppercase">VENT</span>}
+                                          {bed.smart_bed_enabled && <span className="bg-indigo-50 text-indigo-600 px-1 py-0.5 rounded text-[8px] font-bold uppercase">SMART</span>}
+                                          {bed.monitor_attached && <span className="bg-emerald-50 text-emerald-600 px-1 py-0.5 rounded text-[8px] font-bold uppercase">MONITOR</span>}
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-2 font-medium text-gray-600 text-sm">₹{bed.bed_charges}/day</td>
+                                      <td className="px-4 py-2 text-right">
+                                        <div className="flex items-center justify-end gap-1">
+                                          <button className="text-slate-400 hover:text-blue-500 hover:bg-blue-50 p-1 rounded transition-all" onClick={() => {
+                                            setSelectedBed(bed);
+                                            setBedForm(bed);
+                                            setShowEditBedModal(true);
+                                          }}>
+                                            <Edit style={{ fontSize: 16 }} />
+                                          </button>
+                                          <button className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1 rounded transition-all" onClick={() => handleDeleteBed(bed.bed_id)}>
+                                            <Delete style={{ fontSize: 16 }} />
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </React.Fragment>
+                            );
+                          })}
+                        </React.Fragment>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        </div>
+      )}
+      {/* Nurse Assignments Tab Content */}
+      {mainTab === 'NurseAssignments' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Shift & Staff Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-left">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Active Assignments</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{nurseAssignments.length}</p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-slate-700 flex items-center justify-center">
+                  <Assignment className="text-white text-lg" fontSize="inherit" />
+                </div>
+              </div>
+              <div className="h-px w-full bg-slate-200 my-3"></div>
+              <p className="text-xs text-slate-600">On duty currently</p>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 text-left">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Morning Shift</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {nurseAssignments.filter(nas => nas.shift_type === 'Morning').length} Assigned
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-blue-500 flex items-center justify-center">
+                  <LocalHospital className="text-white text-lg" fontSize="inherit" />
+                </div>
+              </div>
+              <div className="h-px w-full bg-blue-200 my-3"></div>
+              <p className="text-xs text-blue-600">Morning roster tracking</p>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-left">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Evening Shift</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {nurseAssignments.filter(nas => nas.shift_type === 'Evening').length} Assigned
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-amber-500 flex items-center justify-center">
+                  <History className="text-white text-lg" fontSize="inherit" />
+                </div>
+              </div>
+              <div className="h-px w-full bg-amber-200 my-3"></div>
+              <p className="text-xs text-amber-600">Evening roster tracking</p>
+            </div>
+
+            <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 text-left">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">Night Shift</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {nurseAssignments.filter(nas => nas.shift_type === 'Night').length} Assigned
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center">
+                  <Shield className="text-white text-lg" fontSize="inherit" />
+                </div>
+              </div>
+              <div className="h-px w-full bg-indigo-200 my-3"></div>
+              <p className="text-xs text-indigo-600">Overnight monitoring</p>
+            </div>
+          </div>
+
+          {/* Search and Filters Bar */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
+            <div className="relative w-full md:w-[480px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10" fontSize="small" />
+              <input
+                type="text"
+                placeholder="Search by Nurse, Patient, or Instructions..."
+                className="form-input w-full text-sm py-2"
+                style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
+                value={nurseSearchQuery}
+                onChange={(e) => setNurseSearchQuery(e.target.value)}
+              />
+              {nurseSearchQuery && (
+                <button
+                  onClick={() => setNurseSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10 flex items-center justify-center"
+                >
+                  <Close fontSize="small" />
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2 w-full md:w-auto">
+              <select
+                className="form-input text-xs py-2 px-3 w-full md:w-40"
+                value={nurseShiftFilter}
+                onChange={(e) => setNurseShiftFilter(e.target.value)}
+              >
+                <option value="">All Shifts</option>
+                <option value="Morning">Morning Shift</option>
+                <option value="Evening">Evening Shift</option>
+                <option value="Night">Night Shift</option>
+              </select>
+              <select
+                className="form-input text-xs py-2 px-3 w-full md:w-40"
+                value={nurseWardFilter}
+                onChange={(e) => setNurseWardFilter(e.target.value)}
+              >
+                <option value="">All Wards</option>
+                {wards.map(w => (
+                  <option key={w.ward_id || w.id} value={w.ward_id || w.id}>{w.ward_name || w.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Nurse Assignment Clinical Table */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-fade-in">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-black uppercase tracking-wider">
+                    <th className="py-4 px-6">Nurse ID</th>
+                    <th className="py-4 px-6">Nurse Name</th>
+                    <th className="py-4 px-6">Allocated Ward</th>
+                    <th className="py-4 px-6">Patient Name</th>
+                    <th className="py-4 px-6">Patient Join Date</th>
+                    <th className="py-4 px-6 text-center w-[120px]">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {nurseAssignments
+                    .filter(nas => {
+                      const matchesSearch =
+                        nas.nurse_id?.toLowerCase().includes(nurseSearchQuery.toLowerCase()) ||
+                        nas.patient_id?.toLowerCase().includes(nurseSearchQuery.toLowerCase()) ||
+                        nas.special_instructions?.toLowerCase().includes(nurseSearchQuery.toLowerCase());
+                      const matchesShift = nurseShiftFilter ? nas.shift_type === nurseShiftFilter : true;
+                      const matchesWard = nurseWardFilter ? nas.ward_id === nurseWardFilter : true;
+                      return matchesSearch && matchesShift && matchesWard;
+                    })
+                    .map(nas => {
+                      const matchedWard = wards.find(w => w.ward_id === nas.ward_id || w.id === nas.ward_id);
+                      const matchedPatient = allPatients.find(p => p.id === nas.patient_id);
+                      const matchedNurse = availableNurses.find(n => n.id === nas.nurse_id);
+                      return (
+                        <tr key={nas.nurse_assignment_id} className="hover:bg-slate-50/65 transition-colors">
+                          {/* Nurse ID */}
+                          <td className="py-4 px-6 align-middle font-mono font-bold text-slate-600">
+                            {nas.nurse_id}
+                          </td>
+
+                          {/* Nurse Name */}
+                          <td className="py-4 px-6 align-middle">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
+                                <MedicalInformation className="text-blue-500" style={{ fontSize: 15 }} />
+                                {matchedNurse?.name || 'N/A'}
+                              </span>
+                              {matchedNurse?.specialty && (
+                                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mt-0.5 ml-5">
+                                  {matchedNurse.specialty}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Allocated Ward */}
+                          <td className="py-4 px-6 align-middle">
+                            <span className="font-semibold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg text-xs border border-slate-200">
+                              {matchedWard?.ward_name || matchedWard?.name || 'General Ward'}
+                            </span>
+                          </td>
+
+                          {/* Patient Name */}
+                          <td className="py-4 px-6 align-middle">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-blue-600 text-sm">
+                                {matchedPatient?.name || `Patient (${nas.patient_id})`}
+                              </span>
+                              <span className="text-[10px] text-gray-400 font-medium mt-0.5">
+                                ID: {nas.patient_id}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Patient Join Date */}
+                          <td className="py-4 px-6 align-middle font-semibold text-slate-700">
+                            {nas.assigned_date}
+                          </td>
+
+                          {/* Action Buttons: View & Delete */}
+                          <td className="py-4 px-6 text-center align-middle">
+                            <div className="flex gap-2 justify-center">
+                              <button
+                                className="btn border border-blue-200 hover:bg-blue-50 text-blue-600 btn-xs font-bold py-1.5 px-3 flex items-center justify-center gap-1 shadow-sm transition-all"
+                                onClick={() => {
+                                  setSelectedNurseAssignment(nas);
+                                  setShowViewNurseModal(true);
+                                }}
+                              >
+                                <Visibility style={{ fontSize: 12 }} /> View
+                              </button>
+                              <button
+                                className="btn border border-red-200 hover:bg-red-50 text-red-600 btn-xs font-bold py-1.5 px-3 flex items-center justify-center gap-1 shadow-sm transition-all"
+                                onClick={() => handleDeleteNurseAssignment(nas.nurse_assignment_id)}
+                              >
+                                <Delete style={{ fontSize: 12 }} /> Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Doctor Rounds Tab Content */}
+      {mainTab === 'DoctorRounds' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Shift & Round Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-left shadow-sm">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Total Scheduled Rounds</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{doctorRounds.length}</p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-slate-700 flex items-center justify-center">
+                  <MedicalInformation className="text-white text-lg" fontSize="inherit" />
+                </div>
+              </div>
+              <div className="h-px w-full bg-slate-200 my-3"></div>
+              <p className="text-xs text-slate-600">Active ward visitation rosters</p>
+            </div>
+
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 text-left shadow-sm">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Completed Rounds</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {doctorRounds.filter(r => r.status === 'Completed').length} Checked
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-emerald-500 flex items-center justify-center">
+                  <CheckCircle className="text-white text-lg" fontSize="inherit" />
+                </div>
+              </div>
+              <div className="h-px w-full bg-emerald-200 my-3"></div>
+              <p className="text-xs text-emerald-600">Visitation goals met today</p>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 text-left shadow-sm">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Active Inpatient Plans</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {treatmentPlans.filter(p => p.status === 'Active').length} Active
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-blue-500 flex items-center justify-center">
+                  <Hotel className="text-white text-lg" fontSize="inherit" />
+                </div>
+              </div>
+              <div className="h-px w-full bg-blue-200 my-3"></div>
+              <p className="text-xs text-blue-600">Monitored care pathways</p>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-left shadow-sm">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Pending Plans Review</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {treatmentPlans.filter(p => p.status === 'Pending').length} Pending
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-amber-500 flex items-center justify-center">
+                  <MonitorHeart className="text-white text-lg" fontSize="inherit" />
+                </div>
+              </div>
+              <div className="h-px w-full bg-amber-200 my-3"></div>
+              <p className="text-xs text-amber-600">Awaiting clinical approval</p>
+            </div>
+          </div>
+
+          {/* Section: Doctor Rounds Tracker */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 text-left">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <MedicalInformation className="text-blue-500" />
+                  Doctor Inpatient Ward Rounds
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">Track active ward rounds, clinical checkup dates, and visited patients.</p>
+              </div>
+              <div className="flex gap-3 items-center">
+                <div className="relative w-80">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10" fontSize="small" />
+                  <input
+                    type="text"
+                    placeholder="Search rounds by doctor or ward..."
+                    className="form-input w-full text-xs py-1.5 animate-fade-in"
+                    style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
+                    value={roundsSearch}
+                    onChange={(e) => setRoundsSearch(e.target.value)}
+                  />
+                  {roundsSearch && (
+                    <button
+                      onClick={() => setRoundsSearch('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10 flex items-center justify-center"
+                    >
+                      <Close fontSize="small" style={{ fontSize: 14 }} />
+                    </button>
+                  )}
                 </div>
                 <button
-                  onClick={() => setShowEmergencyModal(true)}
-                  className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2 px-4 rounded-xl flex items-center gap-1.5 shadow transition-all animate-pulse"
+                  onClick={() => {
+                    setRoundForm({
+                      doctor_name: '',
+                      specialty: 'General Medicine',
+                      ward_name: wards[0]?.ward_name || wards[0]?.name || 'General Ward',
+                      round_date: new Date().toISOString().split('T')[0],
+                      round_time: '',
+                      patients_visited: '',
+                      status: 'Scheduled',
+                      clinical_notes: ''
+                    });
+                    setShowAddRoundModal(true);
+                  }}
+                  className="btn bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center justify-center py-1.5 px-4 rounded-xl text-xs gap-1.5 shadow-md shadow-blue-100"
                 >
-                  <LocalHospital fontSize="small" /> Direct Emergency Admission
+                  <Add fontSize="small" /> Schedule Round
                 </button>
               </div>
+            </div>
 
-              {recommendedList.length === 0 ? (
-                <div className="text-center py-12 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
-                  <Hotel className="text-slate-300 text-5xl mb-2 mx-auto" />
-                  <h4 className="text-sm font-bold text-slate-600">Queue is Clear</h4>
-                  <p className="text-xs text-slate-400 mt-1">No pending inpatient admission recommendations from OPD.</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <DataTable
-                    columns={[
-                      { key: "id", title: "Patient ID", sortable: true, className: "font-mono font-bold text-xs" },
-                      { key: "name", title: "Patient Name", sortable: true, className: "font-bold text-slate-700" },
-                      { key: "age", title: "Age / Gender", render: (_, row) => `${row.age} yrs / ${row.gender}` },
-                      { key: "diagnosis", title: "Diagnosis", sortable: true, className: "text-slate-600 italic" },
-                      { key: "consultant", title: "Consultant Doctor", sortable: true },
-                      { key: "recommendedWard", title: "Ward Type Recommended", className: "font-semibold text-blue-600" },
-                      { key: "date", title: "Consult Date", sortable: true },
-                      {
-                        key: "actions",
-                        title: "Actions",
-                        render: (_, row) => (
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => handleSelectAdmit(row)}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-1 px-3 rounded-lg flex items-center gap-1"
-                            >
-                              <Check fontSize="small" /> Admit Patient
-                            </button>
-                            <button
-                              onClick={() => handleRegretAdmission(row)}
-                              className="bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 text-xs font-bold py-1 px-3 rounded-lg"
-                            >
-                              Regret
-                            </button>
+            <div className="overflow-x-auto border border-slate-100 rounded-xl">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-black uppercase tracking-wider">
+                    <th className="py-3 px-4">Round ID</th>
+                    <th className="py-3 px-4">Doctor / Specialty</th>
+                    <th className="py-3 px-4">Allocated Location</th>
+                    <th className="py-3 px-4">Visitation Schedule</th>
+                    <th className="py-3 px-4">Visited Patient Name(s)</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4 text-center w-[120px]">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {doctorRounds
+                    .filter(r =>
+                      r.doctor_name?.toLowerCase().includes(roundsSearch.toLowerCase()) ||
+                      r.ward_name?.toLowerCase().includes(roundsSearch.toLowerCase())
+                    )
+                    .map(r => (
+                      <tr key={r.round_id} className="hover:bg-slate-50/65 transition-colors">
+                        <td className="py-3 px-4 font-mono font-bold text-slate-500">{r.round_id}</td>
+                        <td className="py-3 px-4">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-900">{r.doctor_name}</span>
+                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{r.specialty}</span>
                           </div>
-                        )
-                      }
-                    ]}
-                    data={recommendedList}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="font-semibold text-slate-700">{r.ward_name}</span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-semibold text-slate-700">{r.round_date}</span>
+                            <span className="text-[10px] text-slate-400 font-bold">{r.round_time}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-blue-600 font-bold">{r.patients_visited || 'None'}</span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${r.status === 'Completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                            r.status === 'In Progress' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                              'bg-blue-50 text-blue-700 border border-blue-200'
+                            }`}>
+                            {r.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <button
+                            className="btn border border-red-200 hover:bg-red-50 text-red-600 btn-xs font-bold py-1 px-2.5 flex items-center justify-center gap-1 mx-auto"
+                            onClick={() => handleDeleteRound(r.round_id)}
+                          >
+                            <Delete style={{ fontSize: 12 }} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  {doctorRounds.length === 0 && (
+                    <tr>
+                      <td colSpan="7" className="py-8 text-center text-slate-400 font-medium">No doctor rounds scheduled today.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Section: Inpatient Patient Treatment Plans */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 text-left">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <Assignment className="text-emerald-500" />
+                  Inpatient Treatment & Care Pathways
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">Manage patient clinical diagnoses, prescribed medications, drip rates, and treatment progress.</p>
+              </div>
+              <div className="flex gap-3 items-center">
+                <div className="relative w-80">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10" fontSize="small" />
+                  <input
+                    type="text"
+                    placeholder="Search plans by patient or diagnosis..."
+                    className="form-input w-full text-xs py-1.5 animate-fade-in"
+                    style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
+                    value={plansSearch}
+                    onChange={(e) => setPlansSearch(e.target.value)}
                   />
+                  {plansSearch && (
+                    <button
+                      onClick={() => setPlansSearch('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10 flex items-center justify-center"
+                    >
+                      <Close fontSize="small" style={{ fontSize: 14 }} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => {
+                    setPlanForm({
+                      patient_id: allPatients[0]?.id || '',
+                      patient_name: allPatients[0]?.name || '',
+                      diagnosis: '',
+                      doctor_name: 'Dr. Alexander Bennett',
+                      treatment_details: '',
+                      cycles_prescribed: 'Standard Day Cycle',
+                      drip_flow_rate: '100 ml/hr',
+                      start_date: new Date().toISOString().split('T')[0],
+                      duration: '7 Days',
+                      status: 'Active'
+                    });
+                    setShowAddPlanModal(true);
+                  }}
+                  className="btn bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center py-1.5 px-4 rounded-xl text-xs gap-1.5 shadow-md shadow-emerald-100"
+                >
+                  <Add fontSize="small" /> Record Treatment Plan
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto border border-slate-100 rounded-xl">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-black uppercase tracking-wider">
+                    <th className="py-3 px-4">Plan ID</th>
+                    <th className="py-3 px-4">Patient Details</th>
+                    <th className="py-3 px-4">Diagnosis</th>
+                    <th className="py-3 px-4">Prescribed Treatment Pathway</th>
+                    <th className="py-3 px-4">Cycle & Flow Rate</th>
+                    <th className="py-3 px-4">Duration & Start</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4 text-center w-[120px]">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {treatmentPlans
+                    .filter(p =>
+                      p.patient_name?.toLowerCase().includes(plansSearch.toLowerCase()) ||
+                      p.diagnosis?.toLowerCase().includes(plansSearch.toLowerCase())
+                    )
+                    .map(p => (
+                      <tr key={p.plan_id} className="hover:bg-slate-50/65 transition-colors">
+                        <td className="py-3 px-4 font-mono font-bold text-slate-500">{p.plan_id}</td>
+                        <td className="py-3 px-4">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-blue-600">{p.patient_name}</span>
+                            <span className="text-[10px] font-medium text-slate-400">ID: {p.patient_id}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="font-semibold text-slate-800 bg-slate-50 px-2 py-1 rounded border border-slate-150">{p.diagnosis}</span>
+                        </td>
+                        <td className="py-3 px-4 max-w-[280px]">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-medium text-slate-700 line-clamp-2">{p.treatment_details}</span>
+                            <span className="text-[10px] text-slate-400 font-bold mt-0.5">By: {p.doctor_name}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[9px] font-black text-blue-800 bg-blue-50 px-2 py-0.5 rounded tracking-wide w-fit">
+                              {p.cycles_prescribed}
+                            </span>
+                            <span className="text-[9px] font-bold text-slate-500 font-mono">
+                              Flow: {p.drip_flow_rate}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-semibold text-slate-700">{p.start_date}</span>
+                            <span className="text-[10px] text-slate-400 font-bold">Span: {p.duration}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${p.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-800'
+                            }`}>
+                            {p.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <button
+                            className="btn border border-red-200 hover:bg-red-50 text-red-600 btn-xs font-bold py-1 px-2.5 flex items-center justify-center gap-1 mx-auto"
+                            onClick={() => handleDeletePlan(p.plan_id)}
+                          >
+                            <Delete style={{ fontSize: 12 }} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  {treatmentPlans.length === 0 && (
+                    <tr>
+                      <td colSpan="8" className="py-8 text-center text-slate-400 font-medium">No patient treatment plans recorded.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Modal
+        isOpen={showAdmissionForm}
+        onClose={() => {
+          setShowAdmissionForm(false);
+          setAdmissionForm({
+            patientId: '',
+            patientAge: '',
+            gender: 'Male',
+            bloodGroup: '',
+            admissionDateTime: new Date().toISOString().slice(0, 16),
+            caseType: 'Medical',
+            triageLevel: 'Routine',
+            diagnosis: '',
+            ward: '',
+            roomId: '',
+            consultant: '',
+            department: '',
+            emergencyContact: '',
+            estimatedStay: '',
+            admissionType: 'Routine',
+            admissionNotes: ''
+          });
+          setPatientNameSearch('');
+          setDoctorSearch('');
+          setDeptSearch('');
+        }}
+        title="New IPD Admission"
+        size="lg"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setShowAdmissionForm(false)}
+              className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 border-none"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleAdmission}
+              className="btn bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center px-8 shadow-lg shadow-emerald-100"
+            >
+              <Hotel className="mr-2" fontSize="small" /> Complete Admission
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-6">
+          {/* Patient Selection — Name + ID */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Patient Name — searchable combobox */}
+            <div className="form-group relative md:col-span-1">
+              <label className="form-label">Patient Name <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <input
+                  ref={patientNameRef}
+                  type="text"
+                  className="form-input pl-10 pr-10"
+                  placeholder="Search by name or ID..."
+                  value={patientNameSearch}
+                  onChange={(e) => {
+                    setPatientNameSearch(e.target.value);
+                    setShowPatientDropdown(true);
+                    // If the typed value no longer matches a patient, clear the ID
+                    const match = allPatients.find(p => p.name.toLowerCase() === e.target.value.toLowerCase());
+                    if (match) {
+                      setAdmissionForm(prev => ({ ...prev, patientId: match.id }));
+                    } else {
+                      setAdmissionForm(prev => ({ ...prev, patientId: '' }));
+                    }
+                  }}
+                  onFocus={() => setShowPatientDropdown(true)}
+                  required
+                />
+                {/* Arrow toggle button */}
+                <div className="absolute inset-y-0 right-0 flex items-center pr-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowPatientDropdown(prev => !prev)}
+                    className={`p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all ${showPatientDropdown ? 'rotate-180' : ''
+                      }`}
+                  >
+                    <KeyboardArrowDown fontSize="small" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Dropdown results */}
+              {showPatientDropdown && (
+                <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                  {filteredPatients.length > 0 ? (
+                    filteredPatients.map(p => (
+                      <div
+                        key={p.id}
+                        className={`px-4 py-2.5 flex justify-between items-center cursor-pointer transition-colors border-b border-gray-50 last:border-0 ${admissionForm.patientId === p.id
+                          ? 'bg-blue-50'
+                          : 'hover:bg-gray-50'
+                          }`}
+                        onClick={() => selectPatient(p)}
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{p.name}</p>
+                          <p className="text-[11px] text-gray-500">{p.id}</p>
+                        </div>
+                        {admissionForm.patientId === p.id && (
+                          <span className="text-[10px] font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">Selected</span>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-4 py-3 text-sm text-gray-400 italic text-center">No matching patients</div>
+                  )}
+                  <div
+                    className="px-4 py-2.5 text-emerald-600 font-semibold text-sm cursor-pointer hover:bg-emerald-50 border-t border-gray-100 flex items-center gap-1"
+                    onClick={() => {
+                      setShowPatientDropdown(false);
+                      alert('Redirecting to Patient Registration...');
+                    }}
+                  >
+                    Register New Patient
+                  </div>
                 </div>
               )}
             </div>
-          )}
 
-          {/* ========================================================================= */}
-          {/* TAB 3: ACTIVE INPATIENTS & CLINICAL VIEWER                                */}
-          {/* ========================================================================= */}
-          {activeTab === "Inpatients" && (
-            <div className="space-y-4">
+            {/* Patient ID — auto-filled, editable */}
+            <div className="form-group">
+              <label className="form-label">Patient ID <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. PAT-001"
+                value={admissionForm.patientId}
+                onChange={(e) => {
+                  const newId = e.target.value;
+                  setAdmissionForm(prev => ({ ...prev, patientId: newId }));
+                  // Reverse-lookup: if ID matches a known patient, fill the name
+                  const match = allPatients.find(p => p.id.toLowerCase() === newId.toLowerCase());
+                  if (match) {
+                    setPatientNameSearch(match.name);
+                    setAdmissionForm(prev => ({
+                      ...prev,
+                      patientId: match.id,
+                      patientAge: match.age || '',
+                      gender: match.gender || 'Male',
+                      bloodGroup: match.bloodGroup || ''
+                    }));
+                  }
+                }}
+                required
+              />
+            </div>
+          </div>
 
-              {/* FILTERS */}
-              <div className="bg-white border border-slate-200 p-4 rounded-2xl flex flex-wrap gap-4 items-center justify-between shadow-sm">
-                <div className="relative flex-1 min-w-[280px]">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fontSize="small" />
-                  <input
-                    type="text"
-                    placeholder="Search by Patient Name, ID, Diagnosis or Admission No..."
-                    className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
+          {/* Age, Gender, Blood Group row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="form-group">
+              <label className="form-label">Age</label>
+              <input
+                type="number"
+                className="form-input"
+                placeholder="Years"
+                value={admissionForm.patientAge}
+                onChange={(e) => setAdmissionForm({ ...admissionForm, patientAge: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Gender</label>
+              <select
+                className="form-input"
+                value={admissionForm.gender}
+                onChange={(e) => setAdmissionForm({ ...admissionForm, gender: e.target.value })}
+              >
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Blood Group</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. O+"
+                value={admissionForm.bloodGroup}
+                onChange={(e) => setAdmissionForm({ ...admissionForm, bloodGroup: e.target.value })}
+              />
+            </div>
+          </div>
 
-                <div className="flex gap-2">
-                  <select
-                    className="border border-slate-200 p-2 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 font-semibold text-slate-600"
-                    value={wardFilter}
-                    onChange={(e) => setWardFilter(e.target.value)}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="form-group md:col-span-2">
+              <label className="form-label">Admission Date & Time <span className="text-red-500">*</span></label>
+              <input
+                type="datetime-local"
+                value={admissionForm.admissionDateTime}
+                onChange={(e) => setAdmissionForm({ ...admissionForm, admissionDateTime: e.target.value })}
+                className="form-input"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="form-group">
+              <label className="form-label">Triage Level <span className="text-red-500">*</span></label>
+              <select
+                value={admissionForm.triageLevel}
+                onChange={(e) => setAdmissionForm({ ...admissionForm, triageLevel: e.target.value })}
+                className="form-input"
+                required
+              >
+                <option value="Routine">Routine (P3)</option>
+                <option value="Urgent">Urgent (P2)</option>
+                <option value="Critical">Critical (P1)</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Case Type <span className="text-red-500">*</span></label>
+              <select
+                value={admissionForm.caseType}
+                onChange={(e) => setAdmissionForm({ ...admissionForm, caseType: e.target.value })}
+                className="form-input"
+                required
+              >
+                <option value="Medical">Medical</option>
+                <option value="Surgical">Surgical</option>
+                <option value="Diagnostic">Diagnostic</option>
+                <option value="Palliative">Palliative</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Admission Type <span className="text-red-500">*</span></label>
+              <select
+                value={admissionForm.admissionType}
+                onChange={(e) => setAdmissionForm({ ...admissionForm, admissionType: e.target.value })}
+                className="form-input"
+                required
+              >
+                <option value="Emergency">Emergency</option>
+                <option value="Routine">Routine</option>
+                <option value="Scheduled">Scheduled</option>
+                <option value="Maternity">Maternity</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="form-group">
+              <label className="form-label">Ward <span className="text-red-500">*</span></label>
+              <select
+                value={admissionForm.ward}
+                onChange={(e) => setAdmissionForm({ ...admissionForm, ward: e.target.value, roomId: '' })}
+                className="form-input"
+                required
+              >
+                <option value="">Select Ward</option>
+                {wards.filter(w => w.availableBeds > 0).map(ward => (
+                  <option key={ward.id} value={ward.name}>
+                    {ward.name} (Available: {ward.availableBeds}, Rate: ₹{ward.rate}/day)
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Room <span className="text-red-500">*</span></label>
+              <select
+                value={admissionForm.roomId}
+                onChange={(e) => setAdmissionForm({ ...admissionForm, roomId: e.target.value })}
+                className="form-input"
+                required
+                disabled={!admissionForm.ward}
+              >
+                <option value="">Select Room</option>
+                {rooms
+                  .filter(r => r.ward_id === (wards.find(w => w.name === admissionForm.ward)?.ward_id || wards.find(w => w.name === admissionForm.ward)?.id))
+                  .map(room => (
+                    <option key={room.room_id} value={room.room_id}>
+                      Room {room.room_number} ({room.room_type} - {room.room_status})
+                    </option>
+                  ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Primary Diagnosis <span className="text-red-500">*</span></label>
+            <textarea
+              value={admissionForm.diagnosis}
+              onChange={(e) => setAdmissionForm({ ...admissionForm, diagnosis: e.target.value })}
+              className="form-input"
+              rows="2"
+              placeholder="Enter primary diagnosis..."
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Doctor Name Search */}
+            <div className="form-group relative md:col-span-1">
+              <label className="form-label">Doctor Name <span className="text-red-500">*</span></label>
+              <div className="relative">
+
+                <input
+                  type="text"
+                  className="form-input pl-10 pr-10"
+                  placeholder="Search or enter doctor..."
+                  value={doctorSearch || admissionForm.consultant}
+                  onChange={(e) => {
+                    setDoctorSearch(e.target.value);
+                    setAdmissionForm({ ...admissionForm, consultant: e.target.value });
+                    setShowDoctorDropdown(true);
+                  }}
+                  onFocus={() => setShowDoctorDropdown(true)}
+                  required
+                />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowDoctorDropdown(!showDoctorDropdown)}
+                    className="p-1 rounded hover:bg-gray-100 text-gray-400"
                   >
-                    <option value="">All Wards</option>
-                    {wards.map(w => (
-                      <option key={w.ward_id} value={w.ward_id}>{w.ward_name}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    className="border border-slate-200 p-2 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 font-semibold text-slate-600"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                  >
-                    <option value="">All Statuses</option>
-                    <option value="Admitted">Admitted</option>
-                    <option value="Critical">Critical</option>
-                    <option value="Discharge Pending">Discharge Pending</option>
-                    <option value="Ready for Exit">Ready for Exit</option>
-                    <option value="Discharged">Discharged</option>
-                  </select>
+                    <KeyboardArrowDown fontSize="small" />
+                  </button>
                 </div>
               </div>
+              {showDoctorDropdown && (
+                <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                  {doctors
+                    .filter(d => d.name.toLowerCase().includes((doctorSearch || admissionForm.consultant).toLowerCase()))
+                    .map((d, i) => (
+                      <div
+                        key={i}
+                        className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-50 last:border-0"
+                        onClick={() => {
+                          setAdmissionForm({
+                            ...admissionForm,
+                            consultant: d.name,
+                            department: d.dept
+                          });
+                          setDoctorSearch(d.name);
+                          setDeptSearch(d.dept);
+                          setShowDoctorDropdown(false);
+                        }}
+                      >
+                        <p className="font-bold text-gray-900">{d.name}</p>
+                        <p className="text-[10px] text-gray-500 uppercase">{d.dept}</p>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
 
-              {/* TABLE */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <DataTable
-                  columns={[
-                    {
-                      key: "admissionNo",
-                      title: "Patient Details",
-                      render: (_, row) => (
-                        <div className="text-left">
-                          <p className="font-bold text-slate-900">{row.patientName}</p>
-                          <p className="text-[10px] text-slate-400 font-mono">ID: {row.patientId} | ADM: {row.admissionNo}</p>
-                          {row.readmission && (
-                            <span className="inline-block bg-rose-100 text-rose-800 text-[8px] font-black uppercase px-1.5 py-0.5 rounded mt-1">Readmission (30d)</span>
-                          )}
-                        </div>
-                      )
-                    },
-                    {
-                      key: "allocation",
-                      title: "Ward & Room/Bed",
-                      render: (_, row) => {
-                        const ward = wards.find(w => w.ward_id === row.ward_id);
-                        const room = rooms.find(r => r.room_id === row.room_id);
-                        const bed = beds.find(b => b.bed_id === row.bed_id);
-                        return (
-                          <div className="text-center">
-                            <p className="font-semibold text-slate-800 text-xs">{ward?.ward_name}</p>
-                            <p className="text-[10px] text-slate-500 font-bold">Room {room?.room_number} | Bed {bed?.bed_number}</p>
-                          </div>
-                        );
-                      }
-                    },
-                    { key: "diagnosis", title: "Diagnosis", className: "italic text-slate-600 text-xs text-left" },
-                    {
-                      key: "careStaff",
-                      title: "Care Staff",
-                      render: (_, row) => {
-                        const doc = INITIAL_DOCTORS.find(d => d.id === row.consultant_id);
-                        const nurse = INITIAL_NURSES.find(n => n.id === row.nurse_id);
-                        return (
-                          <div className="text-center text-xs">
-                            <p className="font-bold text-slate-700">MD: {doc?.name}</p>
-                            <p className="text-[10px] text-slate-400 font-semibold">NS: {nurse?.name}</p>
-                          </div>
-                        );
-                      }
-                    },
-                    { key: "daysStayed", title: "Days Stayed", className: "font-semibold text-center text-xs" },
-                    {
-                      key: "billing",
-                      title: "Billing Invoice Due",
-                      render: (_, row) => {
-                        const sum = getBillingSummary(row.admissionNo);
-                        return (
-                          <div className="text-center text-xs">
-                            <p className="font-bold text-slate-900">Total: ₹{sum.total}</p>
-                            <p className="text-[10px] text-red-600 font-bold">Due: ₹{sum.pendingAmt}</p>
-                          </div>
-                        );
-                      }
-                    },
-                    {
-                      key: "status",
-                      title: "Status",
-                      render: (val) => (
-                        <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${val === "Critical" ? "bg-rose-100 text-rose-800 border border-rose-300" :
-                          val === "Discharge Pending" ? "bg-amber-100 text-amber-800" :
-                            val === "Ready for Exit" ? "bg-indigo-100 text-indigo-800" :
-                              val === "Discharged" ? "bg-slate-100 text-slate-500" :
-                                "bg-emerald-100 text-emerald-800"
-                          }`}>
-                          {val}
-                        </span>
-                      )
-                    },
-                    {
-                      key: "actions",
-                      title: "Desk Actions",
-                      render: (_, row) => {
-                        const isDischarged = row.status === "Discharged";
-                        return (
-                          <div className="flex items-center justify-center gap-1.5">
+            {/* Department Search */}
+            <div className="form-group relative md:col-span-1">
+              <label className="form-label">Department <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <input
+                  type="text"
+                  className="form-input pl-10 pr-10"
+                  placeholder="Search or enter dept..."
+                  value={deptSearch || admissionForm.department}
+                  onChange={(e) => {
+                    setDeptSearch(e.target.value);
+                    setAdmissionForm({ ...admissionForm, department: e.target.value });
+                    setShowDeptDropdown(true);
+                  }}
+                  onFocus={() => setShowDeptDropdown(true)}
+                  required
+                />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowDeptDropdown(!showDeptDropdown)}
+                    className="p-1 rounded hover:bg-gray-100 text-gray-400"
+                  >
+                    <KeyboardArrowDown fontSize="small" />
+                  </button>
+                </div>
+              </div>
+              {showDeptDropdown && (
+                <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                  {departments
+                    .filter(dept => dept.toLowerCase().includes((deptSearch || admissionForm.department).toLowerCase()))
+                    .map((dept, i) => (
+                      <div
+                        key={i}
+                        className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-50 last:border-0"
+                        onClick={() => {
+                          setAdmissionForm({ ...admissionForm, department: dept });
+                          setDeptSearch(dept);
+                          setShowDeptDropdown(false);
+                        }}
+                      >
+                        {dept}
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
 
-                            {/* View clinical profile */}
-                            <button
-                              onClick={() => {
-                                setSelectedAdmission(row);
-                                setShowDetailsModal(true);
-                              }}
-                              className="text-slate-600 hover:bg-slate-100 p-1.5 rounded-lg border bg-white"
-                              title="Patient Medical Profile"
-                            >
-                              <Visibility fontSize="small" />
-                            </button>
+            {/* Estimated Stay */}
+            <div className="form-group md:col-span-1">
+              <label className="form-label">Est. Stay (Days)</label>
+              <input
+                type="number"
+                value={admissionForm.estimatedStay}
+                onChange={(e) => setAdmissionForm({ ...admissionForm, estimatedStay: e.target.value })}
+                className="form-input"
+                min="1"
+                max="30"
+              />
+            </div>
+          </div>
 
-                            {/* Bed / Room Transfer */}
-                            {!isDischarged && (
-                              <button
-                                onClick={() => handleInitiateTransfer(row)}
-                                className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg border border-blue-200 bg-white"
-                                title="Transfer Ward / Bed"
-                              >
-                                <SwapHoriz fontSize="small" />
-                              </button>
-                            )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="form-group md:col-span-2">
+              <label className="form-label">Emergency Contact <span className="text-red-500">*</span></label>
+              <input
+                type="tel"
+                value={admissionForm.emergencyContact}
+                onChange={(e) => setAdmissionForm({ ...admissionForm, emergencyContact: e.target.value })}
+                className="form-input"
+                placeholder="+91 98765 43210"
+                required
+              />
+            </div>
+          </div>
 
-                            {/* Payment details */}
-                            {!isDischarged && (
-                              <button
-                                onClick={() => {
-                                  setBillingAuditNo(row.admissionNo);
-                                  setShowBillViewModal(true);
-                                }}
-                                className="bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-black uppercase py-1 px-2.5 rounded-lg"
-                                title="Collect Payments"
-                              >
-                                Billing
-                              </button>
-                            )}
+          <div className="form-group">
+            <label className="form-label">Admission Notes</label>
+            <textarea
+              value={admissionForm.admissionNotes}
+              onChange={(e) => setAdmissionForm({ ...admissionForm, admissionNotes: e.target.value })}
+              className="form-input"
+              rows="3"
+              placeholder="Any special instructions or notes..."
+            />
+          </div>
+        </div>
+      </Modal>
 
-                            {/* Complete exit */}
-                            {row.status === "Ready for Exit" && (
-                              <button
-                                onClick={() => handleFinalizeExit(row.admissionNo)}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase py-1 px-2.5 rounded-lg"
-                                title="Discharge Exit Clearance"
-                              >
-                                Exit Clear
-                              </button>
-                            )}
+      <Modal
+        isOpen={showTransferModal}
+        onClose={() => {
+          setShowTransferModal(false);
+          setSelectedPatient(null);
+          setTransferForm({
+            newWard: '',
+            transferDate: new Date().toISOString().split('T')[0],
+            priority: 'Routine',
+            reason: ''
+          });
+        }}
+        title={`Patient Transfer: ${selectedPatient?.patientName || ''}`}
+        size="md"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => {
+                setShowTransferModal(false);
+                setSelectedPatient(null);
+                setTransferForm({
+                  newWard: '',
+                  transferDate: new Date().toISOString().split('T')[0],
+                  priority: 'Routine',
+                  reason: ''
+                });
+              }}
+              className="btn bg-gray-100 hover:bg-gray-200 text-gray-700"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleTransfer}
+              className="btn bg-blue-600 hover:bg-blue-700 text-white flex items-center shadow-lg shadow-blue-100"
+            >
+              <SwapHoriz className="mr-2" fontSize="small" /> Complete Transfer
+            </button>
+          </div>
+        }
+      >
+        {selectedPatient && (
+          <div className="space-y-6">
+            {/* Location Status */}
+            <div className="flex items-center gap-4 p-4 border border-gray-100 rounded-2xl shadow-sm">
+              <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-100">
+                <SwapHoriz className="text-gray-400" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Current Ward</span>
+                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded">Active</span>
+                </div>
+                <p className="text-base font-bold text-gray-900 mt-0.5">
+                  {selectedPatient.ward} <span className="mx-2 text-gray-300">|</span> <span className="text-gray-500 font-normal">Bed {selectedPatient.bed}</span>
+                </p>
+              </div>
+            </div>
 
-                            {/* Print summary */}
-                            {isDischarged && (
-                              <button
-                                onClick={() => handlePrintDischarge(row)}
-                                className="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[10px] font-black uppercase py-1 px-2.5 rounded-lg flex items-center gap-1"
-                              >
-                                <Print fontSize="inherit" /> Summary
-                              </button>
-                            )}
-
-                          </div>
-                        );
-                      }
-                    }
-                  ]}
-                  data={filteredPatients}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Transfer Date</label>
+                <input
+                  type="date"
+                  value={transferForm.transferDate}
+                  onChange={(e) => setTransferForm({ ...transferForm, transferDate: e.target.value })}
+                  className="w-full text-sm px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50/30"
+                  required
                 />
               </div>
-            </div>
-          )}
-
-
-          {/* ========================================================================= */}
-          {/* TAB 5: BED TRANSFERS AUDIT LOGS                                          */}
-          {/* ========================================================================= */}
-
-
-          {/* ========================================================================= */}
-          {/* TAB 6: BILLING INVOICES & COLLECTIONS                                    */}
-          {/* ========================================================================= */}
-          {activeTab === "Billing Cycles" && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-left">
-
-              {/* Inpatients Accounts list */}
-              <div className="lg:col-span-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm h-fit">
-                <h3 className="text-sm font-bold text-slate-800 mb-4 border-b pb-3 flex items-center gap-1">
-                  <ReceiptLong className="text-blue-600" fontSize="small" /> Inpatient Accounts List
-                </h3>
-
-                <div className="space-y-2.5 max-h-[440px] overflow-y-auto pr-1">
-                  {admissions.map(adm => {
-                    const bill = getBillingSummary(adm.admissionNo);
-                    return (
-                      <div
-                        key={adm.admissionNo}
-                        onClick={() => setBillingAuditNo(adm.admissionNo)}
-                        className={`p-3 border rounded-xl cursor-pointer transition-all flex justify-between items-center ${billingAuditNo === adm.admissionNo
-                          ? "bg-blue-50/50 border-blue-300 shadow-sm"
-                          : "border-slate-100 hover:bg-slate-50"
-                          }`}
-                      >
-                        <div>
-                          <p className="text-xs font-bold text-slate-800">{adm.patientName}</p>
-                          <p className="text-[10px] text-slate-500 font-bold mt-0.5">ADM: {adm.admissionNo}</p>
-                          <span className={`inline-block px-1.5 py-0.2 rounded text-[8px] font-black uppercase mt-1 ${adm.status === "Ready for Exit" ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"
-                            }`}>{adm.status}</span>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs font-black text-slate-800">Total: ₹{bill.total}</p>
-                          <p className="text-[9px] font-bold text-red-500 mt-1">Due: ₹{bill.pendingAmt}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Billing Ledger Account Panel */}
-              <div className="lg:col-span-8 space-y-6">
-                {billingAuditNo && admissions.find(a => a.admissionNo === billingAuditNo) ? (() => {
-                  const patient = admissions.find(a => a.admissionNo === billingAuditNo);
-                  const bills = billing[billingAuditNo] || [];
-                  const summary = getBillingSummary(billingAuditNo);
-                  return (
-                    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                      <div className="border-b pb-4 mb-4 flex justify-between items-center flex-wrap gap-2">
-                        <div>
-                          <h3 className="text-base font-extrabold text-slate-900">{patient.patientName}</h3>
-                          <p className="text-xs text-slate-500 font-semibold">
-                            Account ADM: {patient.admissionNo} | Plan: {patient.insurance?.isTpaEnabled ? `Insurance TPA (${patient.insurance.provider})` : "Self Pay (Cash Basis)"}
-                          </p>
-                        </div>
-
-                        <button
-                          onClick={() => handlePrintDischarge(patient)}
-                          className="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-1.5 px-3 rounded-lg border flex items-center gap-1 transition-all"
-                        >
-                          <Print fontSize="small" /> Statement Summary
-                        </button>
-                      </div>
-
-                      {/* Ledger Items */}
-                      <div className="border border-slate-200 rounded-xl overflow-hidden mb-6">
-                        <table className="w-full text-xs text-left">
-                          <thead className="bg-slate-50 text-slate-500 font-black uppercase tracking-wider border-b">
-                            <tr>
-                              <th className="px-4 py-2">Date</th>
-                              <th className="px-4 py-2">Category</th>
-                              <th className="px-4 py-2">Description</th>
-                              <th className="px-4 py-2 text-right">Charges (₹)</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y text-slate-700">
-                            {bills.map(item => (
-                              <tr key={item.id} className="hover:bg-slate-50/50">
-                                <td className="px-4 py-2">{item.date}</td>
-                                <td className="px-4 py-2 font-bold">{item.category}</td>
-                                <td className="px-4 py-2 text-slate-500">{item.description}</td>
-                                <td className="px-4 py-2 text-right font-bold text-slate-900">₹{item.amount}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Aggregated Totals */}
-                      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
-                        <div className="space-y-1 w-full text-xs">
-                          <div className="flex justify-between border-b pb-1 text-slate-500">
-                            <span>Subtotal Amount:</span>
-                            <span className="font-bold">₹{summary.total}</span>
-                          </div>
-                          <div className="flex justify-between border-b pb-1 text-slate-500">
-                            <span>Deposits / Advance Credits:</span>
-                            <span className="font-bold text-emerald-600">- ₹{summary.advance}</span>
-                          </div>
-                          {patient.insurance?.isTpaEnabled && (
-                            <div className="flex justify-between border-b pb-1 text-slate-500">
-                              <span>TPA Coverage claim:</span>
-                              <span className="font-bold text-blue-600">- ₹{summary.insuranceAmt}</span>
-                            </div>
-                          )}
-                          <div className="flex justify-between text-base font-black text-slate-900 pt-1.5">
-                            <span>Total Balance Due:</span>
-                            <span className="text-red-600">₹{summary.pendingAmt}</span>
-                          </div>
-                          {summary.excessRefund > 0 && (
-                            <div className="flex justify-between text-xs font-black text-emerald-600 pt-1">
-                              <span>Excess Refund Due:</span>
-                              <span>₹{summary.excessRefund}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Cash Actions Forms */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                        {/* Record Payment */}
-                        <form onSubmit={handleProcessPayment} className="border p-4 bg-slate-50/50 rounded-2xl">
-                          <h4 className="text-xs font-black text-slate-700 uppercase tracking-wide mb-3">Clear Ledger Balance</h4>
-
-                          <div className="space-y-3">
-                            <div>
-                              <label className="text-[10px] font-bold text-slate-500 block mb-1">Payment Amount (₹)</label>
-                              <input
-                                type="number"
-                                required
-                                placeholder={summary.pendingAmt}
-                                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs outline-none"
-                                value={paymentForm.amount}
-                                onChange={(e) => setPaymentForm(prev => ({ ...prev, amount: e.target.value }))}
-                              />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2 text-left">
-                              <div>
-                                <label className="text-[10px] font-bold text-slate-500 block mb-1">Mode</label>
-                                <select
-                                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                                  value={paymentForm.paymentMode}
-                                  onChange={(e) => setPaymentForm(prev => ({ ...prev, paymentMode: e.target.value }))}
-                                >
-                                  <option value="Cash">Cash</option>
-                                  <option value="Card (POS)">Card (POS)</option>
-                                  <option value="UPI / QR">UPI / QR</option>
-                                  <option value="TPA Claims Credit">TPA Credit</option>
-                                </select>
-                              </div>
-                              <div>
-                                <label className="text-[10px] font-bold text-slate-500 block mb-1">Ref Transaction No</label>
-                                <input
-                                  type="text"
-                                  placeholder="REF-88127"
-                                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-                                  value={paymentForm.referenceNo}
-                                  onChange={(e) => setPaymentForm(prev => ({ ...prev, referenceNo: e.target.value }))}
-                                />
-                              </div>
-                            </div>
-
-                            <button
-                              type="submit"
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-1.5 w-full rounded-lg shadow-sm"
-                            >
-                              Log Bill Receipt
-                            </button>
-                          </div>
-                        </form>
-
-                        {/* Collect Deposit */}
-                        <form onSubmit={handleCollectDeposit} className="border p-4 bg-slate-50/50 rounded-2xl text-left">
-                          <h4 className="text-xs font-black text-slate-700 uppercase tracking-wide mb-3">Collect Inpatient Advance Deposit</h4>
-
-                          <div className="space-y-3">
-                            <div>
-                              <label className="text-[10px] font-bold text-slate-500 block mb-1">Deposit Amount (₹)</label>
-                              <input
-                                type="number"
-                                required
-                                placeholder="5000"
-                                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs outline-none"
-                                value={depositAmount}
-                                onChange={(e) => setDepositAmount(e.target.value)}
-                              />
-                            </div>
-                            <p className="text-[10px] text-slate-400 font-semibold leading-relaxed">Collecting advance deposits updates ledger credits, reducing net discharges bill balance requirements.</p>
-
-                            <button
-                              type="submit"
-                              className="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold py-1.5 w-full rounded-lg shadow-sm"
-                            >
-                              Append Deposit Credit
-                            </button>
-                          </div>
-                        </form>
-
-                      </div>
-
-                    </div>
-                  );
-                })() : (
-                  <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-sm">
-                    <ReceiptLong className="text-slate-300 text-5xl mb-2 mx-auto" />
-                    <h4 className="text-sm font-bold text-slate-600">No Billing Account Selected</h4>
-                    <p className="text-xs text-slate-400 mt-1">Select an active admitted patient ledger account to view details, add deposits, or make payments.</p>
-                  </div>
-                )}
-              </div>
-
-            </div>
-          )}
-
-          {/* ========================================================================= */}
-          {/* TAB 7: VISUAL BED MAP                                                    */}
-          {/* ========================================================================= */}
-          {activeTab === "Infrastructure" && (
-            <div className="space-y-6 text-left">
-              <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex flex-col md:flex-row justify-between md:items-center gap-4">
-                <div>
-                  <h3 className="text-base font-extrabold text-slate-800">Hospital Wards Map & Bed Occupancy</h3>
-                  <p className="text-xs text-slate-500">Real-time room occupancy grid status layout. Clean visual indicators representation.</p>
-                </div>
-                <div className="flex flex-wrap gap-2.5">
-                  <button
-                    onClick={() => setShowAddWardModal(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-4 rounded-xl flex items-center gap-1.5 shadow-sm transition-all"
-                  >
-                    <Add fontSize="small" /> Add Ward
-                  </button>
-                  <button
-                    onClick={() => {
-                      setAddRoomForm(prev => ({ ...prev, ward_id: wards[0]?.ward_id || "" }));
-                      setShowAddRoomModal(true);
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-4 rounded-xl flex items-center gap-1.5 shadow-sm transition-all"
-                  >
-                    <Add fontSize="small" /> Add Room
-                  </button>
-                  <button
-                    onClick={() => {
-                      setAddBedForm(prev => ({ ...prev, ward_id: wards[0]?.ward_id || "", room_id: "" }));
-                      setShowAddBedModal(true);
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-4 rounded-xl flex items-center gap-1.5 shadow-sm transition-all"
-                  >
-                    <Add fontSize="small" /> Add Bed
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-                {/* Visual Rooms Grid */}
-                <div className="lg:col-span-8 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                  <div className="space-y-5">
-                    {wards.map(ward => {
-                      const wardRooms = rooms.filter(r => r.ward_id === ward.ward_id);
-                      return (
-                        <div key={ward.ward_id} className="border rounded-xl overflow-hidden bg-slate-50/50 text-left">
-
-                          <div className="bg-slate-100 px-4 py-2 border-b flex justify-between items-center text-xs font-bold">
-                            <span className="text-slate-800 font-extrabold uppercase">{ward.ward_name} ({ward.floor})</span>
-                            <div className="flex items-center gap-3">
-                              <span className="text-blue-700">Capacity: {ward.capacity} Beds</span>
-                              <div className="flex gap-1.5 border-l pl-3 border-slate-300">
-                                <button
-                                  onClick={() => handleOpenEditWard(ward)}
-                                  className="text-blue-600 hover:text-blue-800 p-0.5"
-                                  title="Edit Ward"
-                                >
-                                  <Edit style={{ fontSize: 14 }} />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteWard(ward.ward_id)}
-                                  className="text-red-600 hover:text-red-800 p-0.5"
-                                  title="Delete Ward"
-                                >
-                                  <Delete style={{ fontSize: 14 }} />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {wardRooms.map(room => {
-                              const roomBeds = beds.filter(b => b.room_id === room.room_id);
-                              return (
-                                <div key={room.room_id} className="bg-white border border-slate-150 rounded-xl p-3 shadow-sm text-left">
-                                  <div className="flex items-center justify-between border-b pb-1.5 mb-2.5 text-xs font-bold">
-                                    <span className="text-slate-700">Room {room.room_number}</span>
-                                    <span className="text-blue-600">₹{room.daily_price}/day</span>
-                                  </div>
-
-                                  <div className="grid grid-cols-4 gap-2">
-                                    {roomBeds.map(bed => (
-                                      <div
-                                        key={bed.bed_id}
-                                        title={`Bed ${bed.bed_number} [O2: ${bed.is_oxygen_available ? "Yes" : "No"}] - Status: ${bed.status}`}
-                                        className={`p-2 rounded-lg border text-center transition-all ${bed.status === "Occupied"
-                                          ? "bg-blue-50 border-blue-200 text-blue-700"
-                                          : bed.status === "Reserved"
-                                            ? "bg-amber-100 border-amber-300 text-amber-800"
-                                            : bed.cleaning_status === "Needs Cleaning"
-                                              ? "bg-yellow-50 border-yellow-200 text-yellow-700 cursor-pointer hover:bg-yellow-100"
-                                              : "bg-emerald-50 border-emerald-200 text-emerald-700"
-                                          }`}
-                                        onClick={() => {
-                                          if (bed.cleaning_status === "Needs Cleaning") {
-                                            handleMarkBedClean(bed.bed_id);
-                                          }
-                                        }}
-                                      >
-                                        <Bed style={{ fontSize: 16 }} />
-                                        <p className="text-[8px] font-black mt-1 font-mono">{bed.bed_number}</p>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Base price list read only */}
-                <div className="lg:col-span-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm h-fit text-left">
-                  <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
-                    <Payments className="text-blue-500" fontSize="small" /> Standard Room Base Pricing
-                  </h3>
-
-                  <div className="space-y-3 text-xs border-b pb-3.5">
-                    {Object.keys(pricingConfig.wardCharges).map(k => (
-                      <div key={k} className="flex justify-between items-center text-xs">
-                        <span className="font-semibold text-slate-600">{k} Charges</span>
-                        <span className="font-bold text-slate-800">₹{pricingConfig.wardCharges[k]} / Day</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-4 space-y-2 text-xs">
-                    <div className="flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-wider">Legend Status Indicators</div>
-                    <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 bg-emerald-100 border border-emerald-300 rounded-sm"></span> Available Clean Beds</div>
-                    <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 bg-blue-100 border border-blue-300 rounded-sm"></span> Occupied Beds</div>
-                    <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 bg-yellow-100 border border-yellow-200 rounded-sm"></span> Cleaning & Sanitization</div>
-                  </div>
-                </div>
-
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Priority Level</label>
+                <select
+                  value={transferForm.priority}
+                  onChange={(e) => setTransferForm({ ...transferForm, priority: e.target.value })}
+                  className="w-full text-sm px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50/30"
+                  required
+                >
+                  <option value="Routine">Routine</option>
+                  <option value="Urgent">Urgent</option>
+                  <option value="Emergency">Emergency</option>
+                </select>
               </div>
             </div>
-          )}
 
-          {/* ========================================================================= */}
-          {/* TAB 8: AUDIT TRAILS                                                      */}
-          {/* ========================================================================= */}
-          {activeTab === "Audit Trail" && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm text-left">
-              <div className="border-b pb-3 mb-4 flex justify-between items-center">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-800">Inpatient Registry Desk Logs</h3>
-                  <p className="text-xs text-slate-500">Chronological history log of desk admissions, bed reservations, cancellations, transfers, and clearance billing payments.</p>
-                </div>
-                <span className="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-xl">Logs: {auditLogs.length}</span>
-              </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Target Ward Location</label>
+              <select
+                className="w-full text-sm px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50/30 font-semibold text-gray-900"
+                value={transferForm.newWard}
+                onChange={(e) => setTransferForm({ ...transferForm, newWard: e.target.value })}
+                required
+              >
+                <option value="">Select Ward...</option>
+                {wards
+                  .filter(w => w.name !== selectedPatient.ward && w.availableBeds > 0)
+                  .map(ward => (
+                    <option key={ward.id} value={ward.name}>
+                      {ward.name} ({ward.availableBeds} beds left) • ₹{ward.rate}/day
+                    </option>
+                  ))}
+              </select>
+            </div>
 
-              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
-                {auditLogs.map((log, idx) => (
-                  <div key={idx} className="border border-slate-100 p-3.5 rounded-xl hover:bg-slate-50 flex justify-between items-start gap-4 text-left">
-                    <div className="flex items-start gap-3">
-                      <span className={`p-2 rounded-lg mt-0.5 shrink-0 ${log.action === "Emergency Admission" ? "bg-red-100 text-red-600" :
-                        log.action === "Discharge Completion" ? "bg-emerald-100 text-emerald-600" :
-                          log.action === "Transfer" ? "bg-blue-100 text-blue-600" :
-                            "bg-slate-100 text-slate-600"
-                        }`}>
-                        <Info fontSize="small" />
-                      </span>
-                      <div>
-                        <span className="inline-block bg-slate-100 text-slate-700 text-[8px] font-black uppercase px-2 py-0.2 rounded mb-1">{log.action}</span>
-                        <p className="text-xs text-slate-700 font-medium">{log.detail}</p>
-                        <p className="text-[10px] text-slate-400 font-bold mt-1">Authorized User: {log.user}</p>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-mono text-slate-400 font-bold shrink-0">{log.timestamp}</span>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Clinical Reason</label>
+              <textarea
+                className="w-full text-sm px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50/30"
+                rows="3"
+                value={transferForm.reason}
+                onChange={(e) => setTransferForm({ ...transferForm, reason: e.target.value })}
+                placeholder="Briefly describe the clinical necessity for ward transfer..."
+              />
+            </div>
+
+            {/* Protocol Steps */}
+            <div className="p-4 border border-dashed border-gray-200 rounded-2xl">
+              <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <Assignment style={{ fontSize: 14 }} /> Transfer Protocol Checklist
+              </h5>
+              <div className="space-y-2">
+                {[
+                  'Room charges will auto-adjust upon completion',
+                  'Nursing stations & consultants will be alerted',
+                  'Verify all medical equipment is moved with patient'
+                ].map((note, idx) => (
+                  <div key={idx} className="flex items-start gap-2 text-[11px] text-gray-500 leading-relaxed">
+                    <div className="w-1 h-1 rounded-full bg-blue-400 mt-1.5 flex-shrink-0" />
+                    {note}
                   </div>
                 ))}
               </div>
             </div>
-          )}
-
-        </>
-      )}
-
-      {/* ========================================================================= */}
-      {/* MODALS SECTION                                                           */}
-      {/* ========================================================================= */}
-
-      {/* 1. Admissions allocation */}
-      <Modal
-        isOpen={showAdmitForm}
-        onClose={() => setShowAdmitForm(false)}
-        title="Admit Allocation"
-        size="md"
-      >
-        {admitPatientData && (
-          <form onSubmit={handleConfirmAdmission} className="space-y-4 text-left">
-            <div className="bg-slate-50 border p-3 rounded-xl text-xs space-y-1">
-              <p className="font-bold text-slate-700">Patient: {admitPatientData.name}</p>
-              <p className="text-slate-500 font-semibold">Diagnosis: {admitPatientData.diagnosis} | Recommend Ward: {admitPatientData.recommendedWard}</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-left">
-              <div>
-                <label className="text-xs font-bold text-slate-500 block mb-1">Ward Selection</label>
-                <select
-                  required
-                  name="ward_id"
-                  className="w-full bg-white border rounded-lg p-2 text-xs font-semibold"
-                  onChange={(e) => handleWardChangeInForm(e.target.value)}
-                >
-                  <option value="">Select Ward...</option>
-                  {wards.map(w => (
-                    <option key={w.ward_id} value={w.ward_id}>{w.ward_name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-500 block mb-1">Room No Selection</label>
-                <select
-                  required
-                  name="room_id"
-                  className="w-full bg-white border rounded-lg p-2 text-xs font-semibold"
-                  onChange={(e) => handleRoomChangeInForm(e.target.value)}
-                >
-                  <option value="">Select Room...</option>
-                  {availableRooms.map(r => (
-                    <option key={r.room_id} value={r.room_id}>Room {r.room_number}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <label className="text-xs font-bold text-slate-500 block mb-1">Bed No</label>
-                <select
-                  required
-                  name="bed_id"
-                  className="w-full bg-white border rounded-lg p-2 text-xs font-semibold"
-                >
-                  <option value="">Select Bed...</option>
-                  {availableBeds.map(b => (
-                    <option key={b.bed_id} value={b.bed_id}>Bed {b.bed_number}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-500 block mb-1">Consulting MD</label>
-                <select required name="consultant_id" className="w-full bg-white border rounded-lg p-2 text-xs font-semibold text-slate-700">
-                  {INITIAL_DOCTORS.map(d => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-500 block mb-1">Assigned Nurse</label>
-                <select required name="nurse_id" className="w-full bg-white border rounded-lg p-2 text-xs font-semibold text-slate-700">
-                  {INITIAL_NURSES.map(n => (
-                    <option key={n.id} value={n.id}>{n.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="bg-slate-50 p-4 border rounded-xl space-y-3">
-              <p className="text-[10px] font-black text-slate-400 uppercase">Insurance TPA & Deposit details</p>
-
-              <div className="grid grid-cols-3 gap-2 text-left">
-                <div>
-                  <label className="text-[9px] font-bold text-slate-500 block mb-1">Advance Deposit Paid (₹)</label>
-                  <input type="number" name="advancePaid" placeholder="5000" className="w-full bg-white border rounded p-1 text-xs" />
-                </div>
-                <div>
-                  <label className="text-[9px] font-bold text-slate-500 block mb-1">TPA Insurance Company</label>
-                  <input type="text" name="insuranceProvider" placeholder="e.g. Star Health" className="w-full bg-white border rounded p-1 text-xs" />
-                </div>
-                <div>
-                  <label className="text-[9px] font-bold text-slate-500 block mb-1">Policy Approval Limit (₹)</label>
-                  <input type="number" name="approvalLimit" placeholder="100000" className="w-full bg-white border rounded p-1 text-xs" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-left">
-                <div>
-                  <label className="text-[9px] font-bold text-slate-500 block mb-1">Copay Ratio (%)</label>
-                  <input type="number" name="copayPercent" placeholder="10" className="w-full bg-white border rounded p-1 text-xs" />
-                </div>
-                <div>
-                  <label className="text-[9px] font-bold text-slate-500 block mb-1">Policy ID No</label>
-                  <input type="text" name="policyNo" placeholder="POL-88126" className="w-full bg-white border rounded p-1 text-xs" />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <button type="button" onClick={() => setShowAdmitForm(false)} className="bg-slate-100 text-slate-700 text-xs font-bold py-2 px-4 rounded-xl">Cancel</button>
-              <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm">Confirm Admission</button>
-            </div>
-          </form>
+          </div>
         )}
       </Modal>
 
-      {/* 2. Regrets Form */}
-      <Modal
-        isOpen={showRegretModal}
-        onClose={() => setShowRegretModal(false)}
-        title="Regret Admission refusal documentation"
-        size="sm"
-      >
-        <form onSubmit={submitRegretAdmission} className="space-y-4 text-left">
-          <p className="text-xs text-slate-500">Capture reason details for OPD recommended patient admission refusal.</p>
-
-          <div>
-            <label className="text-xs font-bold text-slate-500 block mb-1">Refusal Reason</label>
-            <select
-              className="w-full bg-white border rounded-lg p-2 text-xs font-semibold text-slate-700"
-              value={regretForm.reason}
-              onChange={(e) => setRegretForm(prev => ({ ...prev, reason: e.target.value }))}
-            >
-              <option value="Financial issue">Financial issue</option>
-              <option value="Wants another hospital">Wants another hospital</option>
-              <option value="Personal reason">Personal reason</option>
-              <option value="Not interested">Not interested</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-slate-500 block mb-1">Comments Notes</label>
-            <textarea
-              rows="3" placeholder="Enter comments..."
-              className="w-full bg-white border rounded-lg p-2.5 text-xs outline-none focus:ring-2 focus:ring-blue-500"
-              value={regretForm.notes}
-              onChange={(e) => setRegretForm(prev => ({ ...prev, notes: e.target.value }))}
-            ></textarea>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-3 border-t">
-            <button type="button" onClick={() => setShowRegretModal(false)} className="bg-slate-100 text-slate-700 text-xs font-bold py-2 px-4 rounded-xl">Cancel</button>
-            <button type="submit" className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2 px-5 rounded-xl">Save Regret</button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* 3. Emergency admission */}
-      <Modal
-        isOpen={showEmergencyModal}
-        onClose={() => setShowEmergencyModal(false)}
-        title="Direct Emergency Admission Desk"
-        size="md"
-      >
-        <form onSubmit={handleEmergencyAdmissionSubmit} className="space-y-4 text-left">
-          <div className="grid grid-cols-2 gap-3 text-left">
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Patient Name</label>
-              <input
-                type="text" required placeholder="Patient name"
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-                value={emergencyForm.name}
-                onChange={(e) => setEmergencyForm(prev => ({ ...prev, name: e.target.value }))}
-              />
+      {/* Patient Detail Modal */}
+      {selectedPatient && !showTransferModal && !showDischargeModal && !showBillingModal && (
+        <Modal
+          isOpen={!!selectedPatient}
+          onClose={() => {
+            setSelectedPatient(null);
+            setActiveTab('Overview');
+          }}
+          title={
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-100">
+                <Hotel fontSize="medium" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-black text-slate-800 tracking-tight">Patient Clinical Record</h3>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${getStatusColor(selectedPatient.status)}`}>
+                    {selectedPatient.status}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-500 font-medium flex items-center gap-2 mt-0.5">
+                  <span className="text-slate-900 font-bold">{selectedPatient.patientName}</span>
+                  <span className="w-1 h-1 rounded-full bg-slate-300" />
+                  <span>ID: {selectedPatient.patientId}</span>
+                </p>
+              </div>
+            </div>
+          }
+          size="lg"
+          footer={
+            <div className="flex justify-end gap-3 w-full pt-4 border-t border-slate-100">
+              <button
+                className="btn bg-yellow-500  text-white flex items-center justify-center px-6 transition-all duration-200 shadow-md shadow-teal-100 font-bold text-xs  tracking-wider"
+                onClick={() => setShowRecordsModal(true)}
+              >
+                <MedicalInformation className="mr-2" style={{ fontSize: 18 }} /> Medical Records
+              </button>
+              <button
+                className={`btn flex items-center justify-center px-6 transition-all duration-200 shadow-md font-bold text-xs tracking-wider ${selectedPatient.status === 'Discharged' || selectedPatient.status === 'Discharge Pending'
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-100'
+                  }`}
+                onClick={() => selectedPatient.status !== 'Discharged' && selectedPatient.status !== 'Discharge Pending' && initiateTransfer(selectedPatient)}
+                disabled={selectedPatient.status === 'Discharged' || selectedPatient.status === 'Discharge Pending'}
+              >
+                <SwapHoriz className="mr-2" style={{ fontSize: 18 }} /> Transfer Ward
+              </button>
+              <button
+                className={`btn flex items-center justify-center px-6 transition-all duration-200 shadow-lg font-bold text-xs tracking-wider ${selectedPatient.status === 'Discharged' || selectedPatient.status === 'Discharge Pending'
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-100'
+                  }`}
+                onClick={() => selectedPatient.status !== 'Discharged' && selectedPatient.status !== 'Discharge Pending' && initiateDischarge(selectedPatient)}
+                disabled={selectedPatient.status === 'Discharged' || selectedPatient.status === 'Discharge Pending'}
+              >
+                <Logout className="mr-2" style={{ fontSize: 18 }} /> Discharge Patient
+              </button>
+            </div>
+          }
+        >
+          <div className="min-h-[480px]">
+            {/* Professional Tabs Navigation */}
+            <div className="flex items-center p-1.5 bg-slate-100/50 rounded-2xl border border-slate-200/60 mb-8 max-w-fit mx-auto">
+              {[
+                { id: 'Overview', icon: <Assignment style={{ fontSize: 18 }} />, label: 'Admission Overview' },
+                { id: 'Clinical', icon: <MonitorHeart style={{ fontSize: 18 }} />, label: 'Clinical Status' },
+                { id: 'Financial', icon: <Payments style={{ fontSize: 18 }} />, label: 'Financial Summary' }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2.5 px-6 py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl transition-all duration-300 ${activeTab === tab.id
+                    ? 'bg-white text-blue-600 shadow-md shadow-blue-50/50 scale-[1.02]'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/40'
+                    }`}
+                >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              ))}
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-left">
-              <div>
-                <label className="text-xs font-bold text-slate-500 block mb-1">Age</label>
-                <input
-                  type="number" required placeholder="42"
-                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-                  value={emergencyForm.age}
-                  onChange={(e) => setEmergencyForm(prev => ({ ...prev, age: e.target.value }))}
-                />
+            {/* Tab Content with refined alignment */}
+            <div className="px-2 pb-4">
+              {activeTab === 'Overview' && (
+                <div className="animate-fade-in space-y-8">
+                  {/* High-Level Demographics Card */}
+                  <div className="grid grid-cols-4 gap-0 divide-x divide-slate-100 border border-slate-100 rounded-2xl overflow-hidden bg-white shadow-sm">
+                    {[
+                      { label: 'Patient Age', value: `${selectedPatient.patientAge || 'N/A'} Years`, color: 'text-slate-900' },
+                      { label: 'Gender', value: selectedPatient.gender, color: 'text-slate-900' },
+                      { label: 'Blood Group', value: selectedPatient.bloodGroup || 'O+', color: 'text-rose-600 font-black' },
+                      { label: 'Admission ID', value: selectedPatient.id, color: 'text-blue-600' }
+                    ].map((item, idx) => (
+                      <div key={idx} className="p-4 text-center group hover:bg-slate-50 transition-colors">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">{item.label}</label>
+                        <p className={`text-sm font-bold ${item.color}`}>{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Primary Details Grid */}
+                  <div className="grid grid-cols-2 gap-8">
+                    {/* Left Column: Logistics */}
+                    <div className="space-y-6">
+                      <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Logistical Details</h4>
+                      <div className="grid grid-cols-1 gap-5">
+                        <div className="flex justify-between items-center group">
+                          <span className="text-sm text-slate-500">Admission Schedule</span>
+                          <div className="text-right">
+                            <p className="text-sm font-bold text-slate-800">{selectedPatient.admissionDate}</p>
+                            <p className="text-[11px] text-slate-400 font-medium">{selectedPatient.admissionTime || '09:00 AM'}</p>
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center group">
+                          <span className="text-sm text-slate-500">Est. Discharge Date</span>
+                          <p className="text-sm font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-100">
+                            {selectedPatient.estimatedDischarge || 'Not Finalized'}
+                          </p>
+                        </div>
+                        <div className="flex justify-between items-center group">
+                          <span className="text-sm text-slate-500">Ward Location</span>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-black uppercase">BED {selectedPatient.bed}</span>
+                            <span className="text-sm font-bold text-slate-800">{selectedPatient.ward}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right Column: Source & Contact */}
+                    <div className="space-y-6">
+                      <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Source & Emergency</h4>
+                      <div className="grid grid-cols-1 gap-5">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-slate-500">Admission Source</span>
+                          <span className="text-sm font-bold text-slate-800">{selectedPatient.admissionSource || 'OPD'}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-slate-500">Admission Type</span>
+                          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter ${selectedPatient.admissionType === 'Emergency' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-blue-50 text-blue-700 border border-blue-100'}`}>
+                            {selectedPatient.admissionType || 'Routine'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-slate-500">Emergency Contact</span>
+                          <span className="text-sm font-bold text-blue-600 underline underline-offset-4 decoration-blue-200">{selectedPatient.emergencyContact || '+91 00000 00000'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Clinical Status Banner */}
+                  <div className="p-5 bg-gradient-to-r from-slate-50 to-white border border-slate-200/60 rounded-2xl flex gap-4 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/50 rounded-full -mr-12 -mt-12 blur-2xl" />
+                    <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500 border border-amber-100 shrink-0">
+                      <History />
+                    </div>
+                    <div>
+                      <h5 className="text-sm font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                        Clinical Status: <span className="text-amber-600">{selectedPatient.status}</span>
+                      </h5>
+                      <p className="text-xs text-slate-500 leading-relaxed mt-1">
+                        Patient is currently stable and under continuous observation by <strong>{selectedPatient.consultant}</strong>.
+                        The recovery trajectory is <strong>{selectedPatient.status === 'Critical' ? 'Closely Monitored' : 'As Expected'}</strong>.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'Clinical' && (
+                <div className="animate-fade-in space-y-6">
+                  {/* Primary Diagnosis & Medical Team */}
+                  <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                    <div className="bg-slate-50/80 px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <MedicalInformation className="text-blue-500" />
+                        <h4 className="text-xs font-black text-slate-700 uppercase tracking-widest">Medical Assessment</h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-1 bg-blue-50 text-blue-700 text-[10px] font-black rounded-md uppercase border border-blue-100">{selectedPatient.caseType || 'Medical'} Case</span>
+                        <span className="px-2 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-black rounded-md uppercase border border-emerald-100">Verified</span>
+                      </div>
+                    </div>
+                    <div className="p-6 space-y-6">
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Primary Clinical Diagnosis</label>
+                        <p className="text-xl font-bold text-slate-900 leading-tight border-l-4 border-blue-500 pl-4 py-1">{selectedPatient.diagnosis}</p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-6 pt-2">
+                        <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 group transition-all hover:bg-blue-50/50">
+                          <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-100 group-hover:scale-105 transition-transform">
+                            {selectedPatient.consultant?.charAt(0) || 'D'}
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest block mb-0.5">Lead Consultant</label>
+                            <p className="font-bold text-slate-800 text-base">{selectedPatient.consultant}</p>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col justify-center">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Clinical Department</label>
+                          <p className="font-black text-slate-800 text-xs uppercase tracking-wider">{selectedPatient.department || 'Internal Medicine'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Monitoring & Observations */}
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                          <MonitorHeart style={{ fontSize: 18 }} />
+                        </div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Triage & Condition</label>
+                      </div>
+                      <div className="space-y-3.5">
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-slate-500 font-medium">Triage Priority</span>
+                          <span className={`font-black px-2 py-0.5 rounded ${selectedPatient.triageLevel === 'Critical' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                            {selectedPatient.triageLevel || 'Routine'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-slate-500 font-medium">Current Status</span>
+                          <span className="text-slate-900 font-bold">{selectedPatient.initialCondition || 'Stable'}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-slate-500 font-medium">Clinical Referral</span>
+                          <span className="text-slate-900 font-bold">{selectedPatient.referredBy || 'Direct Walk-in'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
+                          <Assignment style={{ fontSize: 18 }} />
+                        </div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Clinical Protocol</label>
+                      </div>
+                      <div className="space-y-3.5 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 font-medium">Vital Signs Status</span>
+                          <span className="text-emerald-600 font-black flex items-center gap-1.5 text-xs uppercase">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Normalized
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 font-medium">Nursing Observation</span>
+                          <span className="text-blue-600 font-black text-xs uppercase italic">Active Phase</span>
+                        </div>
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-50 mt-1">
+                          <span className="text-blue-600 font-bold underline underline-offset-4 cursor-pointer text-[11px] flex items-center gap-2 hover:text-blue-800 transition-colors">
+                            <MedicalInformation style={{ fontSize: 16 }} /> Download Clinical Summary
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedPatient.admissionNotes && (
+                    <div className="p-5 bg-slate-50 border border-dashed border-slate-200 rounded-2xl relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-2 opacity-10">
+                        <Assignment style={{ fontSize: 48 }} />
+                      </div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Physician&apos;s Admission Notes</label>
+                      <p className="text-sm text-slate-700 italic leading-relaxed relative z-10">
+                        &ldquo;{selectedPatient.admissionNotes}&rdquo;
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'Financial' && (
+                <div className="animate-fade-in space-y-8">
+                  {/* Financial Stats Grid */}
+                  <div className="grid grid-cols-3 gap-6">
+                    <div className="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm group hover:border-blue-200 transition-colors">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Daily Ward Rate</p>
+                      <p className="text-2xl font-black text-slate-900 group-hover:text-blue-600 transition-colors">₹{selectedPatient.roomCharges?.toLocaleString()}</p>
+                      <p className="text-[10px] text-slate-400 font-medium mt-1 uppercase tracking-tight">Based on {selectedPatient.ward}</p>
+                    </div>
+                    <div className="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm group hover:border-blue-200 transition-colors">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Observation Tenure</p>
+                      <p className="text-2xl font-black text-slate-900 group-hover:text-blue-600 transition-colors">5 Days</p>
+                      <p className="text-[10px] text-slate-400 font-medium mt-1 uppercase tracking-tight">Since {selectedPatient.admissionDate}</p>
+                    </div>
+                    <div className="p-6 bg-blue-600 text-white rounded-2xl shadow-xl shadow-blue-100 flex flex-col justify-center relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10 blur-xl" />
+                      <p className="text-[10px] font-black text-blue-100 uppercase tracking-widest mb-2 relative z-10">Est. Total Outstanding</p>
+                      <p className="text-3xl font-black relative z-10">₹{selectedPatient.totalBill?.toLocaleString()}</p>
+                    </div>
+                  </div>
+
+                  {/* Billing Breakdown Detailed Card */}
+                  <div className="bg-slate-50/50 rounded-2xl p-6 border border-slate-200 shadow-inner">
+                    <h5 className="text-[11px] font-black text-slate-500 mb-6 flex items-center gap-3 uppercase tracking-widest">
+                      <ReceiptLong className="text-blue-500" style={{ fontSize: 18 }} /> Estimated Billing Breakdown
+                    </h5>
+                    <div className="space-y-4">
+                      {[
+                        { label: 'Accommodation & Nursing (Standard Ward)', amount: selectedPatient.roomCharges * 5 },
+                        { label: 'Medical Consumables & Diagnostics', amount: 3000 },
+                        { label: 'Consultation & Clinical Supervision Fees', amount: 3000 }
+                      ].map((charge, idx) => (
+                        <div key={idx} className="flex justify-between items-center group">
+                          <div className="flex items-center gap-3">
+                            <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                            <span className="text-sm text-slate-600 font-medium">{charge.label}</span>
+                          </div>
+                          <span className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">₹{charge.amount.toLocaleString()}</span>
+                        </div>
+                      ))}
+
+                      <div className="pt-6 mt-6 border-t-2 border-slate-200 border-dashed flex justify-between items-end">
+                        <div className="space-y-1">
+                          <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest block">Final Estimated Outstanding</span>
+                          <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-tight bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Verified by Accounts</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-3xl font-black text-slate-900 tracking-tighter">₹{selectedPatient.totalBill?.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Financial Note */}
+                  <p className="text-[11px] text-slate-400 text-center italic">
+                    Note: Financial details are estimated based on current clinical progress and ward rates. Final billing subject to discharge audit.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Medical Records Modal */}
+      {selectedPatient && (
+        <Modal
+          isOpen={showRecordsModal}
+          onClose={() => setShowRecordsModal(false)}
+          title={
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                <MedicalInformation />
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-500 block mb-1">Gender</label>
+                <h3 className="text-xl font-bold text-gray-900 leading-tight">Medical Records Vault</h3>
+                <p className="text-sm text-gray-500 font-normal">Patient: {selectedPatient.patientName}</p>
+              </div>
+            </div>
+          }
+          size="lg"
+          footer={
+            <div className="flex justify-end gap-3 w-full border-t pt-4">
+              <button
+                className="btn bg-gray-100 hover:bg-gray-200 text-gray-700 px-6"
+                onClick={() => setShowRecordsModal(false)}
+              >
+                Close
+              </button>
+              <button
+                className="btn bg-blue-600 hover:bg-blue-700 text-white flex items-center px-6 shadow-md shadow-blue-100"
+                onClick={() => window.print()}
+              >
+                <ReceiptLong className="mr-2" fontSize="small" /> Print
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+            {/* Quick Stats */}
+            <div className="grid grid-cols-4 gap-4">
+              <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Blood Type</p>
+                <p className="text-lg font-bold text-gray-900">O+ Positive</p>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Allergies</p>
+                <p className="text-lg font-bold text-red-600">Penicillin</p>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Last Visit</p>
+                <p className="text-lg font-bold text-gray-900">12 Feb 2024</p>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Risk Factor</p>
+                <p className="text-lg font-bold text-amber-600">Moderate</p>
+              </div>
+            </div>
+
+            {/* Records Sections */}
+            <div className="space-y-4">
+              <div className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
+                <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2 mb-3">
+                  <Assignment className="text-blue-600" fontSize="small" /> Clinical History & Notes
+                </h4>
+                <div className="space-y-3">
+                  <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-50">
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs font-bold text-blue-700 uppercase">Admission Diagnosis</span>
+                      <span className="text-[10px] text-gray-500 font-medium">{selectedPatient.admissionDate}</span>
+                    </div>
+                    <p className="text-sm text-gray-800 leading-relaxed">{selectedPatient.diagnosis}</p>
+                    <p className="text-xs text-gray-500 mt-2 italic">— Dr. {selectedPatient.consultant}</p>
+                  </div>
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs font-bold text-gray-700 uppercase">Follow-up Observation</span>
+                      <span className="text-[10px] text-gray-500 font-medium">Today, 10:30 AM</span>
+                    </div>
+                    <p className="text-sm text-gray-800 leading-relaxed">Patient showing signs of improvement. Vital signs are stable. Recommended continued monitoring for next 24 hours.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
+                  <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2 mb-3">
+                    <MonitorHeart className="text-rose-600" fontSize="small" /> Vital Sign Trends
+                  </h4>
+                  <div className="space-y-2">
+                    {[
+                      { label: 'Pulse Rate', value: '72 bpm', status: 'Normal' },
+                      { label: 'SPO2', value: '98%', status: 'Normal' },
+                      { label: 'Temperature', value: '98.6°F', status: 'Normal' }
+                    ].map((v, i) => (
+                      <div key={i} className="flex justify-between items-center text-xs p-2 hover:bg-gray-50 rounded transition-colors">
+                        <span className="text-gray-600">{v.label}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-gray-900">{v.value}</span>
+                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">{v.status}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
+                  <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2 mb-3">
+                    <ReceiptLong className="text-indigo-600" fontSize="small" /> Prescribed Medications
+                  </h4>
+                  <div className="space-y-2">
+                    {[
+                      { name: 'Amoxicillin 500mg', dose: '1-0-1', timing: 'After Meals' },
+                      { name: 'Paracetamol 650mg', dose: '1-1-1', timing: 'As needed' },
+                      { name: 'Vitamin C 500mg', dose: '0-1-0', timing: 'After Meals' }
+                    ].map((m, i) => (
+                      <div key={i} className="text-xs p-2 hover:bg-gray-50 rounded transition-colors border-l-2 border-indigo-200">
+                        <p className="font-bold text-gray-900">{m.name}</p>
+                        <p className="text-gray-500 mt-0.5">{m.dose} • {m.timing}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      <Modal
+        isOpen={showDischargeModal}
+        onClose={() => {
+          setShowDischargeModal(false);
+          setSelectedPatient(null);
+          setDischargeForm({
+            dischargeDate: new Date().toISOString().split('T')[0],
+            dischargeTime: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+            dischargeType: 'Normal',
+            dischargeCondition: 'Stable',
+            dischargeMode: 'Walk',
+            finalDiagnosis: '',
+            treatmentSummary: '',
+            dischargeMedications: '',
+            dosageInstructions: '',
+            medicationDuration: '',
+            dietInstructions: '',
+            followUpDate: '',
+            vitalsAtDischarge: {
+              bp: '',
+              pulse: '',
+              temp: '',
+              spo2: ''
+            },
+            billingStatus: 'Pending',
+            totalBillAmount: '',
+            paidAmount: '',
+            pendingAmount: '',
+            paymentMode: 'Cash',
+            handoverTo: '',
+            handoverRelationship: '',
+            attendantSignature: false,
+            dischargeNotes: ''
+          });
+        }}
+        title="Discharge Initiation"
+        size="lg"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => {
+                setShowDischargeModal(false);
+                setSelectedPatient(null);
+                setDischargeForm({
+                  dischargeDate: new Date().toISOString().split('T')[0],
+                  dischargeTime: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+                  dischargeType: 'Normal',
+                  dischargeCondition: 'Stable',
+                  dischargeMode: 'Walk',
+                  finalDiagnosis: '',
+                  treatmentSummary: '',
+                  dischargeMedications: '',
+                  dosageInstructions: '',
+                  medicationDuration: '',
+                  dietInstructions: '',
+                  followUpDate: '',
+                  vitalsAtDischarge: {
+                    bp: '',
+                    pulse: '',
+                    temp: '',
+                    spo2: ''
+                  },
+                  billingStatus: 'Pending',
+                  totalBillAmount: '',
+                  paidAmount: '',
+                  pendingAmount: '',
+                  paymentMode: 'Cash',
+                  handoverTo: '',
+                  handoverRelationship: '',
+                  attendantSignature: false,
+                  dischargeNotes: ''
+                });
+              }}
+              className="btn bg-gray-200 hover:bg-gray-300 text-gray-900"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleConfirmDischarge(selectedPatient.id)}
+              className="btn bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center px-8 shadow-lg shadow-purple-100"
+            >
+              <Logout className="mr-2" fontSize="small" /> Proceed with Discharge
+            </button>
+          </div>
+        }
+      >
+        {selectedPatient && (
+          <div className="space-y-8">
+            {/* Header Notification */}
+            <div className="flex items-center gap-4 p-4 border border-purple-100 rounded-2xl shadow-sm">
+              <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center border border-purple-100">
+                <Logout className="text-purple-600" />
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-bold text-slate-800">Initiate Discharge Process</h4>
+                <p className="text-xs text-slate-500 leading-relaxed mt-0.5">
+                  Starting the discharge workflow for <strong className="text-slate-700">{selectedPatient.patientName}</strong>. This includes final medical summary and billing clearance.
+                </p>
+              </div>
+            </div>
+
+            {/* Section: Patient & Financial Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h5 className="text-xs font-bold text-gray-700 tracking-wider">Patient Summary</h5>
+                <div className="grid grid-cols-2 gap-y-3 gap-x-4">
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] text-gray-400 font-bold">Patient Name</p>
+                    <p className="text-sm font-bold text-slate-800">{selectedPatient.patientName}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] text-gray-400 font-bold">Patient ID</p>
+                    <p className="text-xs font-bold text-gray-700">{selectedPatient.patientId}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] text-gray-400 font-bold">Age / Gender</p>
+                    <p className="text-xs font-bold text-gray-700">{selectedPatient.patientAge}Y / {selectedPatient.gender}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] text-gray-400 font-bold">Admission ID</p>
+                    <p className="text-xs font-bold text-gray-700">{selectedPatient.id}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] text-gray-400 font-bold">Adm. Date & Time</p>
+                    <p className="text-xs font-bold text-gray-700">{selectedPatient.admissionDate} • {selectedPatient.admissionTime}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] text-gray-400 font-bold">Ward / Bed</p>
+                    <p className="text-xs font-bold text-gray-700">{selectedPatient.ward} • {selectedPatient.bed}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] text-gray-400 font-bold">Consultant</p>
+                    <p className="text-xs font-bold text-gray-700">{selectedPatient.consultant}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h5 className="text-xs font-bold text-gray-700 tracking-wider flex justify-between items-center">
+                  <span>Financial Summary</span>
+                  <span className="text-[10px] font-medium text-emerald-600 italic">Estimated</span>
+                </h5>
+                <div className="space-y-3 p-4 bg-gray-50/50 rounded-xl border border-gray-100">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-500">Room Charges</span>
+                    <span className="text-gray-700 font-bold">₹{selectedPatient.roomCharges?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-500">Est. Misc Charges</span>
+                    <span className="text-gray-700 font-bold">₹{(selectedPatient.totalBill * 0.15).toFixed(0).toLocaleString()}</span>
+                  </div>
+                  <div className="pt-2 mt-2 border-t border-gray-200 flex justify-between items-center">
+                    <span className="text-xs font-bold text-gray-800">Final Outstanding</span>
+                    <span className="text-lg font-black text-emerald-700">₹{selectedPatient.totalBill?.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Section: Discharge Parameters */}
+            <div className="space-y-4">
+              <h5 className="text-xs font-bold text-gray-700 tracking-wider">Discharge Documentation</h5>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700">Discharge Date <span className="text-red-500">*</span></label>
+                  <input
+                    type="date"
+                    value={dischargeForm.dischargeDate}
+                    onChange={(e) => setDischargeForm({ ...dischargeForm, dischargeDate: e.target.value })}
+                    className="form-input"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700">Discharge Time <span className="text-red-500">*</span></label>
+                  <input
+                    type="time"
+                    value={dischargeForm.dischargeTime}
+                    onChange={(e) => setDischargeForm({ ...dischargeForm, dischargeTime: e.target.value })}
+                    className="form-input"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700">Discharge Type <span className="text-red-500">*</span></label>
+                  <select
+                    value={dischargeForm.dischargeType}
+                    onChange={(e) => setDischargeForm({ ...dischargeForm, dischargeType: e.target.value })}
+                    className="form-input"
+                    required
+                  >
+                    <option value="Normal">Normal Discharge</option>
+                    <option value="LAMA">LAMA (Against Medical Advice)</option>
+                    <option value="Transfer">Medical Transfer</option>
+                    <option value="Death">Death (Expired)</option>
+                    <option value="Absconded">Absconded</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700">Condition at Discharge <span className="text-red-500">*</span></label>
+                  <select
+                    value={dischargeForm.dischargeCondition}
+                    onChange={(e) => setDischargeForm({ ...dischargeForm, dischargeCondition: e.target.value })}
+                    className="form-input"
+                    required
+                  >
+                    <option value="Recovered">Recovered</option>
+                    <option value="Improved">Improved</option>
+                    <option value="Stable">Stable</option>
+                    <option value="Critical">Critical</option>
+                    <option value="Expired">Expired</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700">Discharge Mode <span className="text-red-500">*</span></label>
+                  <select
+                    value={dischargeForm.dischargeMode}
+                    onChange={(e) => setDischargeForm({ ...dischargeForm, dischargeMode: e.target.value })}
+                    className="form-input"
+                    required
+                  >
+                    <option value="Walk">Walk</option>
+                    <option value="Wheelchair">Wheelchair</option>
+                    <option value="Stretcher">Stretcher</option>
+                    <option value="Ambulance">Ambulance</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700">Final Medical Diagnosis <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={dischargeForm.finalDiagnosis}
+                    onChange={(e) => setDischargeForm({ ...dischargeForm, finalDiagnosis: e.target.value })}
+                    className="form-input"
+                    placeholder="E.g., Resolved Acute Bronchitis"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700">Clinical Course & Summary <span className="text-red-500">*</span></label>
+                  <textarea
+                    value={dischargeForm.treatmentSummary}
+                    onChange={(e) => setDischargeForm({ ...dischargeForm, treatmentSummary: e.target.value })}
+                    className="form-input"
+                    rows="4"
+                    placeholder="Brief overview of treatment and hospital course..."
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700">Diet Instructions</label>
+                  <textarea
+                    value={dischargeForm.dietInstructions}
+                    onChange={(e) => setDischargeForm({ ...dischargeForm, dietInstructions: e.target.value })}
+                    className="form-input"
+                    rows="4"
+                    placeholder="E.g., Low salt diet, Soft food only..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Section: Medication & Prescription */}
+            <div className="space-y-4">
+              <h5 className="text-xs font-bold text-gray-700 tracking-wider">Medication & Prescription</h5>
+
+              <div className="form-group">
+                <label className="form-label font-bold text-gray-700">Discharge Medications <span className="text-red-500">*</span></label>
+                <textarea
+                  value={dischargeForm.dischargeMedications}
+                  onChange={(e) => setDischargeForm({ ...dischargeForm, dischargeMedications: e.target.value })}
+                  className="form-input"
+                  rows="3"
+                  placeholder="List medications to be continued at home..."
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700">Dosage Instructions</label>
+                  <input
+                    type="text"
+                    value={dischargeForm.dosageInstructions}
+                    onChange={(e) => setDischargeForm({ ...dischargeForm, dosageInstructions: e.target.value })}
+                    className="form-input"
+                    placeholder="E.g., 1-0-1 after food"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700">Duration of Medication</label>
+                  <input
+                    type="text"
+                    value={dischargeForm.medicationDuration}
+                    onChange={(e) => setDischargeForm({ ...dischargeForm, medicationDuration: e.target.value })}
+                    className="form-input"
+                    placeholder="E.g., 5 days, 2 weeks"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Section: Billing & Financial Clearance */}
+            <div className="space-y-4">
+              <h5 className="text-xs font-bold text-gray-700 tracking-wider">Billing & Financial Clearance</h5>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700">Total Bill Amount <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">₹</span>
+                    <input
+                      type="number"
+                      value={dischargeForm.totalBillAmount}
+                      onChange={(e) => {
+                        const total = e.target.value;
+                        const pending = total - (dischargeForm.paidAmount || 0);
+                        setDischargeForm({ ...dischargeForm, totalBillAmount: total, pendingAmount: pending });
+                      }}
+                      className="form-input pl-7"
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700">Paid Amount <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">₹</span>
+                    <input
+                      type="number"
+                      value={dischargeForm.paidAmount}
+                      onChange={(e) => {
+                        const paid = e.target.value;
+                        const pending = (dischargeForm.totalBillAmount || 0) - paid;
+                        setDischargeForm({ ...dischargeForm, paidAmount: paid, pendingAmount: pending });
+                      }}
+                      className="form-input pl-7"
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700">Pending Amount</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">₹</span>
+                    <input
+                      type="number"
+                      value={dischargeForm.pendingAmount}
+                      className="form-input pl-7 bg-gray-50 font-bold text-red-600"
+                      readOnly
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700">Payment Mode</label>
+                  <select
+                    value={dischargeForm.paymentMode}
+                    onChange={(e) => setDischargeForm({ ...dischargeForm, paymentMode: e.target.value })}
+                    className="form-input"
+                  >
+                    <option value="Cash">Cash</option>
+                    <option value="Card">Card</option>
+                    <option value="UPI">UPI</option>
+                    <option value="Insurance">Insurance</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700">Billing Status <span className="text-red-500">*</span></label>
+                  <select
+                    value={dischargeForm.billingStatus}
+                    onChange={(e) => setDischargeForm({ ...dischargeForm, billingStatus: e.target.value })}
+                    className="form-input"
+                    required
+                  >
+                    <option value="Cleared">Cleared</option>
+                    <option value="Pending">Pending</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Logistics Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="form-group">
+                <label className="form-label font-bold text-gray-700">Follow-up Date</label>
+                <input
+                  type="date"
+                  value={dischargeForm.followUpDate}
+                  onChange={(e) => setDischargeForm({ ...dischargeForm, followUpDate: e.target.value })}
+                  className="form-input"
+                />
+              </div>
+            </div>
+
+            {/* Section: Handover & Responsibility */}
+            <div className="space-y-4">
+              <h5 className="text-xs font-bold text-gray-700 tracking-wider">Handover & Responsibility</h5>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700">Patient Handover To <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={dischargeForm.handoverTo}
+                    onChange={(e) => setDischargeForm({ ...dischargeForm, handoverTo: e.target.value })}
+                    className="form-input"
+                    placeholder="Relative/Guardian name"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700">Relationship <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={dischargeForm.handoverRelationship}
+                    onChange={(e) => setDischargeForm({ ...dischargeForm, handoverRelationship: e.target.value })}
+                    className="form-input"
+                    placeholder="e.g., Spouse, Parent, Sibling"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-group flex flex-col justify-end">
+                <label className="flex items-center gap-2 p-3 rounded-xl border border-gray-100 hover:bg-gray-50 cursor-pointer transition-all">
+                  <input
+                    type="checkbox"
+                    checked={dischargeForm.attendantSignature}
+                    onChange={(e) => setDischargeForm({ ...dischargeForm, attendantSignature: e.target.checked })}
+                    className="w-4 h-4 rounded text-purple-600 border-gray-300 focus:ring-purple-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Attendant Signature Verified</span>
+                  <span className="text-[10px] text-gray-400 font-normal ml-auto">(Optional)</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Exit Vitals Section */}
+            <div className="space-y-4">
+              <h5 className="text-xs font-bold text-gray-700 tracking-wider">Exit Vitals</h5>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="form-group">
+                  <label className="text-[10px] font-bold text-gray-500">BP (mmHg)</label>
+                  <input
+                    type="text"
+                    value={dischargeForm.vitalsAtDischarge.bp}
+                    onChange={(e) => setDischargeForm({
+                      ...dischargeForm,
+                      vitalsAtDischarge: { ...dischargeForm.vitalsAtDischarge, bp: e.target.value }
+                    })}
+                    className="form-input"
+                    placeholder="120/80"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="text-[10px] font-bold text-gray-500">Pulse (bpm)</label>
+                  <input
+                    type="text"
+                    value={dischargeForm.vitalsAtDischarge.pulse}
+                    onChange={(e) => setDischargeForm({
+                      ...dischargeForm,
+                      vitalsAtDischarge: { ...dischargeForm.vitalsAtDischarge, pulse: e.target.value }
+                    })}
+                    className="form-input"
+                    placeholder="72"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="text-[10px] font-bold text-gray-500">Temp (°F)</label>
+                  <input
+                    type="text"
+                    value={dischargeForm.vitalsAtDischarge.temp}
+                    onChange={(e) => setDischargeForm({
+                      ...dischargeForm,
+                      vitalsAtDischarge: { ...dischargeForm.vitalsAtDischarge, temp: e.target.value }
+                    })}
+                    className="form-input"
+                    placeholder="98.6"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="text-[10px] font-bold text-gray-500">SPO2 (%)</label>
+                  <input
+                    type="text"
+                    value={dischargeForm.vitalsAtDischarge.spo2}
+                    onChange={(e) => setDischargeForm({
+                      ...dischargeForm,
+                      vitalsAtDischarge: { ...dischargeForm.vitalsAtDischarge, spo2: e.target.value }
+                    })}
+                    className="form-input"
+                    placeholder="98%"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Section: Checklist */}
+            <div className="p-5 border border-dashed border-gray-200 rounded-2xl bg-gray-50/30">
+              <h5 className="text-[10px] font-bold text-gray-400 tracking-widest mb-4 flex items-center gap-2">
+                <Assignment style={{ fontSize: 14 }} /> Discharge Clearance Checklist
+              </h5>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[
+                  'Final consultation summary signed',
+                  'Nursing & Ward clearance completed',
+                  'Pharmacy medication return processed',
+                  'All lab/radiology reports handed over',
+                  'Patient belongings verified & returned',
+                  'Billing clearance & receipt generated'
+                ].map((item, index) => (
+                  <label key={index} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-white cursor-pointer transition-all hover:shadow-sm">
+                    <input type="checkbox" className="w-4 h-4 rounded text-purple-600 border-gray-300 focus:ring-purple-500" />
+                    <span className="text-[11px] font-medium text-gray-600">{item}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={showBillingModal}
+        onClose={() => {
+          setShowBillingModal(false);
+          setSelectedPatient(null);
+        }}
+        title={`Update Bill: ${selectedPatient?.patientName || ''}`}
+        size="md"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => {
+                setShowBillingModal(false);
+                setSelectedPatient(null);
+                setPendingCharges([]);
+              }}
+              className="btn bg-gray-100 hover:bg-gray-200 text-gray-700"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleUpdateBill(selectedPatient.id)}
+              className="btn bg-yellow-600 hover:bg-yellow-700 text-white flex items-center justify-center px-8 shadow-lg shadow-yellow-100"
+            >
+              <Payments className="mr-2" fontSize="small" /> Save Billing Changes
+            </button>
+          </div>
+        }
+      >
+        {selectedPatient && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200">
+              <div>
+                <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Current Outstanding</p>
+                <p className="text-2xl font-bold text-slate-900">₹{selectedPatient.totalBill}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Patient ID</p>
+                <p className="font-medium text-slate-700">{selectedPatient.patientId}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h5 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Add New Charges</h5>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-group">
+                  <label className="form-label">Charge Category</label>
+                  <select
+                    className="form-input"
+                    value={billingForm.category}
+                    onChange={(e) => setBillingForm({ ...billingForm, category: e.target.value })}
+                  >
+                    <option>Pharmacy / Medications</option>
+                    <option>Laboratory / Investigations</option>
+                    <option>Radiology / Imaging</option>
+                    <option>Nursing Charges</option>
+                    <option>Consumables</option>
+                    <option>Miscellaneous</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Amount (₹)</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    placeholder="0.00"
+                    value={billingForm.amount}
+                    onChange={(e) => setBillingForm({ ...billingForm, amount: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Description / Remarks</label>
+                <textarea
+                  className="form-input"
+                  rows="2"
+                  placeholder="Itemized details..."
+                  value={billingForm.description}
+                  onChange={(e) => setBillingForm({ ...billingForm, description: e.target.value })}
+                ></textarea>
+              </div>
+
+              <button
+                onClick={addCharge}
+                className="w-full btn border-dashed border-2 border-slate-300 text-slate-500 hover:bg-slate-50 hover:border-slate-400 py-3 flex items-center justify-center gap-2"
+              >
+                <Close style={{ transform: 'rotate(45deg)', fontSize: 18 }} /> Add to Pending Items
+              </button>
+            </div>
+
+            {pendingCharges.length > 0 && (
+              <div className="bg-yellow-50/50 p-4 rounded-xl border border-yellow-100">
+                <h5 className="text-xs font-bold text-yellow-700 uppercase tracking-wider mb-3">Pending Items to Add</h5>
+                <div className="space-y-2">
+                  {pendingCharges.map((item) => (
+                    <div key={item.id} className="flex justify-between items-center bg-white p-2.5 rounded-lg border border-yellow-100 shadow-sm text-sm">
+                      <div>
+                        <p className="font-semibold text-gray-900">{item.category}</p>
+                        <p className="text-[10px] text-gray-500">{item.description || 'No description'}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="font-bold text-gray-900">₹{item.amount}</span>
+                        <button
+                          onClick={() => removePendingCharge(item.id)}
+                          className="text-red-400 hover:text-red-600 p-1"
+                        >
+                          <Close style={{ fontSize: 14 }} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="pt-2 border-t border-yellow-100 flex justify-between items-center text-sm font-bold text-yellow-800">
+                    <span>Total Pending</span>
+                    <span>₹{pendingCharges.reduce((sum, c) => sum + parseFloat(c.amount), 0)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="pt-4 border-t">
+              <h5 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Recent Transactions</h5>
+              <div className="space-y-2">
+                {[
+                  { date: '2023-10-15', desc: 'Pharmacy - Antibiotics', amt: 1250 },
+                  { date: '2023-10-14', desc: 'Lab - Blood Test (CBC)', amt: 850 }
+                ].map((t, i) => (
+                  <div key={i} className="flex justify-between items-center p-3 bg-slate-50/50 border border-slate-100 rounded-lg text-sm grayscale opacity-70">
+                    <div>
+                      <p className="font-medium text-slate-700">{t.desc}</p>
+                      <p className="text-[10px] text-gray-500 uppercase">{t.date}</p>
+                    </div>
+                    <span className="font-bold text-slate-600">₹{t.amt}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Unified Ward Modal */}
+      <Modal
+        isOpen={showAddWardModal || showEditWardModal}
+        onClose={() => {
+          setShowAddWardModal(false);
+          setShowEditWardModal(false);
+          setSelectedWard(null);
+        }}
+        title={selectedWard ? "Edit Ward Details" : "Create New Ward"}
+        size="md"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => {
+                setShowAddWardModal(false);
+                setShowEditWardModal(false);
+                setSelectedWard(null);
+              }}
+              className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={selectedWard ? handleEditWard : handleAddWard}
+              className="btn bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg shadow-blue-100 font-semibold"
+            >
+              {selectedWard ? <><Edit className="mr-1" fontSize="small" /> Save Changes</> : <><Add className="mr-1" fontSize="small" /> Save Ward</>}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4 text-left p-1">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Ward Name <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                className="form-input w-full text-sm"
+                placeholder="e.g. General Medicine Wing A"
+                value={wardForm.ward_name}
+                onChange={(e) => setWardForm({ ...wardForm, ward_name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Ward Type</label>
+              <select
+                className="form-input w-full text-sm"
+                value={wardForm.ward_type}
+                onChange={(e) => setWardForm({ ...wardForm, ward_type: e.target.value })}
+              >
+                <option value="General">General</option>
+                <option value="ICU">ICU</option>
+                <option value="Semi-Private">Semi-Private</option>
+                <option value="Private">Private</option>
+                <option value="Deluxe">Deluxe</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Floor Number <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                className="form-input w-full text-sm"
+                placeholder="e.g. 1"
+                value={wardForm.floor_number}
+                onChange={(e) => setWardForm({ ...wardForm, floor_number: e.target.value })}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Department</label>
+              <select
+                className="form-input w-full text-sm"
+                value={wardForm.department_id}
+                onChange={(e) => setWardForm({ ...wardForm, department_id: e.target.value })}
+              >
+                {departments.map((dept, i) => (
+                  <option key={i} value={dept}>{dept}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Total Rooms</label>
+              <input
+                type="number"
+                className="form-input w-full text-sm"
+                value={wardForm.total_rooms}
+                onChange={(e) => setWardForm({ ...wardForm, total_rooms: parseInt(e.target.value) || 0 })}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Total Beds</label>
+              <input
+                type="number"
+                className="form-input w-full text-sm"
+                value={wardForm.total_beds}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value) || 0;
+                  if (selectedWard) {
+                    setWardForm({ ...wardForm, total_beds: val });
+                  } else {
+                    setWardForm({ ...wardForm, total_beds: val, available_beds: val });
+                  }
+                }}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Daily Charge (₹)</label>
+              <input
+                type="number"
+                className="form-input w-full text-sm"
+                value={wardForm.rate}
+                onChange={(e) => setWardForm({ ...wardForm, rate: parseFloat(e.target.value) || 0 })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="form-group col-span-2">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Ward Status</label>
+              <select
+                className="form-input w-full text-sm"
+                value={wardForm.ward_status}
+                onChange={(e) => setWardForm({ ...wardForm, ward_status: e.target.value })}
+              >
+                <option value="Active">Active</option>
+                <option value="Maintenance">Maintenance</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+
+
+      {/* Unified Room Modal */}
+      <Modal
+        isOpen={showAddRoomModal || showEditRoomModal}
+        onClose={() => {
+          setShowAddRoomModal(false);
+          setShowEditRoomModal(false);
+          setSelectedRoom(null);
+        }}
+        title={selectedRoom ? "Edit Room Details" : "Add New Room"}
+        size="md"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => {
+                setShowAddRoomModal(false);
+                setShowEditRoomModal(false);
+                setSelectedRoom(null);
+              }}
+              className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={selectedRoom ? handleEditRoom : handleAddRoom}
+              className="btn bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg shadow-blue-100 font-semibold"
+            >
+              {selectedRoom ? <><Edit className="mr-1" fontSize="small" /> Save Changes</> : <><Add className="mr-1" fontSize="small" /> Save Room</>}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4 text-left p-1">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Room Number <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                className="form-input w-full text-sm"
+                placeholder="e.g. 101"
+                value={roomForm.room_number}
+                onChange={(e) => setRoomForm({ ...roomForm, room_number: e.target.value })}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Select Ward Location <span className="text-red-500">*</span></label>
+              <select
+                className="form-input w-full text-sm"
+                value={roomForm.ward_id}
+                onChange={(e) => setRoomForm({ ...roomForm, ward_id: e.target.value })}
+                required
+              >
+                <option value="">Select Ward...</option>
+                {wards.map(w => (
+                  <option key={w.ward_id || w.id} value={w.ward_id || w.id}>{w.ward_name || w.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Room Type</label>
+              <select
+                className="form-input w-full text-sm"
+                value={roomForm.room_type}
+                onChange={(e) => setRoomForm({ ...roomForm, room_type: e.target.value })}
+              >
+                <option value="General">General</option>
+                <option value="ICU">ICU</option>
+                <option value="Semi-Private">Semi-Private</option>
+                <option value="Private">Private</option>
+                <option value="Deluxe">Deluxe</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Floor Number</label>
+              <input
+                type="text"
+                className="form-input w-full text-sm"
+                placeholder="e.g. 1"
+                value={roomForm.floor_number}
+                onChange={(e) => setRoomForm({ ...roomForm, floor_number: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Room Status</label>
+              <select
+                className="form-input w-full text-sm"
+                value={roomForm.room_status}
+                onChange={(e) => setRoomForm({ ...roomForm, room_status: e.target.value })}
+              >
+                <option value="Available">Available</option>
+                <option value="Occupied">Occupied</option>
+                <option value="Maintenance">Maintenance</option>
+                <option value="Reserved">Reserved</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Daily Charge (₹)</label>
+              <input
+                type="number"
+                className="form-input w-full text-sm"
+                value={roomForm.daily_charge}
+                onChange={(e) => setRoomForm({ ...roomForm, daily_charge: parseFloat(e.target.value) || 0 })}
+              />
+            </div>
+          </div>
+
+        </div>
+      </Modal>
+
+      {/* Unified Bed Modal */}
+      <Modal
+        isOpen={showAddBedModal || showEditBedModal}
+        onClose={() => {
+          setShowAddBedModal(false);
+          setShowEditBedModal(false);
+          setSelectedBed(null);
+        }}
+        title={selectedBed ? "Edit Bed Details" : "Add New Bed"}
+        size="md"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => {
+                setShowAddBedModal(false);
+                setShowEditBedModal(false);
+                setSelectedBed(null);
+              }}
+              className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={selectedBed ? handleEditBed : handleAddBed}
+              className="btn bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg shadow-blue-100 font-semibold"
+            >
+              {selectedBed ? <><Edit className="mr-1" fontSize="small" /> Save Changes</> : <><Add className="mr-1" fontSize="small" /> Save Bed</>}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4 text-left p-1">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Bed Number <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                className="form-input w-full text-sm"
+                placeholder="e.g. 101A"
+                value={bedForm.bed_number}
+                onChange={(e) => setBedForm({ ...bedForm, bed_number: e.target.value })}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Bed Type</label>
+              <select
+                className="form-input w-full text-sm"
+                value={bedForm.bed_type}
+                onChange={(e) => setBedForm({ ...bedForm, bed_type: e.target.value })}
+              >
+                <option value="General">General</option>
+                <option value="ICU">ICU</option>
+                <option value="Semi-Private">Semi-Private</option>
+                <option value="Private">Private</option>
+                <option value="Deluxe">Deluxe</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Select Ward <span className="text-red-500">*</span></label>
+              <select
+                className="form-input w-full text-sm"
+                value={bedForm.ward_id}
+                onChange={(e) => setBedForm({ ...bedForm, ward_id: e.target.value, room_id: '' })}
+                required
+              >
+                <option value="">Select Ward...</option>
+                {wards.map(w => (
+                  <option key={w.ward_id || w.id} value={w.ward_id || w.id}>{w.ward_name || w.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Select Room <span className="text-red-500">*</span></label>
+              <select
+                className="form-input w-full text-sm"
+                value={bedForm.room_id}
+                onChange={(e) => setBedForm({ ...bedForm, room_id: e.target.value })}
+                required
+                disabled={!bedForm.ward_id}
+              >
+                <option value="">Select Room...</option>
+                {rooms
+                  .filter(r => r.ward_id === bedForm.ward_id)
+                  .map(r => (
+                    <option key={r.room_id} value={r.room_id}>Room {r.room_number}</option>
+                  ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Bed Status</label>
+              <select
+                className="form-input w-full text-sm"
+                value={bedForm.bed_status}
+                onChange={(e) => setBedForm({ ...bedForm, bed_status: e.target.value })}
+              >
+                <option value="Available">Available</option>
+                <option value="Occupied">Occupied</option>
+                <option value="Maintenance">Maintenance</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Bed Daily Charges (₹)</label>
+              <input
+                type="number"
+                className="form-input w-full text-sm"
+                value={bedForm.bed_charges}
+                onChange={(e) => setBedForm({ ...bedForm, bed_charges: parseFloat(e.target.value) || 0 })}
+              />
+            </div>
+          </div>
+
+          {bedForm.bed_status === 'Occupied' && !selectedBed && (
+            <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-xl space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Patient ID</label>
+                  <select
+                    className="form-input w-full text-xs py-1.5"
+                    value={bedForm.patient_id}
+                    onChange={(e) => setBedForm({ ...bedForm, patient_id: e.target.value })}
+                  >
+                    <option value="">Select Patient...</option>
+                    {allPatients.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.id})</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Assigned Date</label>
+                  <input
+                    type="date"
+                    className="form-input w-full text-xs py-1.5"
+                    value={bedForm.assigned_date}
+                    onChange={(e) => setBedForm({ ...bedForm, assigned_date: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Assigned Time</label>
+                  <input
+                    type="time"
+                    className="form-input w-full text-xs py-1.5"
+                    value={bedForm.assigned_time}
+                    onChange={(e) => setBedForm({ ...bedForm, assigned_time: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Est. Vacant Date</label>
+                  <input
+                    type="date"
+                    className="form-input w-full text-xs py-1.5"
+                    value={bedForm.vacant_date}
+                    onChange={(e) => setBedForm({ ...bedForm, vacant_date: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Bed Category</label>
+              <select className="form-input w-full text-sm" value={bedForm.bed_category} onChange={(e) => setBedForm({ ...bedForm, bed_category: e.target.value })}>
+                <option value="Standard">Standard</option>
+                <option value="Premium">Premium</option>
+                <option value="VIP">VIP</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-sm">Bed Priority</label>
+              <select className="form-input w-full text-sm" value={bedForm.bed_priority} onChange={(e) => setBedForm({ ...bedForm, bed_priority: e.target.value })}>
+                <option value="Normal">Normal</option>
+                <option value="Urgent">Urgent</option>
+                <option value="Emergency">Emergency</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Cleaning Status</label>
+              <select className="form-input w-full text-xs py-1.5" value={bedForm.bed_cleaning_status} onChange={(e) => setBedForm({ ...bedForm, bed_cleaning_status: e.target.value })}>
+                <option value="Clean">Clean</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Needs Cleaning">Needs Cleaning</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Last Cleaned At</label>
+              <input type="datetime-local" className="form-input w-full text-xs py-1.5" value={bedForm.last_cleaned_at} onChange={(e) => setBedForm({ ...bedForm, last_cleaned_at: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Maintenance</label>
+              <select className="form-input w-full text-xs py-1.5" value={bedForm.bed_maintenance_status} onChange={(e) => setBedForm({ ...bedForm, bed_maintenance_status: e.target.value })}>
+                <option value="Operational">Operational</option>
+                <option value="Under Maintenance">Under Maintenance</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-4 p-3 bg-slate-50 border border-slate-200 rounded-xl mt-2">
+            <label className="flex items-center gap-2 cursor-pointer font-semibold text-xs text-gray-700">
+              <input
+                type="checkbox"
+                checked={bedForm.is_oxygen_available}
+                onChange={(e) => setBedForm({ ...bedForm, is_oxygen_available: e.target.checked })}
+                className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500"
+              />
+              Oxygen Supported
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer font-semibold text-xs text-gray-700">
+              <input
+                type="checkbox"
+                checked={bedForm.ventilator_available}
+                onChange={(e) => setBedForm({ ...bedForm, ventilator_available: e.target.checked })}
+                className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500"
+              />
+              Ventilator Supported
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer font-semibold text-xs text-gray-700">
+              <input
+                type="checkbox"
+                checked={bedForm.cleaning_required}
+                onChange={(e) => setBedForm({ ...bedForm, cleaning_required: e.target.checked })}
+                className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500"
+              />
+              Cleaning Required
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer font-semibold text-xs text-gray-700">
+              <input type="checkbox" checked={bedForm.monitor_attached} onChange={(e) => setBedForm({ ...bedForm, monitor_attached: e.target.checked })} className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500" />
+              Monitor Attached
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer font-semibold text-xs text-gray-700">
+              <input type="checkbox" checked={bedForm.ecg_available} onChange={(e) => setBedForm({ ...bedForm, ecg_available: e.target.checked })} className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500" />
+              ECG Available
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer font-semibold text-xs text-gray-700">
+              <input type="checkbox" checked={bedForm.suction_available} onChange={(e) => setBedForm({ ...bedForm, suction_available: e.target.checked })} className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500" />
+              Suction Available
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer font-semibold text-xs text-gray-700">
+              <input type="checkbox" checked={bedForm.oxygen_flow_meter} onChange={(e) => setBedForm({ ...bedForm, oxygen_flow_meter: e.target.checked })} className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500" />
+              Oxygen Flow Meter
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer font-semibold text-xs text-gray-700">
+              <input type="checkbox" checked={bedForm.nurse_call_system} onChange={(e) => setBedForm({ ...bedForm, nurse_call_system: e.target.checked })} className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500" />
+              Nurse Call System
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer font-semibold text-xs text-gray-700">
+              <input type="checkbox" checked={bedForm.smart_bed_enabled} onChange={(e) => setBedForm({ ...bedForm, smart_bed_enabled: e.target.checked })} className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500" />
+              Smart Bed
+            </label>
+          </div>
+        </div>
+      </Modal>
+      {/* Unified Nurse Assignment Modal (Add & Edit) */}
+      <Modal
+        isOpen={showAddNurseModal}
+        onClose={() => {
+          setShowAddNurseModal(false);
+          setSelectedNurseAssignment(null);
+        }}
+        title="New Nurse Assignment"
+        size="lg"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => {
+                setShowAddNurseModal(false);
+                setSelectedNurseAssignment(null);
+              }}
+              className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleAddNurseAssignment}
+              className="btn bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg shadow-blue-100 font-semibold"
+            >
+              <Add className="mr-1" fontSize="small" /> Save Assignment
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-5 text-left p-1">
+          {/* Assignment Information Section */}
+          <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200/60">
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-1.5">
+              <Assignment style={{ fontSize: 16 }} className="text-blue-500" />
+              Nurse Assignment Details
+            </h4>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Select Nurse Dropdown */}
+              <div className="form-group">
+                <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Select Nurse <span className="text-red-500">*</span></label>
                 <select
-                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                  value={emergencyForm.gender}
-                  onChange={(e) => setEmergencyForm(prev => ({ ...prev, gender: e.target.value }))}
+                  className="form-input w-full text-xs"
+                  value={nurseForm.nurse_id || ''}
+                  onChange={(e) => setNurseForm({ ...nurseForm, nurse_id: e.target.value })}
+                  required
                 >
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
+                  <option value="">Select Nurse by Name...</option>
+                  {availableNurses.map(n => (
+                    <option key={n.id} value={n.id}>{n.name} ({n.id} - {n.specialty})</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Select Patient Dropdown */}
+              <div className="form-group">
+                <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Select Patient <span className="text-red-500">*</span></label>
+                <select
+                  className="form-input w-full text-xs"
+                  value={nurseForm.patient_id || ''}
+                  onChange={(e) => setNurseForm({ ...nurseForm, patient_id: e.target.value })}
+                  required
+                >
+                  <option value="">Select Patient...</option>
+                  {allPatients.map(p => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.id})</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Select Ward Dropdown */}
+              <div className="form-group">
+                <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Select Ward <span className="text-red-500">*</span></label>
+                <select
+                  className="form-input w-full text-xs"
+                  value={nurseForm.ward_id || ''}
+                  onChange={(e) => setNurseForm({ ...nurseForm, ward_id: e.target.value })}
+                  required
+                >
+                  <option value="">Select Ward...</option>
+                  {wards.map(w => (
+                    <option key={w.ward_id || w.id} value={w.ward_id || w.id}>{w.ward_name || w.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Select Shift */}
+              <div className="form-group">
+                <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Select Shift</label>
+                <select
+                  className="form-input w-full text-xs"
+                  value={nurseForm.shift_type || 'Morning'}
+                  onChange={(e) => setNurseForm({ ...nurseForm, shift_type: e.target.value })}
+                >
+                  <option value="Morning">Morning Shift</option>
+                  <option value="Evening">Evening Shift</option>
+                  <option value="Night">Night Shift</option>
+                </select>
+              </div>
+
+              {/* Assigned Date */}
+              <div className="form-group">
+                <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Assigned Date</label>
+                <input
+                  type="date"
+                  className="form-input w-full text-xs"
+                  value={nurseForm.assigned_date || ''}
+                  onChange={(e) => setNurseForm({ ...nurseForm, assigned_date: e.target.value })}
+                />
+              </div>
+
+              {/* Vitals Schedule */}
+              <div className="form-group">
+                <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Vitals Monitoring Frequency</label>
+                <select
+                  className="form-input w-full text-xs"
+                  value={nurseForm.vitals_monitoring_frequency || 'Every 4 Hours'}
+                  onChange={(e) => setNurseForm({ ...nurseForm, vitals_monitoring_frequency: e.target.value })}
+                >
+                  <option value="Every 1 Hour">Every 1 Hour</option>
+                  <option value="Every 2 Hours">Every 2 Hours</option>
+                  <option value="Every 4 Hours">Every 4 Hours</option>
+                  <option value="Every 6 Hours">Every 6 Hours</option>
+                  <option value="Every 8 Hours">Every 8 Hours</option>
+                  <option value="Once a Shift">Once a Shift</option>
                 </select>
               </div>
             </div>
           </div>
 
-          <div>
-            <label className="text-xs font-bold text-slate-500 block mb-1">Triage Condition Case</label>
-            <input
-              type="text" required placeholder="Myocardial Infarction / Trauma Injury"
-              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-              value={emergencyForm.diagnosis}
-              onChange={(e) => setEmergencyForm(prev => ({ ...prev, diagnosis: e.target.value }))}
-            />
-          </div>
+          {/* Prescribed Cycles Section */}
+          <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200/60">
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-1.5">
+              <span>🩺</span> Doctor-Prescribed Cycles
+            </h4>
 
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Select Ward</label>
-              <select
-                required
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                value={emergencyForm.ward_id}
-                onChange={(e) => {
-                  setEmergencyForm(prev => ({ ...prev, ward_id: e.target.value }));
-                  handleWardChangeInForm(e.target.value);
-                }}
-              >
-                <option value="">Select Ward...</option>
-                {wards.map(w => (
-                  <option key={w.ward_id} value={w.ward_id}>{w.ward_name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Select Room</label>
-              <select
-                required
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                value={emergencyForm.room_id}
-                onChange={(e) => {
-                  setEmergencyForm(prev => ({ ...prev, room_id: e.target.value }));
-                  handleRoomChangeInForm(e.target.value);
-                }}
-              >
-                <option value="">Select Room...</option>
-                {availableRooms.map(r => (
-                  <option key={r.room_id} value={r.room_id}>Room {r.room_number}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Select Bed</label>
-              <select
-                required
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                value={emergencyForm.bed_id}
-                onChange={(e) => setEmergencyForm(prev => ({ ...prev, bed_id: e.target.value }))}
-              >
-                <option value="">Select Bed...</option>
-                {availableBeds.map(b => (
-                  <option key={b.bed_id} value={b.bed_id}>Bed {b.bed_number}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 text-left">
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Consulting MD</label>
-              <select
-                required
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                value={emergencyForm.consultant_id}
-                onChange={(e) => setEmergencyForm(prev => ({ ...prev, consultant_id: e.target.value }))}
-              >
-                <option value="">Select Doctor...</option>
-                {INITIAL_DOCTORS.map(d => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Advance Credit Paid (₹)</label>
-              <input
-                type="number" placeholder="5000"
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-                value={emergencyForm.advancePaid}
-                onChange={(e) => setEmergencyForm(prev => ({ ...prev, advancePaid: e.target.value }))}
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <button type="button" onClick={() => setShowEmergencyModal(false)} className="bg-slate-100 text-slate-700 text-xs font-bold py-2 px-4 rounded-xl">Cancel</button>
-            <button type="submit" className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2 px-5 rounded-xl shadow-md">Confirm Emergency Admission</button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* 4. Bed Transfer */}
-      <Modal
-        isOpen={showTransferModal}
-        onClose={() => setShowTransferModal(false)}
-        title="Execute Bed / Room Transfer"
-        size="md"
-      >
-        <form onSubmit={handleConfirmTransfer} className="space-y-4 text-left">
-          <div className="bg-slate-50 border p-3 rounded-xl text-xs space-y-1">
-            <p className="font-bold text-slate-700">Current Occupancy Allocation Location:</p>
-            <p className="text-slate-500 font-semibold">
-              Ward: {transferForm.currentWard} | Room: {transferForm.currentRoom} | Bed: {transferForm.currentBed}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">New Ward</label>
-              <select
-                required
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                value={transferForm.newWardId}
-                onChange={(e) => {
-                  setTransferForm(prev => ({ ...prev, newWardId: e.target.value }));
-                  handleWardChangeInForm(e.target.value);
-                }}
-              >
-                <option value="">Select Ward...</option>
-                {wards.map(w => (
-                  <option key={w.ward_id} value={w.ward_id}>{w.ward_name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">New Room</label>
-              <select
-                required
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                value={transferForm.newRoomId}
-                onChange={(e) => {
-                  setTransferForm(prev => ({ ...prev, newRoomId: e.target.value }));
-                  handleRoomChangeInForm(e.target.value);
-                }}
-              >
-                <option value="">Select Room...</option>
-                {availableRooms.map(r => (
-                  <option key={r.room_id} value={r.room_id}>Room {r.room_number}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">New Bed</label>
-              <select
-                required
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                value={transferForm.newBedId}
-                onChange={(e) => setTransferForm(prev => ({ ...prev, newBedId: e.target.value }))}
-              >
-                <option value="">Select Bed...</option>
-                {availableBeds.map(b => (
-                  <option key={b.bed_id} value={b.bed_id}>Bed {b.bed_number}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-slate-500 block mb-1">Reason Transfer Details</label>
-            <input
-              type="text" required placeholder="Clinical upgradation / Cardiac monitor ICU requirement"
-              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-              value={transferForm.reason}
-              onChange={(e) => setTransferForm(prev => ({ ...prev, reason: e.target.value }))}
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <button type="button" onClick={() => setShowTransferModal(false)} className="bg-slate-100 text-slate-700 text-xs font-bold py-2 px-4 rounded-xl">Cancel</button>
-            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-5 rounded-xl shadow">Confirm Transfer</button>
-          </div>
-        </form>
-      </Modal>
-
-
-      {/* 6. Medical Profile details view with Simulation buttons */}
-      <Modal
-        isOpen={showDetailsModal}
-        onClose={() => setShowDetailsModal(false)}
-        title="Patient Medical Profile Desk"
-        size="lg"
-      >
-        {selectedAdmission && (() => {
-          const adm = selectedAdmission;
-          const matchedWard = wards.find(w => w.ward_id === adm.ward_id);
-          const matchedRoom = rooms.find(r => r.room_id === adm.room_id);
-          const matchedBed = beds.find(b => b.bed_id === adm.bed_id);
-          const doc = INITIAL_DOCTORS.find(d => d.id === adm.consultant_id);
-          const nurse = INITIAL_NURSES.find(n => n.id === adm.nurse_id);
-
-          return (
-            <div className="space-y-6 text-left p-1 text-xs">
-
-              {/* TOP HEADER */}
-              <div className="bg-slate-50 border p-4 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-black text-slate-900">{adm.patientName}</h3>
-                  <p className="text-xs text-slate-500 font-bold mt-0.5">Patient ID: {adm.patientId} | Age/Gender: {adm.age} yrs / {adm.gender}</p>
-                  <p className="text-[10px] text-slate-400 font-bold mt-0.5">Admitted Location: {matchedWard?.ward_name} (Room {matchedRoom?.room_number} • Bed {matchedBed?.bed_number})</p>
-                  <p className="text-[10px] text-slate-400 font-bold mt-0.5">Consultant: {doc?.name || "None"} | Assigned Nurse: {nurse?.name || "None"}</p>
-                </div>
-
-                <div className="flex flex-col items-end gap-1.5 shrink-0">
-                  <span className={`px-3 py-1 rounded-lg text-xs font-black uppercase tracking-wider ${adm.status === "Critical" ? "bg-red-100 text-red-800" :
-                    adm.status === "Discharge Pending" ? "bg-amber-100 text-amber-800" :
-                      "bg-blue-100 text-blue-800"
-                    }`}>{adm.status}</span>
-                  <p className="text-[10px] text-slate-400 font-bold">Admission Date: {adm.admissionDate} ({adm.admissionTime})</p>
-                </div>
-              </div>
-
-              {/* SIMULATION ZONE FOR GRADING */}
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                <p className="text-xs font-black text-blue-800 flex items-center gap-1.5 uppercase tracking-wide">
-                  <MonitorHeart fontSize="small" /> Inpatient Clinical Simulation Desk
-                </p>
-                <p className="text-[10px] text-blue-700 mt-1 font-semibold leading-relaxed">
-                  As Doctor/Nurse views are removed from this page, use these simulation triggers to append clinical records, log vitals, prescribe medications, or trigger discharge recommendations, which dynamically update the billing and discharge ledger.
-                </p>
-
-                <div className="flex flex-wrap gap-2.5 mt-3">
-                  <button
-                    onClick={() => handleSimulateNurseVitals(adm)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase py-1.5 px-3.5 rounded-lg shadow-sm"
-                  >
-                    🩺 Simulate Vitals Log
-                  </button>
-                  <button
-                    onClick={() => handleSimulateDoctorRound(adm)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black uppercase py-1.5 px-3.5 rounded-lg shadow-sm"
-                  >
-                    📝 Simulate Round & Meds
-                  </button>
-                  {adm.status !== "Discharge Pending" && adm.status !== "Discharged" && (
-                    <button
-                      onClick={() => handleSimulateDoctorDischarge(adm)}
-                      className="bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-black uppercase py-1.5 px-3.5 rounded-lg shadow-sm"
-                    >
-                      🚀 Propose Discharge Recommendation
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* DETAILS PANEL GRID */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                {/* Read only vitals history */}
-                <div className="border rounded-xl p-4 bg-slate-50/50">
-                  <h4 className="font-black text-slate-800 border-b pb-2 mb-3">Vitals Monitoring Timeline</h4>
-                  <div className="space-y-3.5 max-h-[220px] overflow-y-auto pr-1">
-                    {(vitals[adm.admissionNo] || []).length === 0 ? (
-                      <p className="text-[10px] italic text-slate-400 py-3 text-center">No vital readings logged.</p>
-                    ) : (
-                      (vitals[adm.admissionNo] || []).map((vt, idx) => (
-                        <div key={idx} className="border bg-white rounded-xl p-2.5 space-y-1.5 shadow-sm text-left">
-                          <div className="flex justify-between text-[8px] font-bold text-slate-400">
-                            <span>{vt.timestamp}</span>
-                            <span>Logged by: {vt.nurse}</span>
-                          </div>
-                          <div className="grid grid-cols-4 gap-1 text-center font-bold text-[10px] text-slate-800">
-                            <div><span className="text-[8px] block text-slate-400">BP</span>{vt.bp}</div>
-                            <div><span className="text-[8px] block text-slate-400">Pulse</span>{vt.pulse} bpm</div>
-                            <div><span className="text-[8px] block text-slate-400">SPO2</span>{vt.spo2}%</div>
-                            <div><span className="text-[8px] block text-slate-400">Temp</span>{vt.temp}°F</div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                {/* Read only Doctor Rounds Progress Notes */}
-                <div className="border rounded-xl p-4 bg-slate-50/50">
-                  <h4 className="font-black text-slate-800 border-b pb-2 mb-3">Doctor Rounds Progress Logs</h4>
-                  <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
-                    {(clinicalNotes[adm.admissionNo] || []).length === 0 ? (
-                      <p className="text-[10px] italic text-slate-400 py-3 text-center">No round notes logged.</p>
-                    ) : (
-                      (clinicalNotes[adm.admissionNo] || []).map((note, idx) => (
-                        <div key={idx} className="border bg-white rounded-xl p-2.5 space-y-1.5 shadow-sm text-left">
-                          <div className="flex justify-between text-[8px] font-bold text-slate-400">
-                            <span>{note.timestamp} • {note.type}</span>
-                            <span>Author: {note.author}</span>
-                          </div>
-                          <p className="text-[11px] text-slate-600 font-medium italic">&quot;{note.notes}&quot;</p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Medication MAR Record */}
-              <div className="border rounded-xl p-4 bg-slate-50/50 text-left">
-                <h4 className="font-black text-slate-800 border-b pb-2 mb-3">Active Inpatient Medication MAR Chart</h4>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[160px] overflow-y-auto pr-1">
-                  {(medications[adm.admissionNo] || []).length === 0 ? (
-                    <p className="text-[10px] italic text-slate-400 py-3 text-center col-span-2">No medications active.</p>
-                  ) : (
-                    (medications[adm.admissionNo] || []).map(med => (
-                      <div key={med.id} className="border bg-white p-2.5 rounded-xl flex items-center justify-between gap-3 shadow-sm">
-                        <div>
-                          <p className="font-bold text-slate-800 text-[11px]">{med.medicine}</p>
-                          <p className="text-[9px] text-slate-400 mt-0.5">Frequency: {med.frequency}</p>
-                        </div>
-                        <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${med.status === "Administered" ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"
-                          }`}>{med.status}</span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-            </div>
-          );
-        })()}
-      </Modal>
-
-      {/* 7. Billing Invoice accounts check */}
-      <Modal
-        isOpen={showBillViewModal}
-        onClose={() => setShowBillViewModal(false)}
-        title="Patient Billing Ledger Desk"
-        size="lg"
-      >
-        {billingAuditNo && admissions.find(a => a.admissionNo === billingAuditNo) && (() => {
-          const patient = admissions.find(a => a.admissionNo === billingAuditNo);
-          const bills = billing[billingAuditNo] || [];
-          const summary = getBillingSummary(billingAuditNo);
-          return (
-            <div className="space-y-6 text-left p-1 text-xs">
-              <div className="border-b pb-3 flex justify-between items-center">
-                <div>
-                  <h3 className="text-base font-extrabold text-slate-900">{patient.patientName}</h3>
-                  <p className="text-xs text-slate-500 font-semibold">ADM ID: {patient.admissionNo} | Status: {patient.status}</p>
-                </div>
-
-                <button
-                  onClick={() => handlePrintDischarge(patient)}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-1.5 px-3 rounded-lg border flex items-center gap-1"
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Treatment Cycle Pattern */}
+              <div className="form-group col-span-1">
+                <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Treatment Cycle Pattern</label>
+                <select
+                  className="form-input w-full text-xs"
+                  value={nurseForm.treatment_cycle || 'Standard Day Cycle'}
+                  onChange={(e) => setNurseForm({ ...nurseForm, treatment_cycle: e.target.value })}
                 >
-                  <Print fontSize="small" /> Statement Print
-                </button>
+                  <option value="Standard Day Cycle">Standard Day Cycle</option>
+                  <option value="Triple Action Meds Cycle (TID)">Triple Action Meds Cycle (TID)</option>
+                  <option value="Continuous IV Infusion / Drip Check">Continuous IV Infusion / Drip Check</option>
+                  <option value="Intensive Cardiac Post-Op Cycle">Intensive Cardiac Post-Op Cycle</option>
+                  <option value="Diabetes Management Plan">Diabetes Management Plan</option>
+                </select>
               </div>
 
-              {/* Items */}
-              <div className="border rounded-xl overflow-hidden">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-50 text-slate-500 font-black uppercase tracking-wider border-b">
-                    <tr>
-                      <th className="px-4 py-2">Date</th>
-                      <th className="px-4 py-2">Category</th>
-                      <th className="px-4 py-2">Description</th>
-                      <th className="px-4 py-2 text-right">Charges (₹)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y text-slate-700">
-                    {bills.map(item => (
-                      <tr key={item.id} className="hover:bg-slate-50/50">
-                        <td className="px-4 py-2">{item.date}</td>
-                        <td className="px-4 py-2 font-bold">{item.category}</td>
-                        <td className="px-4 py-2 text-slate-500">{item.description}</td>
-                        <td className="px-4 py-2 text-right font-bold text-slate-900">₹{item.amount}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Summary totals */}
-              <div className="bg-slate-50 border p-4 rounded-xl space-y-1.5 text-xs text-left">
-                <div className="flex justify-between border-b pb-1 text-slate-500">
-                  <span>Gross Invoice Total:</span>
-                  <span className="font-bold text-slate-900">₹{summary.total}</span>
-                </div>
-                <div className="flex justify-between border-b pb-1 text-slate-500">
-                  <span>Advance Deposits / Credits:</span>
-                  <span className="font-bold text-emerald-600">- ₹{summary.advance}</span>
-                </div>
-                {patient.insurance?.isTpaEnabled && (
-                  <div className="flex justify-between border-b pb-1 text-slate-500">
-                    <span>Insurance direct direct coverage claim:</span>
-                    <span className="font-bold text-blue-600">- ₹{summary.insuranceAmt}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-base font-black text-slate-900 pt-1.5">
-                  <span>Total Due Outstanding:</span>
-                  <span className="text-red-600">₹{summary.pendingAmt}</span>
-                </div>
-              </div>
-
-              {/* Forms payment logs */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                <form onSubmit={handleProcessPayment} className="border p-4 bg-slate-50/50 rounded-xl text-left">
-                  <h4 className="text-xs font-black text-slate-700 uppercase mb-3">Clear Outstanding Invoice</h4>
-
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Payment Amount (₹)</label>
-                      <input
-                        type="number" required placeholder={summary.pendingAmt}
-                        className="w-full bg-white border rounded p-2 text-xs outline-none focus:ring-2 focus:ring-blue-500"
-                        value={paymentForm.amount}
-                        onChange={(e) => setPaymentForm(prev => ({ ...prev, amount: e.target.value }))}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 block mb-1">Receipt Mode</label>
-                        <select
-                          className="w-full bg-white border rounded p-2 text-xs font-semibold text-slate-700 outline-none"
-                          value={paymentForm.paymentMode}
-                          onChange={(e) => setPaymentForm(prev => ({ ...prev, paymentMode: e.target.value }))}
-                        >
-                          <option value="Cash">Cash</option>
-                          <option value="Card (POS)">Card (POS)</option>
-                          <option value="UPI / QR">UPI / QR</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 block mb-1">Ref No</label>
-                        <input
-                          type="text" placeholder="e.g. UPI-99127"
-                          className="w-full bg-white border rounded p-2 text-xs"
-                          value={paymentForm.referenceNo}
-                          onChange={(e) => setPaymentForm(prev => ({ ...prev, referenceNo: e.target.value }))}
-                        />
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-1.5 w-full rounded-lg shadow-sm"
-                    >
-                      Process Receipt Payment
-                    </button>
-                  </div>
-                </form>
-
-                {/* Advance deposit */}
-                <form onSubmit={handleCollectDeposit} className="border p-4 bg-slate-50/50 rounded-xl text-left">
-                  <h4 className="text-xs font-black text-slate-700 uppercase mb-3">Add Ledger Deposit credit</h4>
-
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Credit Deposit (₹)</label>
-                      <input
-                        type="number" required placeholder="5000"
-                        className="w-full bg-white border rounded p-2 text-xs outline-none"
-                        value={depositAmount}
-                        onChange={(e) => setDepositAmount(e.target.value)}
-                      />
-                    </div>
-
-                    <p className="text-[10px] text-slate-400 font-semibold leading-relaxed">Collections credit ledger advances directly, supporting insurance claim clearances and reducing balance requisites during patient discharges.</p>
-
-                    <button
-                      type="submit"
-                      className="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold py-1.5 w-full rounded-lg"
-                    >
-                      Append Deposit
-                    </button>
-                  </div>
-                </form>
-
+              {/* IV Flow Rate */}
+              <div className="form-group col-span-1">
+                <label className="form-label font-bold text-gray-700 mb-1 block text-xs">IV Flow Rate</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 100 ml/hr"
+                  className="form-input w-full text-xs"
+                  value={nurseForm.drip_flow_rate || ''}
+                  onChange={(e) => setNurseForm({ ...nurseForm, drip_flow_rate: e.target.value })}
+                />
               </div>
             </div>
-          );
-        })()}
+          </div>
+
+          {/* Clinical Instructions Section */}
+          <div className="form-group text-left">
+            <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Special Clinical Instructions</label>
+            <textarea
+              rows="2"
+              className="form-input w-full text-xs p-2.5 border border-slate-200 rounded-xl"
+              placeholder="e.g. Monitor glucose levels before breakfast."
+              value={nurseForm.special_instructions || ''}
+              onChange={(e) => setNurseForm({ ...nurseForm, special_instructions: e.target.value })}
+            />
+          </div>
+        </div>
       </Modal>
 
-      {/* 8. Print Modal Discharge Receipt Summary */}
+
+      {/* View Nurse Assignment Details Modal */}
       <Modal
-        isOpen={showPrintModal}
-        onClose={() => setShowPrintModal(false)}
-        title="Inpatient Account Discharge Certificate & invoice Statement"
+        isOpen={showViewNurseModal}
+        onClose={() => {
+          setShowViewNurseModal(false);
+          setSelectedNurseAssignment(null);
+        }}
+        title="Nurse Assignment Detail Record"
         size="lg"
-      >
-        {printSummaryData && (() => {
-          const adm = printSummaryData;
-          const bill = getBillingSummary(adm.admissionNo);
-          const doc = INITIAL_DOCTORS.find(d => d.id === adm.consultant_id);
-          const summary = adm.dischargeSummary || { finalDiagnosis: adm.diagnosis, summary: "Discharged in stable condition.", followUpInstructions: "Review OPD consult in 7 days.", medications: "Tab Paracetamol 650mg TDS x 3 days" };
-
-          return (
-            <div className="p-4 space-y-6 text-left" id="discharge-printhead">
-
-              <div className="border-b-4 border-slate-900 pb-4 flex justify-between items-start">
-                <div>
-                  <h2 className="text-xl font-black text-slate-900 tracking-wider">LIFELINE MULTI-SPECIALTY HOSPITAL</h2>
-                  <p className="text-[10px] font-bold text-slate-500 mt-0.5">24/7 Multi-Specialty Health Care Infrastructure • New Delhi NCR</p>
-                  <p className="text-[9px] text-slate-400 font-semibold">Contact: +91 11-45091811 | web: www.lifelinehospital.com</p>
-                </div>
-                <div className="text-right">
-                  <span className="inline-block bg-slate-900 text-white text-[10px] font-black uppercase px-2.5 py-1 tracking-wider rounded">IPD DISCHARGE CERTIFICATE</span>
-                  <p className="text-[10px] font-mono font-bold mt-2 text-slate-500">Invoice Ref: INV-{adm.admissionNo}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs bg-slate-50 p-4 border border-slate-200 rounded-xl">
-                <div>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase">Patient Name</span>
-                  <p className="font-bold text-slate-800">{adm.patientName}</p>
-                </div>
-                <div>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase">Age / Gender</span>
-                  <p className="font-bold text-slate-800">{adm.age} yrs / {adm.gender}</p>
-                </div>
-                <div>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase">Admission Date</span>
-                  <p className="font-bold text-slate-800">{adm.admissionDate} ({adm.admissionTime})</p>
-                </div>
-                <div>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase">Discharge Date</span>
-                  <p className="font-bold text-slate-800">{summary.dischargeDate || new Date().toISOString().split("T")[0]}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
-
-                {/* Clinical Notes Summary */}
-                <div className="md:col-span-2 space-y-4">
-                  <div>
-                    <h4 className="font-black text-slate-800 border-b pb-1">Clinical Diagnoses</h4>
-                    <p className="font-semibold text-blue-800 mt-1 italic">&quot;{summary.finalDiagnosis}&quot;</p>
-                  </div>
-                  <div>
-                    <h4 className="font-black text-slate-800 border-b pb-1">Treatment Case Summary</h4>
-                    <p className="text-slate-600 mt-1 font-medium leading-relaxed">{summary.summary}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-black text-slate-800 border-b pb-1">Prescribed Discharge Medication Course</h4>
-                    <p className="text-slate-600 mt-1 font-mono text-[11px] leading-relaxed">{summary.medications}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-black text-slate-800 border-b pb-1">Follow-up Instructions</h4>
-                    <p className="text-slate-600 mt-1 font-medium">{summary.followUpInstructions}</p>
-                  </div>
-                </div>
-
-                {/* Final Billing Receipt */}
-                <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 space-y-3 h-fit">
-                  <h4 className="font-black text-slate-800 border-b pb-1.5">Accounts Statement</h4>
-
-                  <div className="space-y-1.5 text-[11px]">
-                    <div className="flex justify-between text-slate-500">
-                      <span>Total Base Rent:</span>
-                      <span className="font-bold">₹{billing[adm.admissionNo]?.filter(t => t.category === "Room Charges").reduce((s, t) => s + t.amount, 0)}</span>
-                    </div>
-                    <div className="flex justify-between text-slate-500">
-                      <span>Consultation Visits:</span>
-                      <span className="font-bold">₹{billing[adm.admissionNo]?.filter(t => t.category === "Doctor Visit Charges").reduce((s, t) => s + t.amount, 0)}</span>
-                    </div>
-                    <div className="flex justify-between text-slate-500">
-                      <span>Investigations Fee:</span>
-                      <span className="font-bold">₹{billing[adm.admissionNo]?.filter(t => t.category.includes("Lab") || t.category.includes("Radiology")).reduce((s, t) => s + t.amount, 0)}</span>
-                    </div>
-                    <div className="flex justify-between text-slate-500">
-                      <span>Procedures & Nursing:</span>
-                      <span className="font-bold">₹{billing[adm.admissionNo]?.filter(t => t.category.includes("Procedure") || t.category === "Nursing Charges").reduce((s, t) => s + t.amount, 0)}</span>
-                    </div>
-                    <div className="flex justify-between text-slate-500">
-                      <span>Pharmacy Meds:</span>
-                      <span className="font-bold">₹{billing[adm.admissionNo]?.filter(t => t.category === "Pharmacy Charges").reduce((s, t) => s + t.amount, 0)}</span>
-                    </div>
-
-                    <div className="h-px bg-slate-200 my-2"></div>
-
-                    <div className="flex justify-between font-black text-slate-800">
-                      <span>Gross Bill Amount:</span>
-                      <span>₹{bill.total}</span>
-                    </div>
-                    <div className="flex justify-between text-emerald-600 font-bold">
-                      <span>Advance Deposits:</span>
-                      <span>- ₹{bill.advance}</span>
-                    </div>
-                    {adm.insurance?.isTpaEnabled && (
-                      <div className="flex justify-between text-blue-600 font-bold">
-                        <span>Insurance Claimed:</span>
-                        <span>- ₹{bill.insuranceAmt}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-base font-black text-slate-900 border-t pt-1.5">
-                      <span>Net Due Paid:</span>
-                      <span>₹{bill.pendingAmt}</span>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Signatures */}
-              <div className="flex justify-between items-end pt-12 text-xs border-t">
-                <div>
-                  <p className="font-bold text-slate-500">Discharging Consultant MD</p>
-                  <p className="font-black text-slate-800 mt-4">{doc?.name || "Consulting Doctor"}</p>
-                  <p className="text-[10px] text-slate-400 font-semibold">Specialty: {doc?.specialty}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-slate-500">Lifeline Clinical Hospital Account Audit</p>
-                  <p className="font-black text-slate-800 mt-4">Authorized Signature</p>
-                  <p className="text-[10px] text-slate-400 font-semibold">Cleared Date: {new Date().toLocaleDateString()}</p>
-                </div>
-              </div>
-
-              {/* Buttons */}
-              <div className="flex justify-end gap-2 pt-6 border-t print:hidden">
-                <button
-                  onClick={() => setShowPrintModal(false)}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2 px-4 rounded-xl"
-                >
-                  Close
-                </button>
-                <button
-                  onClick={() => window.print()}
-                  className="bg-slate-950 hover:bg-black text-white text-xs font-bold py-2 px-5 rounded-xl flex items-center gap-1 shadow-md"
-                >
-                  <Print fontSize="small" /> Print Discharge Receipt PDF
-                </button>
-              </div>
-
-            </div>
-          );
-        })()}
-      </Modal>
-
-      {/* 9. Add Ward Modal */}
-      <Modal
-        isOpen={showAddWardModal}
-        onClose={() => setShowAddWardModal(false)}
-        title="Add New Ward"
-        size="sm"
-      >
-        <form onSubmit={handleCreateWard} className="space-y-4 text-left text-xs">
-          <div>
-            <label className="text-xs font-bold text-slate-500 block mb-1">Ward Name</label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. ICU, General Ward B"
-              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-              value={addWardForm.ward_name}
-              onChange={(e) => setAddWardForm(prev => ({ ...prev, ward_name: e.target.value }))}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Ward Type</label>
-              <select
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                value={addWardForm.ward_type}
-                onChange={(e) => setAddWardForm(prev => ({ ...prev, ward_type: e.target.value }))}
-              >
-                <option value="General Ward">General Ward</option>
-                <option value="Semi Private Ward">Semi Private Ward</option>
-                <option value="Private Ward">Private Ward</option>
-                <option value="Deluxe Room">Deluxe Room</option>
-                <option value="ICU">ICU</option>
-                <option value="NICU">NICU</option>
-                <option value="PICU">PICU</option>
-                <option value="Emergency Ward">Emergency Ward</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Floor</label>
-              <select
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                value={addWardForm.floor}
-                onChange={(e) => setAddWardForm(prev => ({ ...prev, floor: e.target.value }))}
-              >
-                <option value="Ground Floor">Ground Floor</option>
-                <option value="1st Floor">1st Floor</option>
-                <option value="2nd Floor">2nd Floor</option>
-                <option value="3rd Floor">3rd Floor</option>
-                <option value="4th Floor">4th Floor</option>
-                <option value="5th Floor">5th Floor</option>
-                <option value="6th Floor">6th Floor</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Capacity (Beds)</label>
-              <input
-                type="number"
-                required
-                min="1"
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-                value={addWardForm.capacity}
-                onChange={(e) => setAddWardForm(prev => ({ ...prev, capacity: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Daily Price / Rate (₹)</label>
-              <input
-                type="number"
-                required
-                min="0"
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-                value={addWardForm.daily_price}
-                onChange={(e) => setAddWardForm(prev => ({ ...prev, daily_price: e.target.value }))}
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-4 border-t">
+        footer={
+          <div className="flex justify-end">
             <button
-              type="button"
-              onClick={() => setShowAddWardModal(false)}
-              className="bg-slate-100 text-slate-700 text-xs font-bold py-2 px-4 rounded-xl"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm"
-            >
-              Add Ward
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* 10. Add Room Modal */}
-      <Modal
-        isOpen={showAddRoomModal}
-        onClose={() => setShowAddRoomModal(false)}
-        title="Add New Room"
-        size="sm"
-      >
-        <form onSubmit={handleCreateRoom} className="space-y-4 text-left text-xs">
-          <div>
-            <label className="text-xs font-bold text-slate-500 block mb-1">Room Number / Name</label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. 103, ICU-A"
-              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-              value={addRoomForm.room_number}
-              onChange={(e) => setAddRoomForm(prev => ({ ...prev, room_number: e.target.value }))}
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-slate-500 block mb-1">Assign to Ward</label>
-            <select
-              required
-              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-              value={addRoomForm.ward_id}
-              onChange={(e) => setAddRoomForm(prev => ({ ...prev, ward_id: e.target.value }))}
-            >
-              <option value="">Select Ward...</option>
-              {wards.map(w => (
-                <option key={w.ward_id} value={w.ward_id}>{w.ward_name} ({w.floor})</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-slate-500 block mb-1">Daily Price / Rent (₹)</label>
-            <input
-              type="number"
-              required
-              min="0"
-              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-              value={addRoomForm.daily_price}
-              onChange={(e) => setAddRoomForm(prev => ({ ...prev, daily_price: e.target.value }))}
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <button
-              type="button"
-              onClick={() => setShowAddRoomModal(false)}
-              className="bg-slate-100 text-slate-700 text-xs font-bold py-2 px-4 rounded-xl"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm"
-            >
-              Add Room
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* 11. Add Bed Modal */}
-      <Modal
-        isOpen={showAddBedModal}
-        onClose={() => setShowAddBedModal(false)}
-        title="Add New Bed"
-        size="sm"
-      >
-        <form onSubmit={handleCreateBed} className="space-y-4 text-left text-xs">
-          <div>
-            <label className="text-xs font-bold text-slate-500 block mb-1">Bed Number / Code</label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. 101-C, B-10"
-              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-              value={addBedForm.bed_number}
-              onChange={(e) => setAddBedForm(prev => ({ ...prev, bed_number: e.target.value }))}
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-slate-500 block mb-1">Ward Location</label>
-            <select
-              required
-              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-              value={addBedForm.ward_id}
-              onChange={(e) => {
-                setAddBedForm(prev => ({ ...prev, ward_id: e.target.value, room_id: "" }));
+              onClick={() => {
+                setShowViewNurseModal(false);
+                setSelectedNurseAssignment(null);
               }}
+              className="btn bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 shadow-md shadow-blue-100 rounded-xl"
             >
-              <option value="">Select Ward...</option>
-              {wards.map(w => (
-                <option key={w.ward_id} value={w.ward_id}>{w.ward_name}</option>
-              ))}
-            </select>
+              Close Record
+            </button>
           </div>
+        }
+      >
+        {selectedNurseAssignment && (() => {
+          const nas = selectedNurseAssignment;
+          const matchedWard = wards.find(w => w.ward_id === nas.ward_id || w.id === nas.ward_id);
+          const matchedPatient = allPatients.find(p => p.id === nas.patient_id);
+          const matchedNurse = availableNurses.find(n => n.id === nas.nurse_id);
+          return (
+            <div className="space-y-6 text-left p-1">
+              {/* Top Summary Banner */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg uppercase tracking-wider">
+                    Record ID: {nas.nurse_assignment_id}
+                  </span>
+                  <h3 className="text-xl font-bold text-gray-900 mt-2 flex items-center gap-2">
+                    <MedicalInformation className="text-blue-500" />
+                    {matchedNurse?.name || 'N/A'}
+                  </h3>
+                  <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mt-1 ml-7">
+                    Specialty: {matchedNurse?.specialty || 'General Nursing'}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1.5">
+                  <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${nas.shift_type === 'Morning' ? 'bg-sky-100 text-sky-800' :
+                    nas.shift_type === 'Evening' ? 'bg-amber-100 text-amber-800' :
+                      'bg-indigo-100 text-indigo-800'
+                    }`}>
+                    {nas.shift_type} Shift
+                  </span>
+                  <span className="text-xs text-slate-500 font-semibold">Joined: {nas.assigned_date}</span>
+                </div>
+              </div>
 
-          <div>
-            <label className="text-xs font-bold text-slate-500 block mb-1">Room Assignment</label>
-            <select
-              required
-              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-              value={addBedForm.room_id}
-              onChange={(e) => setAddBedForm(prev => ({ ...prev, room_id: e.target.value }))}
-              disabled={!addBedForm.ward_id}
-            >
-              <option value="">Select Room...</option>
-              {rooms.filter(r => r.ward_id === addBedForm.ward_id).map(r => (
-                <option key={r.room_id} value={r.room_id}>Room {r.room_number}</option>
-              ))}
-            </select>
-          </div>
+              {/* Patient & Location Row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                  <h4 className="font-bold text-slate-900 text-sm mb-3 flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                    <span>👤</span> Patient Information
+                  </h4>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Name:</span>
+                      <span className="font-bold text-blue-600 text-sm">
+                        {matchedPatient?.name || `Patient (${nas.patient_id})`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Patient ID:</span>
+                      <span className="font-semibold text-slate-700">{nas.patient_id}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Age / Gender:</span>
+                      <span className="font-semibold text-slate-700">
+                        {matchedPatient?.age || '42'} yrs / {matchedPatient?.gender || 'Male'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-          <div className="space-y-2 pt-2">
-            <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-700">
-              <input
-                type="checkbox"
-                className="rounded text-blue-600 focus:ring-blue-500"
-                checked={addBedForm.is_oxygen_available}
-                onChange={(e) => setAddBedForm(prev => ({ ...prev, is_oxygen_available: e.target.checked }))}
-              />
-              Oxygen Facility Available
-            </label>
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                  <h4 className="font-bold text-slate-900 text-sm mb-3 flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                    <span>📍</span> Location Allocation
+                  </h4>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Assigned Ward:</span>
+                      <span className="font-bold text-slate-700">
+                        {matchedWard?.ward_name || matchedWard?.name || 'General Ward'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Ward ID:</span>
+                      <span className="font-semibold text-slate-700">{nas.ward_id}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Bed Number:</span>
+                      <span className="font-bold text-emerald-600">Bed 12-A</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-            <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-700">
-              <input
-                type="checkbox"
-                className="rounded text-blue-600 focus:ring-blue-500"
-                checked={addBedForm.ventilator_available}
-                onChange={(e) => setAddBedForm(prev => ({ ...prev, ventilator_available: e.target.checked }))}
-              />
-              Ventilator Setup Available
-            </label>
-          </div>
+              {/* Treatment Cycle, Drips & Vitals */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="bg-blue-50/30 border border-blue-100 rounded-2xl p-5">
+                  <h4 className="font-bold text-slate-900 text-sm mb-3 flex items-center gap-1.5 border-b border-blue-100/50 pb-2">
+                    <span>🩺</span> Prescribed Care & Treatment Cycle
+                  </h4>
+                  <div className="space-y-3.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-medium">Care Plan Cycle:</span>
+                      <span className="font-bold text-blue-600 bg-blue-100/50 px-2 py-0.5 rounded">
+                        {nas.treatment_cycle || 'Standard Day Cycle'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-medium">IV Infusion Flow Rate:</span>
+                      <span className="font-mono font-bold text-slate-700">
+                        {nas.drip_flow_rate || '100 ml/hr'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-          <div className="flex justify-end gap-2 pt-4 border-t">
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
+                  <h4 className="font-bold text-slate-900 text-sm mb-3 flex items-center gap-1.5 border-b border-slate-200 pb-2">
+                    <span>⏱️</span> Vitals Monitoring & Live Metrics
+                  </h4>
+                  <div className="space-y-4 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-medium">Monitoring Schedule:</span>
+                      <span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                        {nas.vitals_monitoring_frequency}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 font-bold block mb-2 uppercase text-[9px] tracking-wider">Last Recorded Vitals</span>
+                      <div className="grid grid-cols-4 gap-2 text-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                        {[
+                          { label: 'BP', value: nas.bp || '--/--', unit: 'mmHg', color: 'text-cyan-600' },
+                          { label: 'Pulse', value: nas.pulse || '--', unit: 'bpm', color: 'text-rose-600' },
+                          { label: 'SPO2', value: nas.spo2 || '--', unit: '%', color: 'text-emerald-600' },
+                          { label: 'Temp', value: nas.temp || '--', unit: '°F', color: 'text-amber-600' }
+                        ].map((v, idx) => (
+                          <div key={idx}>
+                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">{v.label}</span>
+                            <span className={`text-sm font-black block mt-1 ${v.color}`}>{v.value}</span>
+                            <span className="text-[7px] text-slate-500 block">{v.unit}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes & Special instructions */}
+              {(nas.special_instructions || nas.nursing_notes) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {nas.special_instructions && (
+                    <div className="bg-amber-50/40 border border-amber-100 rounded-2xl p-5 text-amber-800">
+                      <span className="font-bold text-xs text-amber-700 uppercase tracking-wider block mb-2">Special Clinical Instructions:</span>
+                      <p className="text-xs italic leading-relaxed">&ldquo;{nas.special_instructions}&rdquo;</p>
+                    </div>
+                  )}
+                  {nas.nursing_notes && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-600">
+                      <span className="font-bold text-xs text-slate-500 uppercase tracking-wider block mb-2">Nursing Notes / Shift Logs:</span>
+                      <p className="text-xs italic leading-relaxed">&ldquo;{nas.nursing_notes}&rdquo;</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </Modal>
+
+      {/* Schedule Doctor Round Modal */}
+      <Modal
+        isOpen={showAddRoundModal}
+        onClose={() => setShowAddRoundModal(false)}
+        title="Schedule New Doctor Round"
+        size="md"
+        footer={
+          <div className="flex justify-end gap-3">
             <button
-              type="button"
-              onClick={() => setShowAddBedModal(false)}
-              className="bg-slate-100 text-slate-700 text-xs font-bold py-2 px-4 rounded-xl"
+              onClick={() => setShowAddRoundModal(false)}
+              className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold"
             >
               Cancel
             </button>
             <button
-              type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm"
+              onClick={handleAddRound}
+              className="btn bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center justify-center gap-1 shadow-lg shadow-blue-100"
             >
-              Add Bed
+              <Add fontSize="small" /> Schedule Round
             </button>
           </div>
-        </form>
-      </Modal>
-
-      {/* 12. Edit Ward Modal */}
-      <Modal
-        isOpen={showEditWardModal}
-        onClose={() => setShowEditWardModal(false)}
-        title="Edit Ward Details"
-        size="sm"
+        }
       >
-        <form onSubmit={handleUpdateWard} className="space-y-4 text-left text-xs">
-          <div>
-            <label className="text-xs font-bold text-slate-500 block mb-1">Ward Name</label>
+        <div className="space-y-4 text-left">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Doctor Name Searchable Select */}
+            <div className="form-group relative" onMouseLeave={() => setShowDoctorDropdown(false)}>
+              <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Doctor Name</label>
+              <div className="relative">
+                <input type="text" placeholder="Search & Select Doctor..." className="form-input w-full text-xs pr-8" value={roundForm.doctor_name} onFocus={() => setShowDoctorDropdown(true)} onChange={(e) => { setRoundForm({ ...roundForm, doctor_name: e.target.value }); setShowDoctorDropdown(true); }} />
+                <KeyboardArrowDown
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer hover:text-slate-600 transition-colors"
+                  style={{ fontSize: '18px' }}
+                  onClick={() => setShowDoctorDropdown(prev => !prev)}
+                />
+              </div>
+
+              {showDoctorDropdown && (
+                <div className="absolute z-[110] left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-slate-100">
+                  {doctors
+                    .filter(doc => doc.name.toLowerCase().includes((roundForm.doctor_name || '').toLowerCase()))
+                    .map((doc, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        className="w-full text-left px-4 py-2 hover:bg-slate-50 text-xs font-semibold text-slate-700 flex justify-between items-center transition-colors border-0"
+                        onClick={() => {
+                          setRoundForm({
+                            ...roundForm,
+                            doctor_name: doc.name,
+                            specialty: doc.dept
+                          });
+                          setShowDoctorDropdown(false);
+                        }}
+                      >
+                        <span>{doc.name}</span>
+                      </button>
+                    ))}
+                  {doctors.filter(doc => doc.name.toLowerCase().includes((roundForm.doctor_name || '').toLowerCase())).length === 0 && (
+                    <div className="px-4 py-2.5 text-xs text-slate-400 italic">No matching doctor found</div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Department / Specialty Searchable Select */}
+            <div className="form-group relative" onMouseLeave={() => setShowDeptDropdown(false)}>
+              <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Medical Specialty / Department</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search & Select Department..."
+                  className="form-input w-full text-xs pr-8"
+                  value={roundForm.specialty}
+                  onFocus={() => setShowDeptDropdown(true)}
+                  onChange={(e) => {
+                    setRoundForm({ ...roundForm, specialty: e.target.value });
+                    setShowDeptDropdown(true);
+                  }}
+                />
+                <KeyboardArrowDown
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer hover:text-slate-600 transition-colors"
+                  style={{ fontSize: '18px' }}
+                  onClick={() => setShowDeptDropdown(prev => !prev)}
+                />
+              </div>
+
+              {showDeptDropdown && (
+                <div className="absolute z-[110] left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-slate-100">
+                  {departments
+                    .filter(dept => dept.toLowerCase().includes((roundForm.specialty || '').toLowerCase()))
+                    .map((dept, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        className="w-full text-left px-4 py-2 hover:bg-slate-50 text-xs font-semibold text-slate-700 flex justify-between items-center transition-colors border-0"
+                        onClick={() => {
+                          setRoundForm({
+                            ...roundForm,
+                            specialty: dept
+                          });
+                          setShowDeptDropdown(false);
+                        }}
+                      >
+                        <span>{dept} Department</span>
+                      </button>
+                    ))}
+                  {departments.filter(dept => dept.toLowerCase().includes((roundForm.specialty || '').toLowerCase())).length === 0 && (
+                    <div className="px-4 py-2.5 text-xs text-slate-400 italic">No matching department found</div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Target Ward Location</label>
+            <select
+              className="form-input w-full text-xs"
+              value={roundForm.ward_name}
+              onChange={(e) => setRoundForm({ ...roundForm, ward_name: e.target.value })}
+            >
+              {wards.map(w => (
+                <option key={w.ward_id || w.id} value={w.ward_name || w.name}>{w.ward_name || w.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Round Date</label>
+              <input
+                type="date"
+                className="form-input w-full text-xs"
+                value={roundForm.round_date}
+                onChange={(e) => setRoundForm({ ...roundForm, round_date: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Round Time</label>
+              <input
+                type="text"
+                placeholder="e.g. 09:30 AM"
+                className="form-input w-full text-xs"
+                value={roundForm.round_time}
+                onChange={(e) => setRoundForm({ ...roundForm, round_time: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Visited Patients (Comma Separated)</label>
             <input
               type="text"
-              required
-              placeholder="e.g. ICU, General Ward B"
-              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-              value={editWardForm.ward_name}
-              onChange={(e) => setEditWardForm(prev => ({ ...prev, ward_name: e.target.value }))}
+              placeholder="e.g. Sarah Jenkins, Michael Chang"
+              className="form-input w-full text-xs"
+              value={roundForm.patients_visited}
+              onChange={(e) => setRoundForm({ ...roundForm, patients_visited: e.target.value })}
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Ward Type</label>
-              <select
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                value={editWardForm.ward_type}
-                onChange={(e) => setEditWardForm(prev => ({ ...prev, ward_type: e.target.value }))}
-              >
-                <option value="General Ward">General Ward</option>
-                <option value="Semi Private Ward">Semi Private Ward</option>
-                <option value="Private Ward">Private Ward</option>
-                <option value="Deluxe Room">Deluxe Room</option>
-                <option value="ICU">ICU</option>
-                <option value="NICU">NICU</option>
-                <option value="PICU">PICU</option>
-                <option value="Emergency Ward">Emergency Ward</option>
+          <div className="form-group">
+            <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Clinical Rounds Notes</label>
+            <textarea
+              rows="2"
+              placeholder="Enter special clinical findings..."
+              className="form-input w-full text-xs p-2.5"
+              value={roundForm.clinical_notes}
+              onChange={(e) => setRoundForm({ ...roundForm, clinical_notes: e.target.value })}
+            />
+          </div>
+        </div>
+      </Modal>
+      {/* Record Inpatient Treatment Plan Modal */}
+      <Modal
+        isOpen={showAddPlanModal}
+        onClose={() => setShowAddPlanModal(false)}
+        title="Record Inpatient Treatment Plan"
+        size="md"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setShowAddPlanModal(false)} className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold">Cancel</button>
+            <button
+              onClick={handleAddPlan}
+              className="btn bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center gap-1 shadow-lg shadow-emerald-100"
+            >
+              <Add fontSize="small" /> Save Treatment Plan
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4 text-left">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Patient Name Searchable Select */}
+            <div className="form-group relative" onMouseLeave={() => setShowPlanPatientDropdown(false)}>
+              <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Patient Name <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search & Select Patient..."
+                  className="form-input w-full text-xs pr-8"
+                  value={planForm.patient_name || ''}
+                  onFocus={() => setShowPlanPatientDropdown(true)}
+                  onChange={(e) => {
+                    const typedVal = e.target.value;
+                    setPlanForm(prev => ({
+                      ...prev,
+                      patient_name: typedVal,
+                      patient_id: ''
+                    }));
+                    setShowPlanPatientDropdown(true);
+                  }}
+                  required
+                />
+                <KeyboardArrowDown
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer hover:text-slate-600 transition-colors"
+                  style={{ fontSize: '18px' }}
+                  onClick={() => setShowPlanPatientDropdown(prev => !prev)}
+                />
+              </div>
+
+              {showPlanPatientDropdown && (
+                <div className="absolute z-[110] left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-slate-100">
+                  {allPatients
+                    .filter(p => p.name.toLowerCase().includes((planForm.patient_name || '').toLowerCase()))
+                    .map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className="w-full text-left px-4 py-2 hover:bg-slate-50 text-xs font-semibold text-slate-700 flex justify-between items-center transition-colors border-0"
+                        onClick={() => {
+                          setPlanForm(prev => ({
+                            ...prev,
+                            patient_name: p.name,
+                            patient_id: p.id
+                          }));
+                          setShowPlanPatientDropdown(false);
+                        }}
+                      >
+                        <span>{p.name}</span>
+                        <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-mono">
+                          {p.id}
+                        </span>
+                      </button>
+                    ))}
+                  {allPatients.filter(p => p.name.toLowerCase().includes((planForm.patient_name || '').toLowerCase())).length === 0 && (
+                    <div className="px-4 py-2.5 text-xs text-slate-400 italic">No matching patient found</div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Patient ID — auto-filled */}
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Patient ID <span className="text-red-500">*</span></label>
+              <input type="text" placeholder="Patient ID" className="form-input w-full text-xs bg-slate-50 border border-slate-200 text-slate-500 font-semibold cursor-not-allowed" value={planForm.patient_id || ''} readOnly required/>
+            </div>
+
+          </div>
+          <div className="form-group">
+            <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Diagnosis / Case Details</label>
+            <input
+              type="text"
+              placeholder="e.g. Acute Coronary Syndrome"
+              className="form-input w-full text-xs"
+              value={planForm.diagnosis}
+              onChange={(e) => setPlanForm({ ...planForm, diagnosis: e.target.value })}
+            />
+          </div>
+
+          <div className="form-group relative" onMouseLeave={() => setShowPlanDoctorDropdown(false)}>
+            <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Prescribing Doctor</label>
+            <div className="relative">
+              <input type="text" placeholder="Search & Select Doctor..." className="form-input w-full text-xs pr-8" value={planForm.doctor_name || ''} onFocus={() => setShowPlanDoctorDropdown(true)} onChange={(e) => { setPlanForm({ ...planForm, doctor_name: e.target.value }); setShowPlanDoctorDropdown(true); }} />
+              <KeyboardArrowDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer hover:text-slate-600 transition-colors" style={{ fontSize: '18px' }} onClick={() => setShowPlanDoctorDropdown(prev => !prev)} />
+            </div>
+
+            {showPlanDoctorDropdown && (
+              <div className="absolute z-[110] left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-slate-100">
+                {doctors
+                  .filter(doc => doc.name.toLowerCase().includes((planForm.doctor_name || '').toLowerCase()))
+                  .map((doc, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      className="w-full text-left px-4 py-2 hover:bg-slate-50 text-xs font-semibold text-slate-700 flex justify-between items-center transition-colors border-0"
+                      onClick={() => {
+                        setPlanForm({
+                          ...planForm,
+                          doctor_name: doc.name
+                        });
+                        setShowPlanDoctorDropdown(false);
+                      }}
+                    >
+                      <span>{doc.name}</span>
+                    </button>
+                  ))}
+                {doctors.filter(doc => doc.name.toLowerCase().includes((planForm.doctor_name || '').toLowerCase())).length === 0 && (
+                  <div className="px-4 py-2.5 text-xs text-slate-400 italic">No matching doctor found</div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Treatment Pathway Details</label>
+            <textarea rows="2" placeholder="Prescribed medicines, oxygen support levels, physiotherapy daily targets..." className="form-input w-full text-xs p-2.5" value={planForm.treatment_details} onChange={(e) => setPlanForm({ ...planForm, treatment_details: e.target.value })} />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Care Plan Cycle</label>
+              <select className="form-input w-full text-xs" value={planForm.cycles_prescribed} onChange={(e) => setPlanForm({ ...planForm, cycles_prescribed: e.target.value })} >
+                <option value="Standard Day Cycle">Standard Day Cycle</option>
+                <option value="Triple Action Meds Cycle (TID)">Triple Action Meds Cycle (TID)</option>
+                <option value="Continuous IV Infusion / Drip Check">Continuous IV Infusion</option>
+                <option value="Intensive Cardiac Post-Op Cycle">Intensive Cardiac Post-Op</option>
+                <option value="Diabetes Management Plan">Diabetes Management Plan</option>
               </select>
             </div>
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Floor</label>
-              <select
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                value={editWardForm.floor}
-                onChange={(e) => setEditWardForm(prev => ({ ...prev, floor: e.target.value }))}
-              >
-                <option value="Ground Floor">Ground Floor</option>
-                <option value="1st Floor">1st Floor</option>
-                <option value="2nd Floor">2nd Floor</option>
-                <option value="3rd Floor">3rd Floor</option>
-                <option value="4th Floor">4th Floor</option>
-                <option value="5th Floor">5th Floor</option>
-                <option value="6th Floor">6th Floor</option>
-              </select>
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-xs">IV Flow Rate</label>
+              <input type="text" placeholder="e.g. 100 ml/hr" className="form-input w-full text-xs" value={planForm.drip_flow_rate} onChange={(e) => setPlanForm({ ...planForm, drip_flow_rate: e.target.value })} />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Capacity (Beds)</label>
-              <input
-                type="number"
-                required
-                min="1"
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-                value={editWardForm.capacity}
-                onChange={(e) => setEditWardForm(prev => ({ ...prev, capacity: e.target.value }))}
-              />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Start Date</label>
+              <input type="date" className="form-input w-full text-xs" value={planForm.start_date} onChange={(e) => setPlanForm({ ...planForm, start_date: e.target.value })} />
             </div>
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Daily Price / Rate (₹)</label>
-              <input
-                type="number"
-                required
-                min="0"
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-                value={editWardForm.daily_price}
-                onChange={(e) => setEditWardForm(prev => ({ ...prev, daily_price: e.target.value }))}
-              />
+            <div className="form-group">
+              <label className="form-label font-bold text-gray-700 mb-1 block text-xs">Treatment Span Duration</label>
+              <input type="text" placeholder="e.g. 7 Days" className="form-input w-full text-xs" value={planForm.duration} onChange={(e) => setPlanForm({ ...planForm, duration: e.target.value })} />
             </div>
           </div>
-
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <button
-              type="button"
-              onClick={() => setShowEditWardModal(false)}
-              className="bg-slate-100 text-slate-700 text-xs font-bold py-2 px-4 rounded-xl"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm"
-            >
-              Save Changes
-            </button>
-          </div>
-        </form>
+        </div>
       </Modal>
 
     </div>
