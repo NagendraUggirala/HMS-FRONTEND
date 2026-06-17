@@ -3,6 +3,8 @@ import { Hotel, Bed, MonitorHeart, MeetingRoom, Payments, Visibility, SwapHoriz,
 import LoadingSpinner from '../../../../components/common/LoadingSpinner/LoadingSpinner';
 import DataTable from '../../../../components/ui/Tables/DataTable';
 import Modal from '../../../../components/common/Modal/Modal';
+import { apiFetch } from '../../../../services/apiClient';
+import { IPD_PATIENTS, IPD_AVAILABLE_PATIENTS, IPD_ADMISSIONS, IPD_DOCTOR_ROUNDS } from '../../../../config/api';
 
 const availableNurses = [];
 
@@ -113,7 +115,7 @@ const IPDManagement = () => {
   const [billingForm, setBillingForm] = useState({ category: 'Pharmacy / Medications', amount: '', description: '' });
   const [pendingCharges, setPendingCharges] = useState([]);
 
-  const allPatients = [];
+  const [allPatients, setAllPatients] = useState([]);
 
   const doctors = [];
 
@@ -164,13 +166,49 @@ const IPDManagement = () => {
 
   const loadIPDData = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setIpdPatients([]);
+    try {
+      // 1. Fetch admitted patients
+      const res = await apiFetch(`${IPD_PATIENTS}?all_hospital=true`);
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const items = data.data?.items || data.data || [];
+        const formatted = items.map(p => ({
+          id: p.admission_number || p.id,
+          name: p.patient_name || p.name,
+          age: p.patient_age || p.age || 'N/A',
+          gender: p.patient_gender || p.gender || 'Unknown',
+          ward: p.ward_name || p.ward,
+          room: p.room_number || p.room,
+          bed: p.bed_number || p.bed,
+          status: p.status === 'ACTIVE' ? 'Admitted' : p.status === 'CRITICAL' ? 'Critical' : p.status || 'Admitted',
+          admissionDate: p.admission_date?.split('T')[0] || p.admissionDate || 'N/A',
+          admissionTime: p.admission_date ? new Date(p.admission_date).toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit' }) : 'N/A',
+          doctor: p.attending_doctor_name || p.doctor,
+          diagnosis: p.diagnosis || 'N/A',
+          patientId: p.patient_id || p.id
+        }));
+        setIpdPatients(formatted);
+      }
 
-      setWards([]);
-
+      // 2. Fetch available patients for admission
+      const availableRes = await apiFetch(IPD_AVAILABLE_PATIENTS);
+      if (availableRes.ok) {
+        const data = await availableRes.json().catch(() => ({}));
+        const items = data.data?.items || data.data || [];
+        const formattedAvailable = items.map(p => ({
+          id: p.patient_id || p.id,
+          name: p.patient_name || p.name || p.first_name + ' ' + p.last_name,
+          age: p.patient_age || p.age || '',
+          gender: p.patient_gender || p.gender || 'Male',
+          bloodGroup: p.blood_group || p.bloodGroup || ''
+        }));
+        setAllPatients(formattedAvailable);
+      }
+    } catch (e) {
+      console.error('Failed to load IPD data', e);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   // WARD MANAGEMENT ACTIONS
@@ -439,28 +477,56 @@ const IPDManagement = () => {
     }
   };
 
-  const handleAddRound = () => {
+  const handleAddRound = async () => {
     if (!roundForm.doctor_name || !roundForm.ward_name) {
       alert('Please fill in both Doctor Name and Ward Location.');
       return;
     }
-    const newRound = {
-      round_id: `RND-${Math.floor(Math.random() * 900) + 100}`,
-      ...roundForm
+    
+    // Find an admission number from the ward to satisfy backend
+    const targetPatient = ipdPatients.find(p => p.ward === roundForm.ward_name) || ipdPatients[0];
+    const admissionNumber = targetPatient ? targetPatient.id : 'ADM-001';
+
+    const payload = {
+      admission_number: admissionNumber,
+      round_type: "Routine",
+      patient_condition: "Stable",
+      clinical_findings: roundForm.clinical_notes || "Routine checkup",
+      assessment_and_plan: "Continue current care plan"
     };
-    setDoctorRounds([newRound, ...doctorRounds]);
-    setShowAddRoundModal(false);
-    setRoundForm({
-      doctor_name: '',
-      specialty: 'General Medicine',
-      ward_name: '',
-      round_date: new Date().toISOString().split('T')[0],
-      round_time: '',
-      patients_visited: '',
-      status: 'Scheduled',
-      clinical_notes: ''
-    });
-    alert('Doctor round scheduled successfully!');
+
+    try {
+      const res = await apiFetch(IPD_DOCTOR_ROUNDS, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      
+      if (!res.ok) {
+        throw new Error('Failed to create round');
+      }
+      
+      const newRound = {
+        round_id: `RND-${Math.floor(Math.random() * 900) + 100}`,
+        ...roundForm,
+        status: 'Scheduled'
+      };
+      setDoctorRounds([newRound, ...doctorRounds]);
+      setShowAddRoundModal(false);
+      setRoundForm({
+        doctor_name: '',
+        specialty: 'General Medicine',
+        ward_name: '',
+        round_date: new Date().toISOString().split('T')[0],
+        round_time: '',
+        patients_visited: '',
+        status: 'Scheduled',
+        clinical_notes: ''
+      });
+      alert('Doctor round scheduled successfully!');
+    } catch (e) {
+      console.error(e);
+      alert('Error scheduling doctor round: ' + e.message);
+    }
   };
 
   const handleDeleteRound = (roundId) => {
@@ -513,88 +579,68 @@ const IPDManagement = () => {
     }));
   };
 
-  const handleAdmission = () => {
+  const handleAdmission = async () => {
     if (!admissionForm.patientId || !admissionForm.ward || !admissionForm.diagnosis || !admissionForm.roomId) {
       alert('Please fill all required fields (including Ward and Room)');
       return;
     }
 
-    const [datePart, timePart] = (admissionForm.admissionDateTime || '').split('T');
-
-    // Auto-assign the first available bed in selectedRoomObj, or generate a bed number
     const selectedRoomObj = rooms.find(r => r.room_id === admissionForm.roomId);
     const firstAvailableBed = beds.find(b => b.room_id === admissionForm.roomId && b.bed_status === 'Available');
     const bedNumber = firstAvailableBed ? firstAvailableBed.bed_number : (selectedRoomObj ? `${selectedRoomObj.room_number}-A` : 'Auto-Assigned');
 
-    const initialConditionVal = admissionForm.triageLevel === 'Critical' ? 'Critical' : admissionForm.triageLevel === 'Urgent' ? 'Fair' : 'Stable';
-
-    const newAdmission = {
-      id: `ADM-${Date.now().toString().slice(-4)}`,
-      patientId: admissionForm.patientId,
-      patientName: patientNameSearch,
-      patientAge: admissionForm.patientAge,
-      gender: admissionForm.gender,
-      bloodGroup: admissionForm.bloodGroup,
-      admissionDate: datePart || new Date().toISOString().split('T')[0],
-      admissionTime: timePart || new Date().toTimeString().slice(0, 5),
-      admissionSource: 'OPD',
-      admissionType: admissionForm.admissionType,
-      caseType: admissionForm.caseType,
-      triageLevel: admissionForm.triageLevel,
-      initialCondition: initialConditionVal,
+    const payload = {
+      patient_ref: admissionForm.patientId,
+      admission_type: admissionForm.admissionType || 'IPD',
+      chief_complaint: admissionForm.diagnosis,
+      provisional_diagnosis: admissionForm.diagnosis,
+      admission_notes: admissionForm.admissionNotes || '',
       ward: admissionForm.ward,
-      bed: bedNumber,
-      diagnosis: admissionForm.diagnosis,
-      consultant: admissionForm.consultant,
-      department: admissionForm.department,
-      referredBy: 'Self',
-      emergencyContact: admissionForm.emergencyContact,
-      estimatedStay: admissionForm.estimatedStay,
-      admissionNotes: admissionForm.admissionNotes,
-      status: 'Admitted',
-      estimatedDischarge: new Date(Date.now() + parseInt(admissionForm.estimatedStay || 3) * 24 * 60 * 60 * 1000)
-        .toISOString().split('T')[0],
-      roomCharges: wards.find(w => w.name === admissionForm.ward)?.rate || 0,
-      totalBill: 0
+      room_number: selectedRoomObj ? selectedRoomObj.room_number : '',
+      bed_number: bedNumber,
+      expected_length_of_stay: parseInt(admissionForm.estimatedStay) || null
     };
 
-    setIpdPatients([newAdmission, ...ipdPatients]);
-
-    // Update bed status to Occupied
-    if (firstAvailableBed) {
-      setBeds(beds.map(b => b.bed_id === firstAvailableBed.bed_id ? { ...b, bed_status: 'Occupied', patient_id: admissionForm.patientId } : b));
+    try {
+      const res = await apiFetch(IPD_ADMISSIONS, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        throw new Error('Failed to admit patient');
+      }
+      
+      alert('Patient admitted successfully and bed assigned!');
+      
+      // Reload IPD data to reflect changes
+      loadIPDData();
+      
+      setAdmissionForm({
+        patientId: '',
+        patientAge: '',
+        gender: 'Male',
+        bloodGroup: '',
+        admissionDateTime: new Date().toISOString().slice(0, 16),
+        caseType: 'Medical',
+        triageLevel: 'Routine',
+        diagnosis: '',
+        ward: '',
+        roomId: '',
+        consultant: '',
+        department: '',
+        emergencyContact: '',
+        estimatedStay: '',
+        admissionType: 'Routine',
+        admissionNotes: ''
+      });
+      setPatientNameSearch('');
+      setDoctorSearch('');
+      setDeptSearch('');
+      setShowAdmissionForm(false);
+    } catch (e) {
+      console.error(e);
+      alert('Error admitting patient: ' + e.message);
     }
-
-    // Update ward availability
-    setWards(wards.map(ward =>
-      ward.name === admissionForm.ward
-        ? { ...ward, availableBeds: Math.max(0, ward.availableBeds - 1) }
-        : ward
-    ));
-
-    alert('Patient admitted successfully and bed assigned!');
-    setAdmissionForm({
-      patientId: '',
-      patientAge: '',
-      gender: 'Male',
-      bloodGroup: '',
-      admissionDateTime: new Date().toISOString().slice(0, 16),
-      caseType: 'Medical',
-      triageLevel: 'Routine',
-      diagnosis: '',
-      ward: '',
-      roomId: '',
-      consultant: '',
-      department: '',
-      emergencyContact: '',
-      estimatedStay: '',
-      admissionType: 'Routine',
-      admissionNotes: ''
-    });
-    setPatientNameSearch('');
-    setDoctorSearch('');
-    setDeptSearch('');
-    setShowAdmissionForm(false);
   };
 
   const initiateTransfer = (patient) => {

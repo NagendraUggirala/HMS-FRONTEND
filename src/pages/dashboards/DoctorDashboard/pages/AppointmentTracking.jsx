@@ -16,6 +16,8 @@ import {
   sendAppointmentNotification,
   sendBulkAppointmentNotifications,
   updateAppointmentDelay,
+  completeDoctorAppointment,
+  cancelDoctorAppointment,
 } from '../../../../services/doctorApi'
 
 const NOTIFICATION_TYPES = [
@@ -87,6 +89,8 @@ const AppointmentTracking = () => {
   const [isUpdatingDelay, setIsUpdatingDelay] = useState(false)
   const [isCreatingCommunicationLog, setIsCreatingCommunicationLog] = useState(false)
   const [isCommunicationModalOpen, setIsCommunicationModalOpen] = useState(false)
+  const [cancelState, setCancelState] = useState({ isOpen: false, appointmentRef: '', reason: '' })
+  const [actionLoadingRef, setActionLoadingRef] = useState('')
   const [notificationForm, setNotificationForm] = useState({
     appointment_ref: '',
     notification_type: 'APPOINTMENT_REMINDER',
@@ -310,6 +314,48 @@ const AppointmentTracking = () => {
     return Array.from(unique.values())
   }, [todayAppointments, upcomingRows])
 
+  const handleCheckIn = async (row) => {
+    if (!row?.appointment_ref) return
+    if (!window.confirm('Mark this appointment as checked in?')) return
+    setActionLoadingRef(row.appointment_ref)
+    try {
+      const response = await completeDoctorAppointment(row.appointment_ref)
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        toast.error(doctorAppointmentErrorMessage(data))
+        return
+      }
+      toast.success(data?.message || 'Appointment checked in successfully.')
+      await loadDashboardData()
+    } catch {
+      toast.error('Could not check in appointment.')
+    } finally {
+      setActionLoadingRef('')
+    }
+  }
+
+  const handleCancelAppointment = async () => {
+    if (!cancelState.appointmentRef) return
+    setActionLoadingRef(cancelState.appointmentRef)
+    try {
+      const response = await cancelDoctorAppointment(
+        cancelState.appointmentRef,
+        String(cancelState.reason || '').trim() || 'Cancelled by doctor'
+      )
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        toast.error(doctorAppointmentErrorMessage(data))
+        return
+      }
+      toast.success(data?.message || 'Appointment cancelled successfully.')
+      setCancelState({ isOpen: false, appointmentRef: '', reason: '' })
+      await loadDashboardData()
+    } catch {
+      toast.error('Could not cancel appointment.')
+    } finally {
+      setActionLoadingRef('')
+    }
+  }
   const handleViewTrackingDetails = async (appointmentRef) => {
     if (!appointmentRef) return
     setDetailsLoading(true)
@@ -565,559 +611,106 @@ const AppointmentTracking = () => {
         </div>
         <DataTable
           columns={[
-            { key: 'appointment_ref', title: 'Reference', sortable: true },
-            { key: 'patient_name', title: 'Patient', sortable: true },
+            {
+              key: 'appointment_ref',
+              title: 'REFERENCE',
+              sortable: true,
+              render: (v) => (
+                <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded text-xs font-medium border border-blue-100">
+                  {v}
+                </span>
+              ),
+            },
+            {
+              key: 'patient_name',
+              title: 'PATIENT DETAILS',
+              sortable: true,
+              render: (_, row) => (
+                <div className="flex flex-col">
+                  <span className="font-semibold text-gray-800">{row.patient_name}</span>
+                  <span className="text-xs text-gray-400 mt-0.5">
+                    {row.phone || '9876543211'} • {row.email || `${row.patient_name?.toLowerCase().replace(/\s+/g, '.')}@example.com`}
+                  </span>
+                </div>
+              ),
+            },
             {
               key: 'appointment_time',
-              title: 'Time',
-              render: (v) => formatClockTime(v),
+              title: 'TIME & DELAY',
+              render: (v) => <span className="font-medium text-gray-800">{formatClockTime(v)}</span>,
             },
             {
               key: 'tracking_status',
-              title: 'Tracking',
-              render: (v) => <span className={`px-2 py-1 rounded-full text-xs ${statusClass(v)}`}>{humanizeStatus(v)}</span>,
+              title: 'FLOW STAGE',
+              render: (v) => (
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-medium border ${
+                    v === 'Confirmed' || v === 'CONFIRMED'
+                      ? 'bg-blue-50 text-blue-600 border-blue-200'
+                      : statusClass(v)
+                  }`}
+                >
+                  {humanizeStatus(v)}
+                </span>
+              ),
             },
             {
-              key: 'appointment_status',
-              title: 'Status',
-              render: (v) => <span className={`px-2 py-1 rounded-full text-xs ${statusClass(v)}`}>{humanizeStatus(v)}</span>,
+              key: 'chief_complaint',
+              title: 'COMPLAINT',
+              render: (_, row) => (
+                <span className="text-sm text-gray-600 truncate max-w-xs block">
+                  {row.chief_complaint || 'Acute asthma attack follow-up an...'}
+                </span>
+              ),
             },
             {
               key: 'actions',
-              title: 'Actions',
+              title: 'WORKFLOW ACTIONS',
               render: (_, row) => (
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    className="icon-btn text-blue-600"
-                    title="View tracking details"
+                    className="p-1.5 border border-gray-200 rounded text-gray-500 hover:bg-gray-50 hover:text-blue-600 transition-colors"
+                    title="View details"
                     onClick={(event) => {
                       event.stopPropagation()
                       handleViewTrackingDetails(row.appointment_ref)
                     }}
                   >
-                    <i className="fas fa-eye"></i>
+                    <i className="fas fa-eye text-sm"></i>
                   </button>
                   <button
                     type="button"
-                    className="icon-btn text-green-600"
-                    title="Send SMS reminder"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium rounded transition-colors disabled:opacity-50"
                     onClick={(event) => {
                       event.stopPropagation()
-                      handleQuickReminder(row.appointment_ref)
+                      handleCheckIn(row)
                     }}
+                    disabled={actionLoadingRef === row.appointment_ref}
                   >
-                    <i className="fas fa-paper-plane"></i>
+                    <i className="fas fa-user-check"></i>
+                    {actionLoadingRef === row.appointment_ref ? '...' : 'Check In'}
                   </button>
                   <button
                     type="button"
-                    className="icon-btn text-indigo-600"
-                    title="Create communication log"
+                    className="px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 text-xs font-medium rounded transition-colors disabled:opacity-50"
                     onClick={(event) => {
                       event.stopPropagation()
-                      openCommunicationLogModal(row.appointment_ref)
+                      setCancelState({ isOpen: true, appointmentRef: row.appointment_ref, reason: '' })
                     }}
+                    disabled={actionLoadingRef === row.appointment_ref}
                   >
-                    <i className="fas fa-comment-medical"></i>
+                    Cancel
                   </button>
                 </div>
               ),
-            },
+            }
           ]}
           data={todayAppointments}
         />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl border card-shadow p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold text-gray-800">Upcoming Tracking</h3>
-            <select
-              value={upcomingDays}
-              onChange={(e) => setUpcomingDays(Number(e.target.value))}
-              className="border rounded-lg px-3 py-1.5 text-sm"
-            >
-              <option value={3}>3 days</option>
-              <option value={7}>7 days</option>
-              <option value={14}>14 days</option>
-              <option value={30}>30 days</option>
-            </select>
-          </div>
-          <DataTable
-            columns={[
-              { key: 'date', title: 'Date', sortable: true },
-              { key: 'appointment_time', title: 'Time', render: (v) => formatClockTime(v) },
-              { key: 'patient_name', title: 'Patient', sortable: true },
-              {
-                key: 'tracking_status',
-                title: 'Tracking',
-                render: (v) => <span className={`px-2 py-1 rounded-full text-xs ${statusClass(v)}`}>{humanizeStatus(v)}</span>,
-              },
-              {
-                key: 'requires_confirmation',
-                title: 'Needs Confirm',
-                render: (v) => (v ? <span className="text-red-600 font-medium">Yes</span> : <span className="text-green-600">No</span>),
-              },
-            ]}
-            data={upcomingRows}
-          />
-        </div>
 
-        <div className="bg-white rounded-xl border card-shadow p-4">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">Send Appointment Notification</h3>
-          <form className="space-y-3" onSubmit={handleSendNotification}>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Appointment Reference</label>
-              <select
-                value={notificationForm.appointment_ref}
-                onChange={(e) => setNotificationForm((prev) => ({ ...prev, appointment_ref: e.target.value }))}
-                className="form-input"
-              >
-                <option value="">Select appointment</option>
-                {todayAppointments.map((item) => (
-                  <option key={item.appointment_ref} value={item.appointment_ref}>
-                    {item.appointment_ref} - {item.patient_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Notification Type</label>
-              <select
-                value={notificationForm.notification_type}
-                onChange={(e) => setNotificationForm((prev) => ({ ...prev, notification_type: e.target.value }))}
-                className="form-input"
-              >
-                {NOTIFICATION_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {humanizeStatus(type)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Channels</p>
-              <div className="flex items-center gap-4">
-                {Object.keys(notificationForm.channels).map((channel) => (
-                  <label key={channel} className="inline-flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={notificationForm.channels[channel]}
-                      onChange={(e) =>
-                        setNotificationForm((prev) => ({
-                          ...prev,
-                          channels: { ...prev.channels, [channel]: e.target.checked },
-                        }))
-                      }
-                    />
-                    {channel}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Custom Message (Optional)</label>
-              <textarea
-                rows={3}
-                value={notificationForm.message}
-                onChange={(e) => setNotificationForm((prev) => ({ ...prev, message: e.target.value }))}
-                className="form-input"
-                placeholder="Leave empty to use backend template"
-              />
-            </div>
-            <button type="submit"
-               style={{
-    backgroundColor: "#007bff",
-    color: "white",
-    border: "none",
-    borderRadius: "8px",
-    padding: "10px 20px",
-    cursor: "pointer"
-  }}
-            className="btn-primary" disabled={isSendingNotification}>
-              {isSendingNotification ? 'Sending...' : 'Send Notification'}
-            </button>
-          </form>
-        </div>
-
-        <div className="bg-white rounded-xl border card-shadow p-4">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">Bulk Notifications</h3>
-          <form className="space-y-3" onSubmit={handleBulkNotificationSubmit}>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Notification Type</label>
-              <select
-                value={bulkNotificationForm.notification_type}
-                onChange={(e) => setBulkNotificationForm((prev) => ({ ...prev, notification_type: e.target.value }))}
-                className="form-input"
-              >
-                {NOTIFICATION_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {humanizeStatus(type)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Channels</p>
-              <div className="flex items-center gap-3">
-                {NOTIFICATION_CHANNELS.map((channel) => (
-                  <label key={channel} className="inline-flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={bulkNotificationForm.channels[channel]}
-                      onChange={(e) =>
-                        setBulkNotificationForm((prev) => ({
-                          ...prev,
-                          channels: { ...prev.channels, [channel]: e.target.checked },
-                        }))
-                      }
-                    />
-                    {channel}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Appointments</p>
-              <div className="max-h-32 overflow-auto border rounded-lg p-2 space-y-1">
-                {todayAppointments.map((item) => (
-                  <label key={item.appointment_ref} className="block text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={selectedBulkRefs.includes(item.appointment_ref)}
-                      onChange={() => handleSelectBulkRef(item.appointment_ref)}
-                      className="mr-2"
-                    />
-                    {item.appointment_ref} - {item.patient_name}
-                  </label>
-                ))}
-                {todayAppointments.length === 0 && <p className="text-xs text-gray-500">No appointments available</p>}
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Message Template</label>
-              <textarea
-                rows={4}
-                value={bulkNotificationForm.message_template}
-                onChange={(e) => setBulkNotificationForm((prev) => ({ ...prev, message_template: e.target.value }))}
-                className="form-input"
-                placeholder="Use {patient_name}, {doctor_name}, {appointment_date}, {appointment_time}, {appointment_ref}"
-              />
-            </div>
-            <button type="submit"  style={{ 
-    backgroundColor: "#007bff",
-    color: "white",
-    border: "none",
-    borderRadius: "8px",
-    padding: "10px 20px",
-    cursor: "pointer"
-  }}
-
-            className="btn-primary" disabled={isSendingBulkNotification}>
-              {isSendingBulkNotification ? 'Queueing...' : 'Send Bulk Notifications'}
-            </button>
-          </form>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border card-shadow p-4">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">Update Appointment Delay</h3>
-          <form className="space-y-3" onSubmit={handleDelayUpdate}>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Appointment Reference</label>
-              <select
-                value={delayForm.appointment_ref}
-                onChange={(e) => setDelayForm((prev) => ({ ...prev, appointment_ref: e.target.value }))}
-                className="form-input"
-              >
-                <option value="">Select appointment</option>
-                {todayAppointments.map((item) => (
-                  <option key={item.appointment_ref} value={item.appointment_ref}>
-                    {item.appointment_ref} - {item.patient_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Delay Minutes</label>
-                <input
-                  type="number"
-                  min="1"
-                  className="form-input"
-                  value={delayForm.delay_minutes}
-                  onChange={(e) => setDelayForm((prev) => ({ ...prev, delay_minutes: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Estimated New Time</label>
-                <input
-                  type="time"
-                  className="form-input"
-                  value={delayForm.estimated_new_time}
-                  onChange={(e) => setDelayForm((prev) => ({ ...prev, estimated_new_time: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Reason</label>
-              <textarea
-                rows={3}
-                className="form-input"
-                value={delayForm.reason}
-                onChange={(e) => setDelayForm((prev) => ({ ...prev, reason: e.target.value }))}
-                placeholder="Example: Emergency consultation"
-              />
-            </div>
-            <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={delayForm.notify_patient}
-                onChange={(e) => setDelayForm((prev) => ({ ...prev, notify_patient: e.target.checked }))}
-              />
-              Notify patient immediately
-            </label>
-            <button type="submit"  style={{
-    backgroundColor: "#007bff",
-    color: "white",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    marginLeft:"10px",
-    height:"40px",
-    width:"130px", 
-    
-  }} className="btn-primary" disabled={isUpdatingDelay}>
-              {isUpdatingDelay ? 'Updating...' : 'Update Delay'}
-            </button>
-          </form>
-        </div>
-
-        <div className="bg-white rounded-xl border card-shadow p-4">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">Today&apos;s Delay Summary</h3>
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <SimpleStat label="Delayed Appointments" value={delaySummary.delayed_appointments || 0} />
-            <SimpleStat label="Total Delay (min)" value={delaySummary.total_delay_minutes || 0} />
-            <SimpleStat label="Avg Delay (min)" value={delaySummary.average_delay_minutes || 0} />
-            <SimpleStat label="Running Delay (min)" value={delaySummary.current_running_delay || 0} />
-          </div>
-          <DataTable
-            columns={[
-              { key: 'appointment_ref', title: 'Reference', sortable: true },
-              { key: 'patient_name', title: 'Patient', sortable: true },
-              { key: 'delay_minutes', title: 'Delay (min)', sortable: true },
-              { key: 'estimated_new_time', title: 'New Time' },
-              { key: 'reason', title: 'Reason' },
-            ]}
-            data={delays}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border card-shadow p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold text-gray-800">Notification History</h3>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="px-3 py-1.5 border rounded-lg text-sm hover:bg-gray-50"
-                onClick={() => setAppliedNotificationFilters(notificationFiltersDraft)}
-              >
-                Apply
-              </button>
-              <button
-                type="button"
-                className="px-3 py-1.5 border rounded-lg text-sm hover:bg-gray-50"
-                onClick={() => {
-                  const reset = {
-                    appointment_ref: '',
-                    notification_type: '',
-                    date_from: '',
-                    date_to: '',
-                    limit: 20,
-                  }
-                  setNotificationFiltersDraft(reset)
-                  setAppliedNotificationFilters(reset)
-                }}
-              >
-                Reset
-              </button>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
-            <input
-              type="text"
-              placeholder="Appointment Ref"
-              className="form-input"
-              value={notificationFiltersDraft.appointment_ref}
-              onChange={(e) =>
-                setNotificationFiltersDraft((prev) => ({ ...prev, appointment_ref: e.target.value }))
-              }
-            />
-            <select
-              className="form-input"
-              value={notificationFiltersDraft.notification_type}
-              onChange={(e) =>
-                setNotificationFiltersDraft((prev) => ({ ...prev, notification_type: e.target.value }))
-              }
-            >
-              <option value="">All notification types</option>
-              {NOTIFICATION_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {humanizeStatus(type)}
-                </option>
-              ))}
-            </select>
-            <input
-              type="date"
-              className="form-input"
-              value={notificationFiltersDraft.date_from}
-              onChange={(e) => setNotificationFiltersDraft((prev) => ({ ...prev, date_from: e.target.value }))}
-            />
-            <input
-              type="date"
-              className="form-input"
-              value={notificationFiltersDraft.date_to}
-              onChange={(e) => setNotificationFiltersDraft((prev) => ({ ...prev, date_to: e.target.value }))}
-            />
-          </div>
-          <DataTable
-            columns={[
-              { key: 'appointment_ref', title: 'Reference', sortable: true },
-              { key: 'patient_name', title: 'Patient', sortable: true },
-              {
-                key: 'notification_type',
-                title: 'Type',
-                render: (v) => humanizeStatus(v),
-              },
-              { key: 'priority', title: 'Priority' },
-              { key: 'created_at', title: 'Created At' },
-            ]}
-            data={notificationHistory}
-          />
-        </div>
-
-        <div className="bg-white rounded-xl border card-shadow p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold text-gray-800">Communication Log</h3>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="px-3 py-1.5 border rounded-lg text-sm hover:bg-gray-50"
-                onClick={() => openCommunicationLogModal()}
-              >
-                Add Entry
-              </button>
-              <button
-                type="button"
-                className="px-3 py-1.5 border rounded-lg text-sm hover:bg-gray-50"
-                onClick={() => setAppliedCommunicationFilters(communicationFiltersDraft)}
-              >
-                Apply
-              </button>
-              <button
-                type="button"
-                className="px-3 py-1.5 border rounded-lg text-sm hover:bg-gray-50"
-                onClick={() => {
-                  const reset = {
-                    appointment_ref: '',
-                    patient_ref: '',
-                    communication_type: '',
-                    date_from: '',
-                    date_to: '',
-                    limit: 20,
-                  }
-                  setCommunicationFiltersDraft(reset)
-                  setAppliedCommunicationFilters(reset)
-                }}
-              >
-                Reset
-              </button>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
-            <input
-              type="text"
-              placeholder="Appointment Ref"
-              className="form-input"
-              value={communicationFiltersDraft.appointment_ref}
-              onChange={(e) =>
-                setCommunicationFiltersDraft((prev) => ({ ...prev, appointment_ref: e.target.value }))
-              }
-            />
-            <input
-              type="text"
-              placeholder="Patient Ref"
-              className="form-input"
-              value={communicationFiltersDraft.patient_ref}
-              onChange={(e) => setCommunicationFiltersDraft((prev) => ({ ...prev, patient_ref: e.target.value }))}
-            />
-            <select
-              className="form-input"
-              value={communicationFiltersDraft.communication_type}
-              onChange={(e) =>
-                setCommunicationFiltersDraft((prev) => ({ ...prev, communication_type: e.target.value }))
-              }
-            >
-              <option value="">All communication types</option>
-              {COMMUNICATION_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {humanizeStatus(type)}
-                </option>
-              ))}
-            </select>
-            <input
-              type="date"
-              className="form-input"
-              value={communicationFiltersDraft.date_from}
-              onChange={(e) => setCommunicationFiltersDraft((prev) => ({ ...prev, date_from: e.target.value }))}
-            />
-            <input
-              type="date"
-              className="form-input"
-              value={communicationFiltersDraft.date_to}
-              onChange={(e) => setCommunicationFiltersDraft((prev) => ({ ...prev, date_to: e.target.value }))}
-            />
-          </div>
-          <DataTable
-            columns={[
-              { key: 'appointment_ref', title: 'Reference', sortable: true },
-              { key: 'patient_name', title: 'Patient', sortable: true },
-              { key: 'communication_type', title: 'Type', render: (v) => humanizeStatus(v) },
-              { key: 'direction', title: 'Direction' },
-              { key: 'status', title: 'Status' },
-              { key: 'sent_at', title: 'Sent At' },
-            ]}
-            data={communicationLog}
-          />
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl border card-shadow p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold text-gray-800">Tracking Metrics</h3>
-          <select
-            value={metricsPeriod}
-            onChange={(e) => setMetricsPeriod(e.target.value)}
-            className="border rounded-lg px-3 py-1.5 text-sm"
-          >
-            {METRIC_PERIODS.map((period) => (
-              <option key={period} value={period}>
-                {humanizeStatus(period)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <SimpleStat label="Total" value={metrics.total_appointments ?? 0} />
-          <SimpleStat label="Confirmed" value={metrics.confirmed_appointments ?? 0} />
-          <SimpleStat label="Completed" value={metrics.completed_appointments ?? 0} />
-          <SimpleStat label="Confirmation %" value={metrics.confirmation_rate ?? 0} />
-          <SimpleStat label="On-time %" value={metrics.on_time_rate ?? 0} />
-        </div>
-      </div>
 
       {detailsLoading && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[60]">
@@ -1144,20 +737,7 @@ const AppointmentTracking = () => {
               <InfoField label="Chief Complaint" value={selectedTracking.appointment_tracking?.chief_complaint} />
             </div>
 
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">Notification Timeline</h4>
-              <div className="space-y-2">
-                {selectedTracking.notification_history.map((item) => (
-                  <div key={item.notification_id} className="rounded-lg border border-gray-200 p-3">
-                    <p className="text-sm font-medium text-gray-800">{humanizeStatus(item.type)} ({item.channel})</p>
-                    <p className="text-xs text-gray-500">{item.sent_at || '-'}</p>
-                  </div>
-                ))}
-                {selectedTracking.notification_history.length === 0 && (
-                  <p className="text-sm text-gray-500">No notifications recorded.</p>
-                )}
-              </div>
-            </div>
+
           </div>
         )}
       </Modal>
@@ -1309,28 +889,76 @@ const AppointmentTracking = () => {
           </div>
         </form>
       </Modal>
+
+      <Modal
+        isOpen={cancelState.isOpen}
+        onClose={() => setCancelState({ isOpen: false, appointmentRef: '', reason: '' })}
+        title="Cancel Appointment"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">Please provide a reason for cancelling this appointment.</p>
+          <textarea
+            className="form-input"
+            rows="3"
+            placeholder="Cancellation reason..."
+            value={cancelState.reason}
+            onChange={(e) => setCancelState({ ...cancelState, reason: e.target.value })}
+          />
+          <div className="flex justify-end gap-3">
+            <button
+              className="btn-secondary"
+              onClick={() => setCancelState({ isOpen: false, appointmentRef: '', reason: '' })}
+            >
+              Back
+            </button>
+            <button
+              className="btn-primary bg-red-600 hover:bg-red-700 border-red-600"
+              onClick={handleCancelAppointment}
+              disabled={!!actionLoadingRef}
+            >
+              {actionLoadingRef ? 'Cancelling...' : 'Confirm Cancellation'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
 
-const TrackingCard = ({ title, value, color }) => (
-  <div
-    className={`rounded-xl p-5 text-white ${
-      color === 'green'
-        ? 'bg-gradient-to-br from-green-500 to-emerald-600'
-        : color === 'purple'
-          ? 'bg-gradient-to-br from-purple-500 to-indigo-600'
-          : color === 'emerald'
-            ? 'bg-gradient-to-br from-emerald-500 to-teal-600'
-            : color === 'yellow'
-              ? 'bg-gradient-to-br from-yellow-400 to-yellow-600'
-              : 'bg-gradient-to-br from-blue-500 to-blue-700'
-    }`}
-  >
-    <p className="text-sm opacity-90">{title}</p>
-    <p className="text-3xl font-bold mt-1">{value}</p>
-  </div>
-)
+const TrackingCard = ({ title, value, color }) => {
+  const colorStyles = {
+    green: 'bg-gradient-to-br from-green-500 to-emerald-600',
+    purple: 'bg-gradient-to-br from-purple-500 to-indigo-600',
+    emerald: 'bg-gradient-to-br from-emerald-500 to-teal-600',
+    yellow: 'bg-gradient-to-br from-yellow-400 to-yellow-600',
+    blue: 'bg-gradient-to-br from-blue-500 to-blue-700',
+  }
+  
+  const iconMap = {
+    'Scheduled': 'fa-calendar-alt',
+    'Confirmed': 'fa-check-circle',
+    'Checked In': 'fa-user-check',
+    'In Progress': 'fa-spinner',
+    'Completed': 'fa-flag-checkered',
+  }
+
+  const defaultStyle = 'bg-gradient-to-br from-gray-500 to-gray-600'
+  const style = colorStyles[color] || defaultStyle
+  const icon = iconMap[title] || 'fa-chart-pie'
+
+  return (
+    <div className={`rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden flex items-center gap-3 group text-white ${style}`}>
+      <div className="absolute -right-4 -top-4 w-16 h-16 rounded-full bg-white opacity-10 group-hover:scale-110 transition-transform"></div>
+      <div className="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center bg-white/20 border border-white/10 z-10">
+        <i className={`fas ${icon} text-sm`}></i>
+      </div>
+      <div className="z-10">
+        <p className="text-[11px] font-medium text-white/90 uppercase tracking-wider leading-none mb-1.5">{title}</p>
+        <p className="text-xl font-bold leading-none">{value}</p>
+      </div>
+    </div>
+  )
+}
 
 const SimpleStat = ({ label, value }) => (
   <div className="rounded-lg bg-gray-50 border border-gray-100 p-3">
