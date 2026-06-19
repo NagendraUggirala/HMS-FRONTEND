@@ -31,6 +31,7 @@ import {
   SUPER_ADMIN_PERFORMANCE_ANALYTICS,
   SUPER_ADMIN_DASHBOARD_OVERVIEW_CARDS,
   SUPER_ADMIN_ANALYTICS_OVERVIEW,
+  SUPER_ADMIN_SUBSCRIPTION_PLANS,
 } from "../../../../config/api";
 
 const ReportsAnalytics = () => {
@@ -64,35 +65,37 @@ const [lastUpdateSource, setLastUpdateSource] = useState(null);
   const [isPerformanceModalOpen, setIsPerformanceModalOpen] = useState(false);
 
   const [subscriptionReports, setSubscriptionReports] = useState([]);
+  const [hospitalList, setHospitalList] = useState([]);
+  const [planList, setPlanList] = useState([]);
   // Super Admin Dashboard Metrics
   const [platformMetrics, setPlatformMetrics] = useState({
     subscription: {
-      totalHospitals: 150,
-      activeSubscriptions: 150,
-      churnRate: 3.2,
-      newSubscriptions: 28,
-      revenueGrowth: 24.5,
+      totalHospitals: 0,
+      activeSubscriptions: 0,
+      churnRate: 0,
+      newSubscriptions: 0,
+      revenueGrowth: 0,
     },
     financial: {
-      totalRevenue: 2450000,
-      monthlyRecurringRevenue: 204167,
-      annualRecurringRevenue: 2450000,
-      averageRevenuePerUser: 16333,
-      collectionRate: 92.5,
+      totalRevenue: 0,
+      monthlyRecurringRevenue: 0,
+      annualRecurringRevenue: 0,
+      averageRevenuePerUser: 0,
+      collectionRate: 0,
     },
     performance: {
-      platformUptime: 99.9,
-      apiResponseTime: 185,
-      customerSatisfaction: 4.7,
-      supportResolutionRate: 96.2,
-      featureAdoption: 78.5,
+      platformUptime: 0,
+      apiResponseTime: 0,
+      customerSatisfaction: 0,
+      supportResolutionRate: 0,
+      featureAdoption: 0,
     },
     usage: {
-      activeUsers: 2450,
-      dailyLogins: 1850,
-      apiCalls: 125000,
-      dataStorage: 285,
-      bandwidthUsage: 450,
+      activeUsers: 0,
+      dailyLogins: 0,
+      apiCalls: 0,
+      dataStorage: 0,
+      bandwidthUsage: 0,
     },
   });
 
@@ -192,9 +195,12 @@ const [lastUpdateSource, setLastUpdateSource] = useState(null);
     setLoadingAnalytics(true);
     try {
       // 1. Dashboard Overview Cards
-      const overviewRes = await apiFetch(`${SUPER_ADMIN_DASHBOARD_OVERVIEW_CARDS(30, 6)}`);
+      const overviewResRaw = await apiFetch(`${SUPER_ADMIN_DASHBOARD_OVERVIEW_CARDS(30, 6)}`);
+      const overviewRes = overviewResRaw.ok ? await overviewResRaw.json() : null;
+      
       // 2. Performance Analytics (for Uptime and Satisfaction)
-      const performanceRes = await apiFetch(SUPER_ADMIN_PERFORMANCE_ANALYTICS);
+      const performanceResRaw = await apiFetch(SUPER_ADMIN_PERFORMANCE_ANALYTICS);
+      const performanceRes = performanceResRaw.ok ? await performanceResRaw.json() : null;
       
       // Update platformMetrics with overview and performance data
       if (overviewRes?.data) {
@@ -234,16 +240,18 @@ const [lastUpdateSource, setLastUpdateSource] = useState(null);
       };
 
       // 3. Subscription Analytics (Charts)
-      const subAnalyticsRes = await apiFetch(SUPER_ADMIN_SUBSCRIPTION_ANALYTICS, {
+      const subAnalyticsResRaw = await apiFetch(SUPER_ADMIN_SUBSCRIPTION_ANALYTICS, {
         method: 'POST',
         body: payload
       });
+      const subAnalyticsRes = subAnalyticsResRaw.ok ? await subAnalyticsResRaw.json() : null;
 
       // 4. Financial Analytics (Charts)
-      const finAnalyticsRes = await apiFetch(SUPER_ADMIN_FINANCIAL_ANALYTICS, {
+      const finAnalyticsResRaw = await apiFetch(SUPER_ADMIN_FINANCIAL_ANALYTICS, {
         method: 'POST',
         body: payload
       });
+      const finAnalyticsRes = finAnalyticsResRaw.ok ? await finAnalyticsResRaw.json() : null;
 
       setAnalyticsData(prev => ({
         ...prev,
@@ -263,6 +271,10 @@ const [lastUpdateSource, setLastUpdateSource] = useState(null);
     fetchAnalyticsData();
     fetchReports();
   }, [dateRange.startDate, dateRange.endDate]);
+
+  useEffect(() => {
+    fetchDropdownData();
+  }, []);
 
   useEffect(() => {
     filterReports();
@@ -359,9 +371,9 @@ const calculateUptimeChange = () => {
 };
 
 const calculateSatisfactionChange = () => {
-  if (performanceReports.length < 2) return 2.1;
-  let currentSatisfaction = 4.5;
-  let previousSatisfaction = 4.5;
+  if (performanceReports.length < 2) return 0;
+  let currentSatisfaction = 0;
+  let previousSatisfaction = 0;
   
   if (performanceReports[0]?.calculatedSatisfaction) {
     currentSatisfaction = parseFloat(performanceReports[0].calculatedSatisfaction);
@@ -401,13 +413,48 @@ const handleTimePeriodChange = (period) => {
   setDateRange({ startDate: start, endDate: now });
 };
 
+  const fetchDropdownData = async () => {
+    try {
+      const [hospitalsResRaw, plansResRaw] = await Promise.all([
+        apiFetch(`${SUPER_ADMIN_HOSPITALS}?page=1&limit=100`),
+        apiFetch(SUPER_ADMIN_SUBSCRIPTION_PLANS)
+      ]);
+
+      if (hospitalsResRaw.ok) {
+        const response = await hospitalsResRaw.json();
+        const raw = response?.data ?? response;
+        const hospitals = Array.isArray(raw?.items) ? raw.items : 
+                          Array.isArray(raw?.hospitals) ? raw.hospitals : 
+                          Array.isArray(raw) ? raw : [];
+        setHospitalList(hospitals);
+      }
+
+      if (plansResRaw.ok) {
+        const response = await plansResRaw.json();
+        const raw = response?.data ?? response;
+        const plans = Array.isArray(raw?.items) ? raw.items : 
+                      Array.isArray(raw?.plans) ? raw.plans : 
+                      Array.isArray(raw) ? raw : [];
+        setPlanList(plans);
+      }
+    } catch (error) {
+      console.error('Failed to fetch dropdown data:', error);
+    }
+  };
+
 
   const fetchReports = async () => {
     try {
-      const response = await apiFetch(SUPER_ADMIN_ANALYTICS_OVERVIEW);
-      if (response && response.data) {
-        setReports(response.data.reports || []);
-        setFilteredReports(response.data.reports || []);
+      const responseRaw = await apiFetch(SUPER_ADMIN_ANALYTICS_OVERVIEW);
+      if (responseRaw.ok) {
+        const response = await responseRaw.json();
+        if (response && response.data) {
+          setReports(response.data.reports || []);
+          setFilteredReports(response.data.reports || []);
+        } else {
+          setReports([]);
+          setFilteredReports([]);
+        }
       } else {
         setReports([]);
         setFilteredReports([]);
@@ -725,7 +772,7 @@ const handleGenerateReport = async (e) => {
     };
 
     setSubscriptionReports((prev) => [subscriptionEntry, ...prev]);
-    setShowSubscriptionTable(true);
+    setIsSubscriptionModalOpen(true);
 
     // UPDATE CHARTS ONLY if checkbox is checked
     if (shouldUpdateCharts) {
@@ -783,6 +830,7 @@ const handleGenerateReport = async (e) => {
     };
 
     setFinancialReports((prev) => [financialReport, ...prev]);
+    setIsFinancialModalOpen(true);
 
     // UPDATE CHARTS ONLY if checkbox is checked
     if (shouldUpdateCharts) {
@@ -1613,7 +1661,7 @@ resetNewReportForm();   //  important
     };
 
     const exportToExcel = () => {
-      const allData = reports.map((r) => ({
+      const allData = financialReports.map((r) => ({
         "Hospital Name": r.hospitalName,
         "Plan Type": r.planType,
         "Billing Cycle": r.billingCycle,
@@ -1772,7 +1820,7 @@ resetNewReportForm();   //  important
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    InvoiceId
+                    Invoice ID
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Hospital
@@ -1799,7 +1847,7 @@ resetNewReportForm();   //  important
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {reports.map((report) => (
+                {financialReports.map((report) => (
                   <tr
                     key={report.id}
                     className="hover:bg-gray-50 transition-colors"
@@ -2173,7 +2221,7 @@ resetNewReportForm();   //  important
     };
 
     const exportToExcel = () => {
-      const allData = reports.map((r) => ({
+      const allData = performanceReports.map((r) => ({
         "Hospital Name": r.hospitalName,
         "Hospital ID": r.hospitalId,
         "Service Status": r.serviceStatus,
@@ -2353,7 +2401,7 @@ resetNewReportForm();   //  important
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {reports.map((report) => (
+                {performanceReports.map((report) => (
                   <tr
                     key={report.id}
                     className="hover:bg-gray-50 transition-colors"
@@ -2700,16 +2748,6 @@ const resetNewReportForm = () => {
       },
       color: "from-green-500 to-green-600",
     },
-    {
-      title: "Platform Performance",
-      icon: "fa-tachometer-alt",
-      description: "Monitor platform uptime and usage",
-      action: () => {
-        setActiveCard("performance");
-        setIsPerformanceModalOpen(true); // Open performance modal
-      },
-      color: "from-purple-500 to-purple-600",
-    },
   ];
 
   // Enhanced Status Badge Component
@@ -2893,450 +2931,7 @@ const resetNewReportForm = () => {
           </div>
         </div>
       </div>
-      {/* Quick Actions - MOBILE OPTIMIZED */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
-        {quickActions.map((action, index) => (
-          <div key={index} className="col-span-1">
-            {/* CARD BUTTON */}
-            <button
-              onClick={action.action}
-              className="w-full bg-gradient-to-br from-white to-gray-50 p-4 md:p-6 rounded-2xl shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300 transform hover:-translate-y-1 text-left group"
-            >
-              <div
-                className={`inline-flex p-2 md:p-3 rounded-xl bg-gradient-to-br ${action.color} mb-3 md:mb-4`}
-              >
-                <i
-                  className={`fas ${action.icon} text-white text-lg md:text-xl`}
-                ></i>
-              </div>
-              <h3 className="font-semibold text-gray-900 text-base md:text-lg mb-1 md:mb-2 group-hover:text-blue-600 transition-colors line-clamp-1">
-                {action.title}
-              </h3>
-              <p className="text-xs md:text-sm text-gray-600 line-clamp-2">
-                {action.description}
-              </p>
-            </button>
-          </div>
-        ))}
-      </div>
-      {/* Super Admin Dashboard Stats - MOBILE OPTIMIZED */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
-        <MetricCard
-          title="Active Subscriptions"
-          value={platformMetrics.subscription.activeSubscriptions.toLocaleString()}
-          change={Number(platformMetrics.subscription.revenueGrowth)}
-          icon="fas fa-hospital"
-          color="bg-green-500"
-          subtitle={`${platformMetrics.subscription.totalHospitals} hospitals`}
-        />
 
-        <MetricCard
-          title="Monthly Revenue"
-          value={`₹${(platformMetrics.financial.monthlyRecurringRevenue / 1000).toFixed(0)}K`}
-          change={Number(platformMetrics.subscription.revenueGrowth)}
-          icon="fas fa-money-bill-wave"
-          color="bg-green-500"
-          subtitle="Recurring revenue"
-        />
-
-          {/* This will update automatically from performance reports */}
-  <MetricCard
-    title="Platform Uptime"
-    value={`${platformMetrics.performance.platformUptime}%`}
-    change={calculateUptimeChange()} // You can add this function
-    icon="fas fa-tachometer-alt"
-    color="bg-purple-500"
-    subtitle={`Based on ${performanceReports.length} report(s)`}
-  />
-
-  {/* This will update automatically from performance reports */}
-  <MetricCard
-    title="Customer Satisfaction"
-    value={`${platformMetrics.performance.customerSatisfaction}/5`}
-    change={calculateSatisfactionChange()} // You can add this function
-    icon="fas fa-star"
-    color="bg-yellow-500"
-    subtitle={`From ${performanceReports.length} hospital(s)`}
-  />
-      </div>
-
-{/* Year Selector for Charts */}
-<div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
-  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-    <div>
-      <h3 className="font-semibold text-gray-900 text-lg">Chart Data Filter</h3>
-      <p className="text-sm text-gray-500 mt-1">
-        Select year to view historical data | Current Year: {new Date().getFullYear()}
-      </p>
-    </div>
-    <div className="flex flex-wrap gap-2">
-      {[2022, 2023, 2024, 2025, new Date().getFullYear()].filter((year, index, self) => 
-        self.indexOf(year) === index
-      ).sort().map(year => (
-        <button
-          key={year}
-          onClick={() => {
-            setCurrentYear(year);
-            // Regenerate data for the selected year and current time period
-            const newData = generateDataByPeriod(timePeriod, year);
-            setAnalyticsData(prev => ({
-              ...prev,
-              revenueTrends: newData.revenueTrends,
-              subscriptionGrowth: newData.subscriptionGrowth,
-            }));
-            // Reset chart update status for the new year
-            setChartUpdateStatus({
-              subscriptionGrowthUpdated: false,
-              planDistributionUpdated: false,
-              revenueTrendsUpdated: false
-            });
-          }}
-          className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-            currentYear === year
-              ? "bg-blue-600 text-white shadow-md"
-              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-          }`}
-        >
-          {year}
-          {year === new Date().getFullYear() && (
-            <span className="ml-1 text-xs opacity-75">(Current)</span>
-          )}
-        </button>
-      ))}
-    </div>
-  </div>
-  
-  {/* Show current data source info with year context */}
-  {(chartUpdateStatus.subscriptionGrowthUpdated || 
-    chartUpdateStatus.revenueTrendsUpdated || 
-    chartUpdateStatus.planDistributionUpdated) && (
-    <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
-      <div className="flex items-center gap-2 flex-wrap">
-        <i className="fas fa-chart-line text-green-600"></i>
-        <span className="text-sm text-green-700">
-          Charts last updated from: {lastUpdateSource || "Initial data"}
-        </span>
-        <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
-          Year: {currentYear}
-        </span>
-        <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
-          Period: {timePeriod}
-        </span>
-      </div>
-    </div>
-  )}
-  
-  {/* Add data summary for selected year */}
-  <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-    <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-      <p className="text-xs text-blue-600 font-medium">Total Revenue ({currentYear})</p>
-      <p className="text-lg font-bold text-blue-900">
-        ₹{analyticsData.revenueTrends
-          .filter(item => item.year === currentYear)
-          .reduce((sum, item) => sum + (item.mrr || 0), 0)
-          .toLocaleString("en-IN")}
-      </p>
-    </div>
-    <div className="bg-green-50 rounded-lg p-3 border border-green-200">
-      <p className="text-xs text-green-600 font-medium">New Hospitals ({currentYear})</p>
-      <p className="text-lg font-bold text-green-900">
-        {analyticsData.subscriptionGrowth
-          .filter(item => item.year === currentYear)
-          .reduce((sum, item) => sum + (item.newHospitals || 0), 0)}
-      </p>
-    </div>
-    <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
-      <p className="text-xs text-purple-600 font-medium">Active Plans ({currentYear})</p>
-      <p className="text-lg font-bold text-purple-900">
-        {analyticsData.planDistribution.reduce((sum, plan) => sum + (plan.hospitals || 0), 0)}
-      </p>
-    </div>
-    <div className="bg-orange-50 rounded-lg p-3 border border-orange-200">
-      <p className="text-xs text-orange-600 font-medium">Net Growth ({currentYear})</p>
-      <p className="text-lg font-bold text-orange-900">
-        {analyticsData.subscriptionGrowth
-          .filter(item => item.year === currentYear)
-          .reduce((sum, item) => sum + (item.netGrowth || 0), 0)}
-      </p>
-    </div>
-  </div>
-</div>
-
-
-{/* Charts Section - MOBILE OPTIMIZED with Update Indicators */}
-<div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-  {/* Revenue Trends Chart with Source Indicator */}
-  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
-    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 md:mb-6 gap-3">
-      <div>
-        <h3 className="font-semibold text-lg text-gray-900">
-          Platform Revenue Trends
-        </h3>
-        {chartUpdateStatus.revenueTrendsUpdated && (
-          <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded text-xs bg-green-100 text-green-700">
-            <i className="fas fa-chart-line mr-1 text-xs"></i>
-            Updated from {lastUpdateSource === "Hospital & Plan Details" ? "Financial Data" : lastUpdateSource === "Hospital Information" ? "Performance Metrics" : "Latest Report"}
-          </span>
-        )}
-        <p className="text-xs text-gray-500 mt-1">Year: {currentYear}</p>
-      </div>
-      <div className="flex gap-1 md:gap-2">
-        <button
-          onClick={() => {
-            handleTimePeriodChange("monthly");
-            const newData = generateDataByPeriod("monthly", currentYear);
-            setAnalyticsData(prev => ({
-              ...prev,
-              revenueTrends: newData.revenueTrends,
-              subscriptionGrowth: newData.subscriptionGrowth,
-            }));
-          }}
-          className={`px-2 md:px-3 py-1.5 text-xs md:text-sm rounded-lg font-medium ${
-            timePeriod === "monthly" ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-50"
-          }`}
-        >
-          Monthly
-        </button>
-        <button
-          onClick={() => {
-            handleTimePeriodChange("quarterly");
-            const newData = generateDataByPeriod("quarterly", currentYear);
-            setAnalyticsData(prev => ({
-              ...prev,
-              revenueTrends: newData.revenueTrends,
-              subscriptionGrowth: newData.subscriptionGrowth,
-            }));
-          }}
-          className={`px-2 md:px-3 py-1.5 text-xs md:text-sm rounded-lg font-medium ${
-            timePeriod === "quarterly" ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-50"
-          }`}
-        >
-          Quarterly
-        </button>
-        <button
-          onClick={() => {
-            handleTimePeriodChange("yearly");
-            const newData = generateDataByPeriod("yearly", currentYear);
-            setAnalyticsData(prev => ({
-              ...prev,
-              revenueTrends: newData.revenueTrends,
-              subscriptionGrowth: newData.subscriptionGrowth,
-            }));
-          }}
-          className={`px-2 md:px-3 py-1.5 text-xs md:text-sm rounded-lg font-medium ${
-            timePeriod === "yearly" ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-50"
-          }`}
-        >
-          Yearly
-        </button>
-      </div>
-    </div>
-    <div className="h-48 md:h-64">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={analyticsData.revenueTrends || []}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis
-            dataKey="month"
-            fontSize={12}
-            tick={{ fill: "#6b7280" }}
-          />
-          <YAxis
-            fontSize={12}
-            tick={{ fill: "#6b7280" }}
-            tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}K`}
-          />
-          <Tooltip
-            formatter={(value) => [
-              `₹${value.toLocaleString("en-IN")}`,
-              "Revenue",
-            ]}
-            contentStyle={{
-              borderRadius: "8px",
-              border: "1px solid #e5e7eb",
-              fontSize: "12px",
-            }}
-          />
-          <Area
-            type="monotone"
-            dataKey="mrr"
-            stroke="#3B82F6"
-            fill="#3B82F6"
-            fillOpacity={0.2}
-            name="MRR"
-          />
-          <Area
-            type="monotone"
-            dataKey="newRevenue"
-            stroke="#10B981"
-            fill="#10B981"
-            fillOpacity={0.2}
-            name="New Revenue"
-          />
-          <Area
-            type="monotone"
-            dataKey="churnRevenue"
-            stroke="#EF4444"
-            fill="#EF4444"
-            fillOpacity={0.2}
-            name="Churn Revenue"
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  </div>
-
-  {/* Subscription Growth Chart with Source Indicator */}
-  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
-    <div>
-      <h3 className="font-semibold text-lg text-gray-900">
-        Subscription Growth
-      </h3>
-      {chartUpdateStatus.subscriptionGrowthUpdated && (
-        <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700">
-          <i className="fas fa-hospital-user mr-1 text-xs"></i>
-          Updated from Subscription Data
-        </span>
-      )}
-      <p className="text-xs text-gray-500 mt-1">Year: {currentYear}</p>
-    </div>
-    <div className="h-48 md:h-64 mt-4">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={analyticsData.subscriptionGrowth}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis
-            dataKey="month"
-            fontSize={12}
-            tick={{ fill: "#6b7280" }}
-          />
-          <YAxis fontSize={12} tick={{ fill: "#6b7280" }} />
-          <Tooltip
-            contentStyle={{
-              borderRadius: "8px",
-              border: "1px solid #e5e7eb",
-              fontSize: "12px",
-            }}
-            formatter={(value, name) => {
-              if (name === "New Hospitals")
-                return [value, "New Hospitals"];
-              if (name === "Churned Hospitals")
-                return [value, "Churned Hospitals"];
-              if (name === "Net Growth") return [value, "Net Growth"];
-              return [value, name];
-            }}
-          />
-          <Bar
-            dataKey="newHospitals"
-            fill="#10B981"
-            radius={[4, 4, 0, 0]}
-            name="New Hospitals"
-          />
-          <Bar
-            dataKey="churnedHospitals"
-            fill="#EF4444"
-            radius={[4, 4, 0, 0]}
-            name="Churned Hospitals"
-          />
-          <Bar
-            dataKey="netGrowth"
-            fill="#3B82F6"
-            radius={[4, 4, 0, 0]}
-            name="Net Growth"
-          />
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  </div>
-</div>
-
-{/* Plan Distribution with Source Indicator */}
-<div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
-  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 md:mb-6">
-    <div>
-      <h3 className="font-semibold text-lg text-gray-900">
-        Subscription Plan Distribution
-      </h3>
-      {chartUpdateStatus.planDistributionUpdated && (
-        <p className="text-xs text-blue-600 mt-1">
-          <i className="fas fa-chart-pie mr-1"></i>
-          Updated from subscription data
-        </p>
-      )}
-      <p className="text-xs text-gray-500 mt-1">Year: {currentYear}</p>
-    </div>
-  </div>
-  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-    <div className="h-60 md:h-80">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={analyticsData.planDistribution}
-            cx="50%"
-            cy="50%"
-            labelLine={false}
-            label={({ name, percent }) =>
-              `${name}: ${(percent * 100).toFixed(0)}%`
-            }
-            outerRadius={80}
-            innerRadius={40}
-            fill="#8884d8"
-            dataKey="hospitals"
-          >
-            {analyticsData.planDistribution.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.color} />
-            ))}
-          </Pie>
-          <Tooltip
-            formatter={(value, name, props) => [
-              value,
-              props.payload.plan,
-            ]}
-            contentStyle={{
-              borderRadius: "8px",
-              border: "1px solid #e5e7eb",
-              fontSize: "12px",
-            }}
-          />
-          <Legend
-            verticalAlign="bottom"
-            height={36}
-            wrapperStyle={{ fontSize: "12px" }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-    </div>
-    <div className="space-y-3 md:space-y-4">
-      {analyticsData.planDistribution.map((plan, index) => (
-        <div
-          key={index}
-          className="flex items-center justify-between p-3 md:p-4 bg-gray-50 rounded-lg border border-gray-200"
-        >
-          <div className="flex items-center min-w-0">
-            <div
-              className="w-3 h-3 md:w-4 md:h-4 rounded-full mr-2 md:mr-3 flex-shrink-0"
-              style={{ backgroundColor: plan.color }}
-            ></div>
-            <div className="min-w-0">
-              <h4 className="font-medium text-gray-900 text-sm md:text-base truncate">
-                {plan.plan} Plan
-              </h4>
-              <p className="text-xs md:text-sm text-gray-500">
-                {plan.hospitals} hospitals
-              </p>
-            </div>
-          </div>
-          <div className="text-right flex-shrink-0 ml-2">
-            <div className="text-base md:text-lg font-bold text-gray-900 whitespace-nowrap">
-              ₹{(plan.revenue / 1000).toFixed(0)}K
-            </div>
-            <div className="text-xs md:text-sm text-green-600 whitespace-nowrap">
-              ↑ {plan.growth}% growth
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-</div>
       {/* Subscription Reports Table - Conditionally Rendered */}
       <Modal
         isOpen={isSubscriptionModalOpen}
@@ -3360,7 +2955,6 @@ const resetNewReportForm = () => {
           }}
         />
       </Modal>
-      // Add the Financial Modal component
       <Modal
         isOpen={isFinancialModalOpen}
         onClose={() => setIsFinancialModalOpen(false)}
@@ -3457,19 +3051,9 @@ const resetNewReportForm = () => {
                       required
                     >
                       <option value="select">Select Hospital</option>
-                      <option value="City General Hospital">
-                        City General Hospital
-                      </option>
-                      <option value="Unity Medical Center">
-                        Unity Medical Center
-                      </option>
-                      <option value="Metro Health Hospital">
-                        Metro Health Hospital
-                      </option>
-                      <option value="Central Clinic">Central Clinic</option>
-                      <option value="Community Hospital">
-                        Community Hospital
-                      </option>
+                      {hospitalList.map((h, i) => (
+                        <option key={i} value={h.name || h.hospital_name}>{h.name || h.hospital_name}</option>
+                      ))}
                     </select>
                   </div>
                   <div>
@@ -3483,10 +3067,9 @@ const resetNewReportForm = () => {
                       className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm md:text-base"
                     >
                       <option value="select">Select plan type</option>
-                      <option value="Basic">Basic</option>
-                      <option value="Professional">Professional</option>
-                      <option value="Enterprise">Enterprise</option>
-                      <option value="Custom">Custom</option>
+                      {planList.map((p, i) => (
+                        <option key={i} value={p.name || p.plan_name}>{p.name || p.plan_name}</option>
+                      ))}
                     </select>
                   </div>
                   <div>
@@ -3611,19 +3194,9 @@ const resetNewReportForm = () => {
                         required
                       >
                         <option value="select">Select Hospital</option>
-                        <option value="City General Hospital">
-                          City General Hospital
-                        </option>
-                        <option value="Unity Medical Center">
-                          Unity Medical Center
-                        </option>
-                        <option value="Metro Health Hospital">
-                          Metro Health Hospital
-                        </option>
-                        <option value="Central Clinic">Central Clinic</option>
-                        <option value="Community Hospital">
-                          Community Hospital
-                        </option>
+                        {hospitalList.map((h, i) => (
+                          <option key={i} value={h.name || h.hospital_name}>{h.name || h.hospital_name}</option>
+                        ))}
                       </select>
                     </div>
                     <div>
@@ -3637,10 +3210,9 @@ const resetNewReportForm = () => {
                         className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm md:text-base"
                       >
                         <option value="select">Select plan type</option>
-                        <option value="Basic">Basic</option>
-                        <option value="Professional">Professional</option>
-                        <option value="Enterprise">Enterprise</option>
-                        <option value="Custom">Custom</option>
+                        {planList.map((p, i) => (
+                          <option key={i} value={p.name || p.plan_name}>{p.name || p.plan_name}</option>
+                        ))}
                       </select>
                     </div>
                     <div>
@@ -4093,17 +3665,11 @@ const resetNewReportForm = () => {
                         required
                       >
                         <option value="">Select Hospital</option>
-                        <option value="H001">
-                          City General Hospital (H001)
-                        </option>
-                        <option value="H002">
-                          Unity Medical Center (H002)
-                        </option>
-                        <option value="H003">
-                          Metro Health Hospital (H003)
-                        </option>
-                        <option value="H004">Central Clinic (H004)</option>
-                        <option value="H005">Community Hospital (H005)</option>
+                        {hospitalList.map((h, i) => (
+                          <option key={i} value={h._id || h.id}>
+                            {h.name || h.hospital_name} ({h._id || h.id})
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div>
@@ -4674,13 +4240,9 @@ const resetNewReportForm = () => {
           </div>
         </form>
       </Modal>
-      {/* Performance Reports Modal */}
-      <Modal
-        isOpen={isPerformanceModalOpen}
-        onClose={() => setIsPerformanceModalOpen(false)}
-        title="Platform Performance Reports"
-        size="xl"
-      >
+      {/* Platform Performance Reports (Inline) */}
+      <div className="mt-8">
+        <h3 className="text-xl font-bold text-gray-900 mb-4">Platform Performance Reports</h3>
         <PerformanceReportsTable
           reports={performanceReports}
           onDelete={(reportId) => {
@@ -4693,14 +4255,10 @@ const resetNewReportForm = () => {
                 prev.filter((r) => r.id !== reportId),
               );
               alert("🗑️ Performance report deleted successfully");
-
-              if (performanceReports.length === 1) {
-                setIsPerformanceModalOpen(false);
-              }
             }
           }}
         />
-      </Modal>
+      </div>
       {/* View Report Modal - MOBILE OPTIMIZED */}
       <Modal
         isOpen={isViewReportModalOpen}

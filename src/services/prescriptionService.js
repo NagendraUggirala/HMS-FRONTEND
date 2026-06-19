@@ -60,7 +60,7 @@ export const createPrescription = async (prescriptionData) => {
 // Get doctor's prescriptions
 export const getDoctorPrescriptions = async (filters = {}) => {
   try {
-    const params = { limit: 50, ...filters };
+    const params = { ...filters };
     const response = await prescriptionApi.get('/api/v1/simple-prescription/doctor/prescriptions', {
       params
     });
