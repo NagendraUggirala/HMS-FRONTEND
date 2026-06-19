@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { apiFetch } from '../../../../services/apiClient';
+import { getDoctorAppointments } from '../../../../services/doctorApi';
 import { DOCTOR_PROFILE, DOCTOR_PROFILE_UPDATE } from '../../../../config/api';
 
 const DEFAULT_AVATAR = "https://images.unsplash.com/photo-1594824436998-d40d9cb115dd?q=80&w=2690&auto=format&fit=crop";
@@ -126,7 +127,8 @@ const DoctorProfile = () => {
         }
 
         // 3. Fetch Today's Appointments/Patients
-        const appointmentsRes = await apiFetch('/api/v1/doctor-dashboard/appointments/today');
+        const todayDate = new Date().toISOString().split('T')[0];
+        const appointmentsRes = await getDoctorAppointments({ date_from: todayDate, date_to: todayDate });
         if (appointmentsRes && appointmentsRes.ok) {
           const apptData = await appointmentsRes.json();
           const appointments = apptData.appointments || apptData.data?.appointments || [];

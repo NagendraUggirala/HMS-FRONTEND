@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import LoadingSpinner from '../../../../components/common/LoadingSpinner/LoadingSpinner'
 import { apiFetch } from '../../../../services/apiClient'
+import { getDoctorAppointments } from '../../../../services/doctorApi'
 
 /* ===========================
    DoctorOverview component
@@ -22,9 +23,10 @@ const DoctorOverview = ({ onPageChange }) => {
   const loadDashboardData = async () => {
     setLoading(true)
     try {
+      const todayDate = new Date().toISOString().split('T')[0];
       const [overviewRes, appointmentsRes, recentPatientsRes, admittedPatientsRes, tasksRes, quickStatsRes] = await Promise.all([
         apiFetch('/api/v1/doctor-dashboard/overview'),
-        apiFetch('/api/v1/doctor-dashboard/appointments/today'),
+        getDoctorAppointments({ date_from: todayDate, date_to: todayDate }),
         apiFetch('/api/v1/doctor-dashboard/patients/recent?limit=10'),
         apiFetch('/api/v1/doctor-dashboard/patients/admitted'),
         apiFetch('/api/v1/doctor-dashboard/tasks/pending'),
@@ -37,7 +39,7 @@ const DoctorOverview = ({ onPageChange }) => {
 
       const appointmentsResult = await appointmentsRes.json()
       const appointmentsData = appointmentsResult.data || appointmentsResult || {}
-      const todayAppointments = appointmentsData.appointments || []
+      const todayAppointments = appointmentsData.appointments || appointmentsData || []
 
       const recentPatientsResult = await recentPatientsRes.json()
       const recentPatientsData = recentPatientsResult.data || recentPatientsResult || {}

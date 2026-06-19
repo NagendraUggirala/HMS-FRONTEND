@@ -58,22 +58,8 @@ const Prescriptions = () => {
   const loadPrescriptions = async (filters = {}) => {
     try {
       setLoading(true)
-      
-      let finalFilters = { ...filters }
-      if (!finalFilters.patient_ref) {
-        // Fetch patients to get a valid patient_ref and avoid backend 500 error
-        const patientsResponse = await searchDoctorPatients({});
-        const payload = await patientsResponse.json().catch(() => ({}));
-        const patientsData = payload?.patients || payload?.data?.patients || payload?.data || [];
-        if (patientsData.length > 0) {
-          finalFilters.patient_ref = patientsData[0].patientId || patientsData[0].patient_ref;
-        } else {
-          finalFilters.patient_ref = 'DUMMY';
-        }
-      }
-
-      const response = await getDoctorPrescriptions(finalFilters)
-      setPrescriptions(response || [])
+      const response = await getDoctorPrescriptions(filters)
+      setPrescriptions(response?.data || response || [])
     } catch (error) {
       console.error('Error loading prescriptions:', error)
       toast.error('Failed to load prescriptions')
@@ -123,6 +109,7 @@ const Prescriptions = () => {
       
       const prescriptionData = {
         ...newPrescription,
+        follow_up_date: newPrescription.follow_up_date || null,
         medicines: validMedicines
       }
       
@@ -135,7 +122,8 @@ const Prescriptions = () => {
       
     } catch (error) {
       console.error('Error creating prescription:', error)
-      toast.error(error.response?.data?.detail || 'Failed to create prescription')
+      const errorMessage = error.response?.data?.message || error.response?.data?.detail || 'Failed to create prescription'
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -526,13 +514,12 @@ const Prescriptions = () => {
                       <input
                         type="text"
                         required
-                        value={medicineSearchQuery && index === newPrescription.medicines.length - 1 ? medicineSearchQuery : medicine.medicine_name}
+                        value={medicine.medicine_name}
                         onChange={(e) => {
+                          updateMedicine(index, 'medicine_name', e.target.value)
                           if (index === newPrescription.medicines.length - 1) {
                             setMedicineSearchQuery(e.target.value)
                             handleMedicineSearch(e.target.value)
-                          } else {
-                            updateMedicine(index, 'medicine_name', e.target.value)
                           }
                         }}
                         className="modal-input form-input-mobile"
