@@ -4,14 +4,14 @@ import Modal from '../../../../components/common/Modal/Modal';
 import {
   KeyboardArrowDown as KeyboardArrowDownIcon, Search as SearchIcon, Print as PrintIcon,
   CheckCircle as CheckCircleIcon, ConfirmationNumber as ConfirmationNumberIcon,
-  MedicalServices as MedicalServicesIcon, Queue as QueueIcon, Person as PersonIcon,
+  MedicalServices as MedicalServicesIcon, Person as PersonIcon,
   AccessTime as AccessTimeIcon, Warning as WarningIcon, PersonAdd as PersonAddIcon,
   PlayArrow as PlayArrowIcon, SwapHoriz as SwapHorizIcon, Visibility as VisibilityIcon,
   Close as CloseIcon, PowerSettingsNew as PowerSettingsNewIcon, Check as CheckIcon,
-  Add as AddIcon, Description as DescriptionIcon, KeyboardArrowUp as KeyboardArrowUpIcon,
+  Add as AddIcon, Description as DescriptionIcon,
   Groups as GroupsIcon, PendingActions as PendingActionsIcon, TaskAlt as TaskAltIcon,
   Delete as DeleteIcon, CalendarMonth as CalendarMonthIcon, Payments as PaymentsIcon,
-  BarChart as BarChartIcon, Timeline as TimelineIcon, ReceiptLong as ReceiptLongIcon,
+  Timeline as TimelineIcon, ReceiptLong as ReceiptLongIcon,
   Science as ScienceIcon, Medication as MedicationIcon, Assessment as AssessmentIcon,
   Edit as EditIcon, ExitToApp as ExitToAppIcon, Info as InfoIcon,
   HistoryEdu as HistoryEduIcon
@@ -23,11 +23,11 @@ import {
   DOCTOR_LIST,
   DEPARTMENT_DOCTORS,
   RECEPTIONIST_PATIENT_SEARCH,
-  OPD_PATIENT_CREATE, OPD_TOKENS, OPD_TOKEN_DETAILS, OPD_PATIENTS_LIST, 
-  OPD_PATIENT_STATUS, OPD_PATIENT_DELETE, OPD_DOCTORS, OPD_DOCTOR_CONFIG, 
-  OPD_DOCTOR_TOGGLE_STATUS, OPD_CONSULTATION, OPD_CONSULTATION_START, 
-  OPD_CONSULTATION_COMPLETE, OPD_CONSULTATION_DETAILS, OPD_CONSULTATION_BY_PATIENT, 
-  OPD_TRANSFER, OPD_TRANSFER_PATIENT, OPD_DASHBOARD_STATS
+  OPD_TOKENS, 
+  OPD_PATIENT_STATUS, OPD_PATIENT_DELETE, 
+  OPD_DOCTOR_TOGGLE_STATUS, OPD_CONSULTATION_START, 
+  OPD_CONSULTATION_COMPLETE, 
+  OPD_TRANSFER
 } from '../../../../config/api';
 
 
@@ -36,7 +36,7 @@ const OPDManagement = () => {
   const [opdPatients, setOpdPatients] = useState([]);
   const [doctors, setDoctors] = useState([]);
   const [showConsultationForm, setShowConsultationForm] = useState(false);
-  const formattedCurrentDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [tokenStep, setTokenStep] = useState('form'); // 'form' or 'slip'
   const [generatedToken, setGeneratedToken] = useState(null);
@@ -55,11 +55,11 @@ const OPDManagement = () => {
   const [doctorToDeactivate, setDoctorToDeactivate] = useState(null);
   const [patientsToReassign, setPatientsToReassign] = useState([]);
   const [showLabResultModal, setShowLabResultModal] = useState(false);
-  const [selectedLabRecord, setSelectedLabRecord] = useState(null);
+  const [selectedLabRecord] = useState(null);
   const [showQueueDetailModal, setShowQueueDetailModal] = useState(false);
   const [selectedQueuePatient, setSelectedQueuePatient] = useState(null);
   const [showPharmacyModal, setShowPharmacyModal] = useState(false);
-  const [selectedPharmacyRecord, setSelectedPharmacyRecord] = useState(null);
+  const [selectedPharmacyRecord] = useState(null);
   const [showExitModal, setShowExitModal] = useState(false);
   const [selectedExitPatient, setSelectedExitPatient] = useState(null);
   const [exitForm, setExitForm] = useState({
@@ -105,8 +105,6 @@ const OPDManagement = () => {
   const [docSearchTerm, setDocSearchTerm] = useState('');
   const [isDocDropdownOpen, setIsDocDropdownOpen] = useState(false);
   const docDropdownRef = useRef(null);
-  const [isDocNameDropdownOpen, setIsDocNameDropdownOpen] = useState(false);
-  const docNameDropdownRef = useRef(null);
 
   const [patientSearchTerm, setPatientSearchTerm] = useState('');
   const [isPatientDropdownOpen, setIsPatientDropdownOpen] = useState(false);
@@ -115,7 +113,6 @@ const OPDManagement = () => {
   // State for Payment Modal
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPaymentPatient, setSelectedPaymentPatient] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState('cash');
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [paymentBillingData, setPaymentBillingData] = useState({
     token: '',
@@ -325,9 +322,6 @@ const OPDManagement = () => {
       if (docDropdownRef.current && !docDropdownRef.current.contains(event.target)) {
         setIsDocDropdownOpen(false);
       }
-      if (docNameDropdownRef.current && !docNameDropdownRef.current.contains(event.target)) {
-        setIsDocNameDropdownOpen(false);
-      }
       if (patientDropdownRef.current && !patientDropdownRef.current.contains(event.target)) {
         setIsPatientDropdownOpen(false);
       }
@@ -493,7 +487,9 @@ const OPDManagement = () => {
                 if (!Array.isArray(dList) && dList.items) dList = dList.items;
                 return Array.isArray(dList) ? dList : [];
               }
-            } catch(e) {}
+            } catch (e) {
+              console.error('Error fetching fallback doctors:', e);
+            }
             return [];
           });
           const results = await Promise.all(promises);
@@ -626,7 +622,6 @@ const OPDManagement = () => {
   // Open Payment Modal
   const handleOpenPaymentModal = (patient) => {
     setSelectedPaymentPatient(patient);
-    setPaymentMethod('cash');
     const doc = doctors.find(d => d.id === patient.assignedDoctorId);
     // Add realistic dummy data if patient data is minimal
     const dummyTests = patient.tests && patient.tests.length > 0
@@ -1365,30 +1360,6 @@ const OPDManagement = () => {
     printWindow.document.close();
   };
 
-  const handleViewLabResult = (patient) => {
-    let patientTests = patient.tests || [];
-    if (patientTests.length < 5) {
-      const dummyTests = ['Complete Blood Count (CBC)', 'Lipid Profile', 'Thyroid Function Test', 'Liver Function Test', 'Urinalysis'];
-      patientTests = [...new Set([...patientTests, ...dummyTests])].slice(0, 5);
-    }
-    const diagnosticResult = patient.diagnosis
-      ? `Diagnostic findings correlate with ${patient.diagnosis}. Clinical parameters show expected variations. No critical deviations requiring immediate intervention.`
-      : patient.status === 'Completed'
-        ? 'All diagnostic parameters within normal physiological range. No clinical anomalies detected during this cycle.'
-        : 'Investigation currently in progress. Preliminary findings being validated by senior clinical staff.';
-
-    setSelectedLabRecord({
-      ...patient,
-      date: patient.date || formattedCurrentDate,
-      prescribedTests: patientTests.join(', '),
-      performedTests: (patient.performedTests || patientTests).join(', '),
-      result: diagnosticResult,
-      uploadedBy: patient.uploadedBy || 'Senior Lab Tech (Ravi Kumar)',
-      reportId: `DGN-${patient.id.split('-')[1] || patient.id.slice(-4)}-${Math.floor(1000 + Math.random() * 9000)}`
-    });
-    setShowLabResultModal(true);
-  };
-
   const handleAssignDoctor = (patient) => {
     alert(`Assigning doctor for ${patient.patientName}`);
     // Future logic: Open assignment modal
@@ -1427,7 +1398,6 @@ const OPDManagement = () => {
     const consultationFee = doctor?.consultationFee || 300;
     return consultationFee + calculateTestsFee(patient) + calculateSurgeryFee(patient);
   };
-  const activeDoctors = doctors.filter(d => d.isActive);
   if (loading) return <LoadingSpinner />;
 
   return (
@@ -1739,7 +1709,7 @@ const OPDManagement = () => {
                             <PrintIcon sx={{ fontSize: 14 }} />
                           </button>
                           {patient.status !== 'Completed' ? (
-                            <button onClick={() => handleOpenPaymentModal(patient)} className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all font-black text-[10px] tracking-widest shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200" title="Process Payment"><PaymentsIcon sx={{ fontSize: 14 }} /></button>
+                            <button onClick={() => handleOpenPaymentModal(patient)} className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 font-black text-[10px] tracking-widest shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200" title="Process Payment"><PaymentsIcon sx={{ fontSize: 14 }} /></button>
                           ) : (
                             <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg border border-green-200 font-black text-[10px] tracking-widest cursor-default"><CheckCircleIcon sx={{ fontSize: 14 }} /></div>
                           )}
@@ -1952,7 +1922,7 @@ const OPDManagement = () => {
                     <div className="space-y-2">
                       <p className="text-[9px] font-black text-gray-400 tracking-widest">Chief Complaints</p>
                       <p className="text-sm font-bold text-black border-l-4 border-blue-600 pl-4 py-1 italic leading-relaxed">
-                        "{consultationForm.symptoms || 'Symptoms not specified.'}"
+                        &quot;{consultationForm.symptoms || 'Symptoms not specified.'}&quot;
                       </p>
                     </div>
                     <div className="space-y-2">
@@ -2019,7 +1989,7 @@ const OPDManagement = () => {
                             </td>
                             <td className="px-6 py-4 text-right">
                               <p className="text-xs font-black text-blue-600">{med.duration}</p>
-                              {med.instructions && <p className="text-[8px] font-bold text-gray-400 italic">"{med.instructions}"</p>}
+                              {med.instructions && <p className="text-[8px] font-bold text-gray-400 italic">&quot;{med.instructions}&quot;</p>}
                             </td>
                           </tr>
                         ))}
@@ -2152,7 +2122,7 @@ const OPDManagement = () => {
                       <div className="p-3 text-center text-gray-500 text-sm">
                         No matching patient found
                         <div className="mt-1">
-                          <button type="button" className="text-xs text-blue-600 font-bold hover:underline" onClick={() => { setTokenForm({ ...tokenForm, patientName: patientSearchTerm }); setIsPatientDropdownOpen(false); }}>+ Use "{patientSearchTerm}" as new </button>
+                          <button type="button" className="text-xs text-blue-600 font-bold hover:underline" onClick={() => { setTokenForm({ ...tokenForm, patientName: patientSearchTerm }); setIsPatientDropdownOpen(false); }}>+ Use &quot;{patientSearchTerm}&quot; as new </button>
                         </div>
                       </div>
                     )}
@@ -2489,7 +2459,7 @@ const OPDManagement = () => {
                             <div className="w-8 h-8 bg-white border border-gray-100 rounded-lg flex items-center justify-center text-blue-600 mt-1"> <AssessmentIcon sx={{ fontSize: 16 }} /> </div>
                             <div>
                               <p className="text-[9px] font-black text-gray-400 tracking-widest mb-1">Primary Diagnosis</p>
-                              <p className="text-lg font-black text-black italic"> "{selectedPatientForView.diagnosis}" </p>
+                              <p className="text-lg font-black text-black italic"> &quot;{selectedPatientForView.diagnosis}&quot; </p>
                             </div>
                           </div>
                         </div>
@@ -2883,7 +2853,7 @@ const OPDManagement = () => {
               </div>
               <div className="p-8 bg-gray-50/30">
                 <p className="text-lg font-black text-black text-center leading-relaxed italic">
-                  "{selectedLabRecord.result}"
+                  &quot;{selectedLabRecord.result}&quot;
                 </p>
               </div>
             </div>
@@ -2989,7 +2959,7 @@ const OPDManagement = () => {
                     {/* Instructions Box */}
                     <div className="lg:w-48 p-3 rounded-xl border border-gray-100 bg-gray-50/50 flex flex-col justify-center">
                       <p className="text-[8px] font-black text-gray-400 tracking-widest mb-1 uppercase">Instructions</p>
-                      <p className="text-[10px] font-bold text-black leading-tight italic">"{med.instruction}"</p>
+                      <p className="text-[10px] font-bold text-black leading-tight italic">&quot;{med.instruction}&quot;</p>
                     </div>
                   </div>
                 ))}
@@ -3281,7 +3251,7 @@ const OPDManagement = () => {
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <label className="text-[10px] font-black text-gray-900 tracking-widest block">Follow-up Required?</label>
-                      <p className="text-[10px] text-gray-500 font-medium mt-0.5">Based on doctor's recommendation</p>
+                      <p className="text-[10px] text-gray-500 font-medium mt-0.5">Based on doctor&apos;s recommendation</p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input type="checkbox" className="sr-only peer" checked={exitForm.followUpRequired} onChange={(e) => setExitForm({ ...exitForm, followUpRequired: e.target.checked })} />

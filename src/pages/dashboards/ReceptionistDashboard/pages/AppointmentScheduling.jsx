@@ -65,20 +65,20 @@ const AppointmentScheduling = () => {
   const [filters, setFilters] = useState({
     page: 1, limit: 50, department_name: '', doctor_name: '', status: ''
   })
-const [formData, setFormData] = useState({
-  id: null,
-  patient_ref: '',
-  patient_name: '',
-  doctor_id: '',
-  doctor_name: '',
-  department_id: '',
-  department_name: '',
-  appointment_date: '',
-  appointment_time: '',
-  appointment_type: 'CONSULTATION',
-  chief_complaint: '',
-  notes: ''
-})
+  const [formData, setFormData] = useState({
+    id: null,
+    patient_ref: '',
+    patient_name: '',
+    doctor_id: '',
+    doctor_name: '',
+    department_id: '',
+    department_name: '',
+    appointment_date: '',
+    appointment_time: '',
+    appointment_type: 'CONSULTATION',
+    chief_complaint: '',
+    notes: ''
+  })
 
   // Searchable Dropdown State
   const [patientSearchTerm, setPatientSearchTerm] = useState('')
@@ -102,6 +102,78 @@ const [formData, setFormData] = useState({
   const [dateAppointments, setDateAppointments] = useState([])
   const [availableSlotsFromApi, setAvailableSlotsFromApi] = useState([])
   const [hasLoadedAvailableSlots, setHasLoadedAvailableSlots] = useState(false)
+  const [submitError, setSubmitError] = useState(null)
+
+  const getLocalDateString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const isSlotInPast = (slotTimeStr, selectedDateStr) => {
+    if (!selectedDateStr || !slotTimeStr) return false;
+    const todayStr = getLocalDateString();
+    if (selectedDateStr > todayStr) return false;
+    if (selectedDateStr < todayStr) return true;
+
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+
+    let timeStr = slotTimeStr.trim();
+    let hour = 0;
+    let minute = 0;
+
+    if (timeStr.includes('AM') || timeStr.includes('PM')) {
+      const [timePart, modifier] = timeStr.split(' ');
+      const parts = timePart.split(':');
+      hour = parseInt(parts[0], 10);
+      minute = parseInt(parts[1], 10) || 0;
+      if (modifier === 'PM' && hour !== 12) hour += 12;
+      if (modifier === 'AM' && hour === 12) hour = 0;
+    } else {
+      const parts = timeStr.split(':');
+      hour = parseInt(parts[0], 10);
+      minute = parseInt(parts[1], 10) || 0;
+    }
+
+    if (hour < currentHour) return true;
+    if (hour === currentHour && minute <= currentMinute) return true;
+    return false;
+  };
+
+  const getSlotPeriod = (slotTimeStr) => {
+    if (!slotTimeStr) return null;
+    let timeStr = slotTimeStr.trim();
+    let hour = 0;
+    let minute = 0;
+
+    if (timeStr.includes('AM') || timeStr.includes('PM')) {
+      const [timePart, modifier] = timeStr.split(' ');
+      const parts = timePart.split(':');
+      hour = parseInt(parts[0], 10);
+      minute = parseInt(parts[1], 10) || 0;
+      if (modifier === 'PM' && hour !== 12) hour += 12;
+      if (modifier === 'AM' && hour === 12) hour = 0;
+    } else {
+      const parts = timeStr.split(':');
+      hour = parseInt(parts[0], 10);
+      minute = parseInt(parts[1], 10) || 0;
+    }
+
+    const totalMinutes = hour * 60 + minute;
+    // Lunch: 1:00 PM to 2:30 PM (13:00 to 14:30) => 780 to 870 mins
+    if (totalMinutes >= 780 && totalMinutes < 810) {
+      return 'lunch';
+    }
+    // Dinner: 8:00 PM to 9:30 PM (20:00 to 21:30) => 1200 to 1290 mins
+    if (totalMinutes >= 1200 && totalMinutes < 1230) {
+      return 'dinner';
+    }
+    return null;
+  };
 
   useEffect(() => {
     loadPatients()
@@ -151,7 +223,7 @@ const [formData, setFormData] = useState({
               deptName = item.department_name;
             }
           }
-          
+
           if (!deptId && item.department_id) {
             deptId = item.department_id;
           }
@@ -345,57 +417,57 @@ const [formData, setFormData] = useState({
     }
   }, [])
 
-const handleSelectPatient = async (patient) => {
-  setFormData(prev => ({
-    ...prev,
-    patient_name: patient.name,
-    patient_ref: patient.referralId || ''
-  }))
+  const handleSelectPatient = async (patient) => {
+    setFormData(prev => ({
+      ...prev,
+      patient_name: patient.name,
+      patient_ref: patient.referralId || ''
+    }))
 
-  setPatientSearchTerm(patient.name)
-  setIsPatientDropdownOpen(false)
+    setPatientSearchTerm(patient.name)
+    setIsPatientDropdownOpen(false)
 
-  if (patient.id !== 'new' && patient.referralId) {
-    try {
-      const res = await apiFetch(
-        RECEPTIONIST_PATIENT_PROFILE(patient.referralId)
-      )
+    if (patient.id !== 'new' && patient.referralId) {
+      try {
+        const res = await apiFetch(
+          RECEPTIONIST_PATIENT_PROFILE(patient.referralId)
+        )
 
-      if (res.ok) {
-        const data = await res.json()
-        setSelectedPatientProfile(data.data || null)
+        if (res.ok) {
+          const data = await res.json()
+          setSelectedPatientProfile(data.data || null)
+        }
+      } catch (err) {
+        console.error('Error fetching patient profile', err)
       }
-    } catch (err) {
-      console.error('Error fetching patient profile', err)
+    } else {
+      setSelectedPatientProfile(null)
     }
-  } else {
-    setSelectedPatientProfile(null)
   }
-}
 
-const handleSelectDept = (dept) => {
-  setFormData(prev => ({
-    ...prev,
-    department_id: dept.id || dept.department_id || '',
-    department_name: dept.name || dept,
-    doctor_name: ''
-  }))
+  const handleSelectDept = (dept) => {
+    setFormData(prev => ({
+      ...prev,
+      department_id: dept.id || dept.department_id || '',
+      department_name: dept.name || dept,
+      doctor_name: ''
+    }))
 
-  setDeptSearchTerm(dept.name || dept)
-  setDocSearchTerm('')
-  setIsDeptDropdownOpen(false)
-}
+    setDeptSearchTerm(dept.name || dept)
+    setDocSearchTerm('')
+    setIsDeptDropdownOpen(false)
+  }
 
-const handleSelectDoc = (doc) => {
-  setFormData(prev => ({
-    ...prev,
-    doctor_id: doc.id || doc.doctor_id || '',
-    doctor_name: doc.name
-  }))
+  const handleSelectDoc = (doc) => {
+    setFormData(prev => ({
+      ...prev,
+      doctor_id: doc.id || doc.doctor_id || '',
+      doctor_name: doc.name
+    }))
 
-  setDocSearchTerm(doc.name)
-  setIsDocDropdownOpen(false)
-}
+    setDocSearchTerm(doc.name)
+    setIsDocDropdownOpen(false)
+  }
 
   const filteredPatients = patients.filter(p =>
     p.name.toLowerCase().includes(patientSearchTerm.toLowerCase()) ||
@@ -411,7 +483,7 @@ const handleSelectDoc = (doc) => {
     const selectedDept = String(formData.department_name || '').toLowerCase().trim();
     const docDeptId = String(d.department_id || '').toLowerCase().trim();
     const selectedDeptId = String(formData.department_id || '').toLowerCase().trim();
-    
+
     const matchesDept = docDept === selectedDept || (selectedDeptId && docDeptId === selectedDeptId);
     const matchesSearch = d.name.toLowerCase().includes(docSearchTerm.toLowerCase());
     return matchesDept && matchesSearch;
@@ -443,12 +515,12 @@ const handleSelectDoc = (doc) => {
 
   const doesTimeFallInSlot = (bookingTime24, slotTime12) => {
     if (!bookingTime24 || !slotTime12) return false;
-    
+
     let [slotTime, modifier] = slotTime12.split(' ');
     let [slotHour] = slotTime.split(':').map(Number);
     if (modifier === 'PM' && slotHour !== 12) slotHour += 12;
     if (modifier === 'AM' && slotHour === 12) slotHour = 0;
-    
+
     let bookingHour = 0;
     if (bookingTime24.includes('AM') || bookingTime24.includes('PM')) {
       const [bTime, bMod] = bookingTime24.split(' ');
@@ -459,13 +531,13 @@ const handleSelectDoc = (doc) => {
     } else {
       bookingHour = parseInt(bookingTime24.split(':')[0], 10);
     }
-    
+
     return slotHour === bookingHour;
   }
 
   const getSlotDetails = (slotTime12) => {
     const normSlot = normalizeTo12Hour(slotTime12);
-    
+
     // 1. If we successfully loaded live available slots from the API, use that comparison:
     if (hasLoadedAvailableSlots) {
       const isAvailable = availableSlotsFromApi.some(s => normalizeTo12Hour(s) === normSlot);
@@ -475,22 +547,22 @@ const handleSelectDoc = (doc) => {
         status: isAvailable ? 'low' : 'full'
       };
     }
-    
+
     // 2. Fallback to local calculation for selected date:
     const selectedDocName = getDoctorName(formData.doctor_name);
     const selectedDateStr = formData.appointment_date;
-      
+
     const doctorAppointments = appointments.filter(apt => {
       const aptDoc = apt.doctor_name || apt.doctor || '';
       const aptDate = apt.appointment_date || apt.date || '';
-      
-      const matchesDoc = aptDoc.toLowerCase() === selectedDocName.toLowerCase() || 
-                         String(apt.doctor_id || apt.doctorId) === String(formData.doctor_name);
+
+      const matchesDoc = aptDoc.toLowerCase() === selectedDocName.toLowerCase() ||
+        String(apt.doctor_id || apt.doctorId) === String(formData.doctor_name);
       const matchesDate = aptDate === selectedDateStr;
-      
+
       return matchesDoc && matchesDate;
     });
-    
+
     const bookedCount = doctorAppointments.filter(apt => {
       if (formData.id && (apt.id === formData.id || apt.appointment_ref === formData.id)) {
         return false;
@@ -498,12 +570,12 @@ const handleSelectDoc = (doc) => {
       const aptTime = apt.appointment_time || apt.time || '';
       return doesTimeFallInSlot(aptTime, slotTime12);
     }).length;
-    
+
     let status = 'low';
     if (bookedCount >= 1) {
       status = 'full';
     }
-    
+
     return {
       bookedCount,
       maxCapacity: 1,
@@ -538,7 +610,7 @@ const handleSelectDoc = (doc) => {
     const endTimeStr = activeSchedule?.end_time || "17:00";
     // Default break from 1:00 PM to 2:30 PM as requested by user
     const breaks = activeSchedule?.breaks || [{ start: "13:00", end: "14:30" }];
-    
+
     const toMins = (timeStr) => {
       if (!timeStr) return 0;
       let time = timeStr.trim();
@@ -557,21 +629,21 @@ const handleSelectDoc = (doc) => {
       }
       return h * 60 + m;
     };
-    
+
     const startMins = toMins(startTimeStr);
     const endMins = toMins(endTimeStr);
-    
+
     const generated = [];
     for (let m = startMins; m < endMins; m += 30) {
       const slotStart = m;
       const slotEnd = m + 30;
-      
+
       const isBreak = breaks.some(b => {
         const bStart = toMins(b.start);
         const bEnd = toMins(b.end);
         return slotStart < bEnd && slotEnd > bStart;
       });
-      
+
       if (!isBreak) {
         const h24 = Math.floor(slotStart / 60);
         const min = slotStart % 60;
@@ -621,7 +693,7 @@ const handleSelectDoc = (doc) => {
         const data = await scheduleRes.json();
         scheduleData = data?.data || data;
       }
-      
+
       const generatedSlots = generateSlots(scheduleData, date);
       setSlots(generatedSlots);
       // 2. Fetch available slots from the actual API endpoint
@@ -663,6 +735,7 @@ const handleSelectDoc = (doc) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    setSubmitError(null)
 
     if (!formData.appointment_time) {
       if (typeof toast !== 'undefined') {
@@ -686,29 +759,29 @@ const handleSelectDoc = (doc) => {
       const deptObj = apiDepartments.find(d => (d.name || d) === formData.department_name);
       const department_id = deptObj ? (deptObj.id || deptObj.department_id || formData.department_name) : formData.department_name;
 
-const payload = {
-  patient_ref: formData.patient_ref,
-  patient_name: formData.patient_name,
+      const payload = {
+        patient_ref: formData.patient_ref,
+        patient_name: formData.patient_name,
 
-  doctor_id: formData.doctor_id || undefined,
-  doctor_name: formData.doctor_name,
+        doctor_id: formData.doctor_id || undefined,
+        doctor_name: formData.doctor_name,
 
-  department_id: formData.department_id,
-  department_name: formData.department_name,
+        department_id: formData.department_id,
+        department_name: formData.department_name,
 
-  appointment_date: formData.appointment_date,
+        appointment_date: formData.appointment_date,
 
-  appointment_time:
-    formData.appointment_time.includes('AM') ||
-    formData.appointment_time.includes('PM')
-      ? convertTo24Hour(formData.appointment_time)
-      : formData.appointment_time,
+        appointment_time:
+          formData.appointment_time.includes('AM') ||
+            formData.appointment_time.includes('PM')
+            ? convertTo24Hour(formData.appointment_time)
+            : formData.appointment_time,
 
-  appointment_type: formData.appointment_type,
+        appointment_type: formData.appointment_type,
 
-  chief_complaint: formData.chief_complaint,
-  notes: formData.notes
-}
+        chief_complaint: formData.chief_complaint,
+        notes: formData.notes
+      }
 
       if (formData.id) {
         // Modify existing appointment
@@ -729,6 +802,7 @@ const payload = {
       if (res.ok) {
         if (typeof toast !== 'undefined') toast.success(data.message || `Appointment ${formData.id ? 'modified' : 'scheduled'} successfully!`);
         setShowForm(false)
+        setSubmitError(null)
         await loadAppointments(true) // Silent reload
 
         setFormData({
@@ -736,7 +810,7 @@ const payload = {
           patient_name: '',
           patient_ref: '',
           department_name: '',
-          
+
           doctor_name: '',
           appointment_date: '',
           appointment_time: '',
@@ -751,9 +825,11 @@ const payload = {
       } else {
         const errorMsg = data.message || data.detail || data.error || 'Error saving appointment';
         if (typeof toast !== 'undefined') toast.error(errorMsg);
+        setSubmitError(errorMsg);
       }
     } catch (err) {
       if (typeof toast !== 'undefined') toast.error('An error occurred while saving');
+      setSubmitError('An error occurred while saving');
     }
   }
   // Handle view appointment
@@ -792,20 +868,21 @@ const payload = {
   const handleReschedule = (appointment) => {
     setSelectedAppointment(null) // Close details modal
     setSelectedPatientProfile(null)
+    setSubmitError(null)
     const doctorObj = apiDoctors.find(d => d.id === appointment.doctorId) || apiDoctors.find(d => d.name === appointment.doctor);
     setFormData({
-  id: appointment.id,
-  patient_ref: appointment.referralId || '',
-  patient_name: appointment.patient || '',
-  doctor_name: appointment.doctor || '',
-  department_id: appointment.department_id || '',
-  department_name: appointment.department || '',
-  appointment_date: appointment.date || '',
-  appointment_time: appointment.time || '',
-  appointment_type: appointment.type || 'CONSULTATION',
-  chief_complaint: appointment.reason || '',
-  notes: appointment.notes || ''
-})
+      id: appointment.id,
+      patient_ref: appointment.referralId || '',
+      patient_name: appointment.patient || '',
+      doctor_name: appointment.doctor || '',
+      department_id: appointment.department_id || '',
+      department_name: appointment.department || '',
+      appointment_date: appointment.date || '',
+      appointment_time: appointment.time || '',
+      appointment_type: appointment.type || 'CONSULTATION',
+      chief_complaint: appointment.reason || '',
+      notes: appointment.notes || ''
+    })
     setPatientSearchTerm(appointment.patient || '')
     setDeptSearchTerm(doctorObj?.department || appointment.department || '')
     setDocSearchTerm(doctorObj?.name || appointment.doctor || '')
@@ -828,30 +905,31 @@ const payload = {
     return `${hours}:${minutes}`
   }
 
-const handleNewAppointment = () => {
-  setSelectedAppointment(null)
-  setSelectedPatientProfile(null)
+  const handleNewAppointment = () => {
+    setSelectedAppointment(null)
+    setSelectedPatientProfile(null)
+    setSubmitError(null)
 
-  setFormData({
-    id: null,
-    patient_ref: '',
-    patient_name: '',
-    doctor_name: '',
-    department_id: '',
-    department_name: '',
-    appointment_date: new Date().toISOString().split('T')[0],
-    appointment_time: '',
-    appointment_type: 'CONSULTATION',
-    chief_complaint: '',
-    notes: ''
-  })
+    setFormData({
+      id: null,
+      patient_ref: '',
+      patient_name: '',
+      doctor_name: '',
+      department_id: '',
+      department_name: '',
+      appointment_date: new Date().toISOString().split('T')[0],
+      appointment_time: '',
+      appointment_type: 'CONSULTATION',
+      chief_complaint: '',
+      notes: ''
+    })
 
-  setPatientSearchTerm('')
-  setDeptSearchTerm('')
-  setDocSearchTerm('')
+    setPatientSearchTerm('')
+    setDeptSearchTerm('')
+    setDocSearchTerm('')
 
-  setShowForm(true)
-}
+    setShowForm(true)
+  }
 
   const handleCancelAppointment = async (appointmentId) => {
     if (window.confirm('Are you sure you want to cancel this appointment?')) {
@@ -1167,25 +1245,38 @@ const handleNewAppointment = () => {
       {/* Form Modal - for NEW and RESCHEDULE */}
       <Modal
         isOpen={showForm}
-        onClose={() => setShowForm(false)}
+        onClose={() => {
+          setShowForm(false)
+          setSubmitError(null)
+        }}
         title={formData.id ? "Edit Appointment" : "Schedule Appointment"}
         size="lg"
         footer={
-          <div className="flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              form="appointment-form"
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md hover:shadow-lg active:scale-95 font-medium"
-            >
-              {formData.id ? 'Save Changes' : 'Schedule Appointment'}
-            </button>
+          <div className="flex flex-col items-end w-full gap-2">
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForm(false)
+                  setSubmitError(null)
+                }}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="appointment-form"
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md hover:shadow-lg active:scale-95 font-medium"
+              >
+                {formData.id ? 'Save Changes' : 'Schedule Appointment'}
+              </button>
+            </div>
+            {submitError && (
+              <p className="text-red-600 text-sm font-medium text-right mt-1 max-w-md">
+                {submitError}
+              </p>
+            )}
           </div>
         }
       >
@@ -1271,79 +1362,79 @@ const handleNewAppointment = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="relative" ref={deptDropdownRef}>
-  <label className="block text-sm font-medium text-gray-700 mb-1">
-    Department Name
-    <span className="text-red-500">*</span>
-  </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Department Name
+                <span className="text-red-500">*</span>
+              </label>
 
-  <div className="relative">
-    <input
-      type="text"
-      value={formData.department_name}
-      placeholder="Search Department..."
-      onChange={(e) => {
-        setFormData({
-          ...formData,
-          department_name: e.target.value
-        })
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formData.department_name}
+                  placeholder="Search Department..."
+                  onChange={(e) => {
+                    setFormData({
+                      ...formData,
+                      department_name: e.target.value
+                    })
 
-        setDeptSearchTerm(e.target.value)
-        setIsDeptDropdownOpen(true)
-      }}
-      onFocus={() => setIsDeptDropdownOpen(true)}
-      className="w-full p-2 pr-10 border rounded focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-      required
-    />
-    <div
-      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer hover:text-blue-500 transition-colors"
-      onClick={() => setIsDeptDropdownOpen(!isDeptDropdownOpen)}
-    >
-      <KeyboardArrowDownIcon />
-    </div>
-  </div>
+                    setDeptSearchTerm(e.target.value)
+                    setIsDeptDropdownOpen(true)
+                  }}
+                  onFocus={() => setIsDeptDropdownOpen(true)}
+                  className="w-full p-2 pr-10 border rounded focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                  required
+                />
+                <div
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer hover:text-blue-500 transition-colors"
+                  onClick={() => setIsDeptDropdownOpen(!isDeptDropdownOpen)}
+                >
+                  <KeyboardArrowDownIcon />
+                </div>
+              </div>
 
-  {isDeptDropdownOpen && (
-    <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-xl max-h-60 overflow-y-auto">
-      {filteredDepartments.map((dept) => (
-        <div
-          key={dept.id}
-          onClick={() => handleSelectDept(dept)}
-          className="p-3 hover:bg-blue-50 cursor-pointer"
-        >
-          {dept.name}
-        </div>
-      ))}
-    </div>
-  )}
-</div>
+              {isDeptDropdownOpen && (
+                <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                  {filteredDepartments.map((dept) => (
+                    <div
+                      key={dept.id}
+                      onClick={() => handleSelectDept(dept)}
+                      className="p-3 hover:bg-blue-50 cursor-pointer"
+                    >
+                      {dept.name}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <div>
-  <label className="block text-sm font-medium text-gray-700 mb-1">
-    Department ID
-    <span className="text-red-500">*</span>
-  </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Department ID
+                <span className="text-red-500">*</span>
+              </label>
 
-  <input
-    type="text"
-    name="department_id"
-    value={formData.department_id}
-    onChange={(e) =>
-      setFormData({
-        ...formData,
-        department_id: e.target.value
-      })
-    }
-    className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
-    placeholder="DEPT-101"
-    required
-  />
-</div>
+              <input
+                type="text"
+                name="department_id"
+                value={formData.department_id}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    department_id: e.target.value
+                  })
+                }
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="DEPT-101"
+                required
+              />
+            </div>
 
             <div className="relative" ref={docDropdownRef}>
               <label className="block text-sm font-medium text-gray-700 mb-1">Doctor <span className="text-red-500">*</span></label>
               <div className="relative">
                 <input
                   type="text"
-                 placeholder={formData.department_name ? "Search Doctor..." : "Select Department First"}
+                  placeholder={formData.department_name ? "Search Doctor..." : "Select Department First"}
                   value={docSearchTerm}
                   disabled={!formData.department_name}
                   onChange={(e) => {
@@ -1382,39 +1473,39 @@ const handleNewAppointment = () => {
                   )}
                 </div>
               )}
-            </div>  
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Appointment Type</label>
               <select
-  name="appointment_type"
-  value={formData.appointment_type}
-  onChange={(e) =>
-    setFormData({
-      ...formData,
-      appointment_type: e.target.value
-    })
-  }
-  className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none transition-all"
->
-  <option value="CONSULTATION">
-    Consultation
-  </option>
+                name="appointment_type"
+                value={formData.appointment_type}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    appointment_type: e.target.value
+                  })
+                }
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+              >
+                <option value="CONSULTATION">
+                  Consultation
+                </option>
 
-  <option value="FOLLOW_UP">
-    Follow Up
-  </option>
+                <option value="FOLLOW_UP">
+                  Follow Up
+                </option>
 
-  <option value="EMERGENCY">
-    Emergency
-  </option>
+                <option value="EMERGENCY">
+                  Emergency
+                </option>
 
-  <option value="ROUTINE_CHECKUP">
-    Routine Checkup
-  </option>
-</select>
+                <option value="ROUTINE_CHECKUP">
+                  Routine Checkup
+                </option>
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Chief Complaint</label>
@@ -1456,7 +1547,7 @@ const handleNewAppointment = () => {
 
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">Appointment Time (Available Slots) <span className="text-red-500">*</span></label>
-            
+
             {!formData.department_name || !formData.doctor_name ? (
               <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center text-sm text-gray-500 italic">
                 Select Department and Doctor first to view available time slots.
@@ -1480,34 +1571,50 @@ const handleNewAppointment = () => {
                   const { bookedCount, status } = getSlotDetails(slot);
                   const isSelected = normalizeTo12Hour(formData.appointment_time) === normalizeTo12Hour(slot);
                   const isFull = status === 'full';
-                  
+                  const isPast = isSlotInPast(slot, formData.appointment_date);
+                  const period = getSlotPeriod(slot);
+                  const isBreakTime = period === 'lunch' || period === 'dinner';
+
                   let statusClasses = "";
                   let accentBarColor = "";
                   let labelText = "Available";
                   let labelColor = "text-green-600";
-                  
+                  let isDisabled = false;
+
                   if (isSelected) {
                     statusClasses = "border-blue-600 bg-blue-50/40 text-blue-900 shadow-md scale-[1.02]";
                     accentBarColor = "bg-blue-600";
                     labelText = bookedCount === 0 ? "Selected (0/1)" : `Selected (1/1)`;
                     labelColor = "text-blue-700 font-semibold";
-                  } else if (isFull) {
-                    statusClasses = "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed";
+                  } else if (isPast) {
+                    statusClasses = "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed opacity-50";
                     accentBarColor = "bg-gray-300";
-                    labelText = "Fully Booked (1/1)";
+                    labelText = "Passed";
                     labelColor = "text-gray-400";
+                    isDisabled = true;
+                  } else if (isFull) {
+                    statusClasses = "border-gray-300 bg-gray-200 text-gray-600 cursor-not-allowed";
+                    accentBarColor = "bg-gray-400";
+                    labelText = "Booked (1/1)";
+                    labelColor = "text-gray-500";
+                    isDisabled = true;
+                  } else if (isBreakTime) {
+                    statusClasses = "border-red-300 bg-red-100 text-red-800 hover:bg-red-200/50";
+                    accentBarColor = "bg-red-500";
+                    labelText = period === 'lunch' ? "Lunch Break" : "Dinner Break";
+                    labelColor = "text-red-600 font-semibold";
                   } else {
                     statusClasses = "border-green-200 bg-white hover:bg-green-50/20 text-gray-800 hover:border-green-400";
                     accentBarColor = "bg-green-500";
                     labelText = "Available (0/1)";
                     labelColor = "text-green-600 font-medium";
                   }
-                  
+
                   return (
                     <button
                       key={slot || idx}
                       type="button"
-                      disabled={isFull && !isSelected}
+                      disabled={isDisabled && !isSelected}
                       onClick={() => {
                         setFormData({ ...formData, appointment_time: slot });
                       }}
@@ -1515,8 +1622,8 @@ const handleNewAppointment = () => {
                     >
                       {/* Left accent bar */}
                       <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${accentBarColor}`} />
-                      
-                      <span className="font-bold text-sm sm:text-base tracking-tight">
+
+                      <span className={`font-bold text-sm sm:text-base tracking-tight ${isPast && !isSelected ? 'line-through' : ''}`}>
                         {slot}
                       </span>
                       <span className={`text-[10px] sm:text-xs mt-0.5 truncate ${labelColor}`}>
