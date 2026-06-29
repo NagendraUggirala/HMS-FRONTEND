@@ -126,6 +126,7 @@ const Sidebar = ({ activePage, onPageChange, isOpen = false, onClose }) => {
 
    const pharmacyMenu = [
     { id: "dashboard", label: "Dashboard Overview", icon: "fas fa-tachometer-alt" },
+    { id: "patientmedicines", label: "Patient Prescriptions", icon: "fas fa-prescription-bottle-alt" },
     { id: "inventory", label: "Inventory Management", icon: "fas fa-boxes" },
     { id: "purchaseorders", label: "Purchase Orders", icon: "fas fa-shopping-cart" },
     { id: "salestracking", label: "Sales Tracking", icon: "fa-chart-line" },
