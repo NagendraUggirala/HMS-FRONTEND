@@ -238,7 +238,7 @@ export const PUBLIC_APPOINTMENTS_AVAILABLE_SLOTS = (doctorId, date) => `/api/v1/
 export const STAFF_DOCTOR_SCHEDULES = (doctorName) => `/api/v1/staff/doctor-schedules/${encodeURIComponent(doctorName)}`;
 export const STAFF_DOCTOR_CHECK_SLOTS = (doctorName, date) => `/api/v1/staff/doctor-schedules/${encodeURIComponent(doctorName)}/check-slots?date=${encodeURIComponent(date)}`;
 export const RECEPTIONIST_APPOINTMENTS_REF = (appointmentId) => `/api/v1/receptionist/appointments/${encodeURIComponent(appointmentId)}`;
-export const RECEPTIONIST_APPOINTMENTS_SCHEDULE = '/api/v1/receptionist/appointments/schedule';
+export const RECEPTIONIST_APPOINTMENTS_SCHEDULE = 'https://hms-backend-2av4.onrender.com/api/v1/receptionist/appointments/schedule';
 export const RECEPTIONIST_APPOINTMENTS_CANCEL = (appointmentId) => `/api/v1/receptionist/appointments/${encodeURIComponent(appointmentId)}/cancel`;
 export const RECEPTIONIST_APPOINTMENTS_STATUS = (appointmentId) => `/api/v1/receptionist/appointments/${encodeURIComponent(appointmentId)}/status`;
 export const RECEPTIONIST_APPOINTMENTS_CHECK_IN = (appointmentId) => `/api/v1/receptionist/appointments/${encodeURIComponent(appointmentId)}/check-in`;

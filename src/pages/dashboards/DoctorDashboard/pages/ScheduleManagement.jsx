@@ -15,7 +15,8 @@ const WEEK_DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATU
 const EMPTY_FORM = {
   date: '',
   start_time: '',
-  end_time: ''
+  end_time: '',
+  slot_duration_minutes: 30
 }
 
 const ScheduleManagement = () => {
@@ -123,7 +124,8 @@ const ScheduleManagement = () => {
     setFormData({
       date: slot.date || '',
       start_time: slot.start_time || '',
-      end_time: slot.end_time || ''
+      end_time: slot.end_time || '',
+      slot_duration_minutes: slot.slot_duration_minutes || 30
     })
     setModalState({ add: false, edit: true })
   }
@@ -138,11 +140,30 @@ const ScheduleManagement = () => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
-  const buildPayload = () => ({
-    date: formData.date || null,
-    start_time: formData.start_time,
-    end_time: formData.end_time
-  })
+  const buildPayload = () => {
+    let dayOfWeek = null;
+    if (formData.date) {
+      try {
+        const d = new Date(formData.date);
+        if (!isNaN(d.getTime())) {
+          const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+          dayOfWeek = days[d.getDay()];
+        }
+      } catch (e) {}
+    }
+    
+    return {
+      date: formData.date || null,
+      day_of_week: formData.day_of_week || dayOfWeek,
+      start_time: formData.start_time,
+      end_time: formData.end_time,
+    slot_duration_minutes: Number(formData.slot_duration_minutes) || 30,
+    slot_duration: Number(formData.slot_duration_minutes) || 30,
+    duration: Number(formData.slot_duration_minutes) || 30,
+    duration_minutes: Number(formData.slot_duration_minutes) || 30,
+    max_patients_per_slot: 1
+  }
+}
 
   const validateForm = () => {
     if (!formData.date || !formData.start_time || !formData.end_time) {
@@ -151,6 +172,11 @@ const ScheduleManagement = () => {
     }
     if (formData.start_time >= formData.end_time) {
       window.alert('End time must be greater than start time.')
+      return false
+    }
+    const duration = Number(formData.slot_duration_minutes);
+    if (!duration || duration < 15 || duration > 120) {
+      window.alert('Slot duration must be between 15 and 120 minutes.')
       return false
     }
     return true
@@ -396,7 +422,7 @@ const ScheduleManagement = () => {
 
 const SlotForm = ({ formData, onChange, onCancel, onSubmit, submitText, submitLoading }) => (
   <div className="space-y-4">
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       <div>
         <label className="block text-sm text-gray-700 mb-1">Date</label>
         <input
@@ -422,6 +448,18 @@ const SlotForm = ({ formData, onChange, onCancel, onSubmit, submitText, submitLo
           className="w-full px-3 py-2 border border-gray-300 rounded-lg"
           value={formData.end_time}
           onChange={(event) => onChange('end_time', event.target.value)}
+        />
+      </div>
+      <div>
+        <label className="block text-sm text-gray-700 mb-1">Slot Duration (mins)</label>
+        <input
+          type="number"
+          min="15"
+          max="120"
+          step="5"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+          value={formData.slot_duration_minutes || 30}
+          onChange={(event) => onChange('slot_duration_minutes', event.target.value)}
         />
       </div>
     </div>
@@ -502,7 +540,7 @@ function normalizeScheduleSlots(rawData) {
       day_of_week: dayVal,
       start_time: item?.start_time || '',
       end_time: item?.end_time || '',
-      slot_duration_minutes: Number(item?.slot_duration_minutes || 0),
+      slot_duration_minutes: Number(item?.slot_duration_minutes || item?.slot_duration || item?.duration || item?.duration_minutes || 30),
       break_start_time: item?.break_start_time || '',
       break_end_time: item?.break_end_time || '',
     max_patients_per_slot: Number(item?.max_patients_per_slot || 1),

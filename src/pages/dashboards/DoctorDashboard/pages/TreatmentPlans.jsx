@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { toast } from "react-toastify";
 import { apiFetch } from "../../../../services/apiClient";
-import { DOCTOR_PROFILE } from "../../../../config/api";
+import { DOCTOR_PROFILE, IPD_ADMISSIONS } from "../../../../config/api";
+import { getTodaysAppointmentTracking } from "../../../../services/doctorApi";
+import { createPrescription, searchMedicines } from "../../../../services/prescriptionService";
 import {
   Users,
   Activity,
@@ -143,10 +145,107 @@ const getPriorityBadgeClass = (priority) => {
 
 const TreatmentPlans = () => {
   // Main local state for patients data
-  const [patients, setPatients] = useState(INITIAL_PATIENTS);
+  const [patients, setPatients] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Dynamic doctor name loaded from profile
   const [doctorName, setDoctorName] = useState("Dr. Sharma");
+
+  // Fetch checked-in patients: today from API + past from localStorage cache
+  useEffect(() => {
+    const CACHE_KEY = "treatment_plans_patients_cache";
+
+    const mapAppointment = (a, idx) => {
+      const pid = a.appointment_ref || a.id || `APT-${idx}`;
+      const storedLab = JSON.parse(localStorage.getItem(`patient_${pid}_labTests`)) || [];
+      const storedPresc = JSON.parse(localStorage.getItem(`patient_${pid}_prescriptions`)) || [];
+      const storedTransfer = JSON.parse(localStorage.getItem(`patient_${pid}_ipdTransfer`)) || null;
+      const storedStatus = JSON.parse(localStorage.getItem(`patient_${pid}_status`)) || null;
+      return {
+        id: pid,
+        patient_ref: a.patient_ref || a.patient_id || a.patient_profile_id || pid,
+        appointment_ref: a.appointment_ref || pid,
+        name: a.patient_name || a.patientName || "Unknown Patient",
+        age: a.patient_age || a.age || 0,
+        gender: a.patient_gender || a.gender || "Male",
+        doctor: a.doctor_name || a.doctorName || doctorName,
+        diagnosis: a.chief_complaint || a.chiefComplaint || a.reason || a.diagnosis || "OPD Visit",
+        treatmentStatus: storedStatus ? storedStatus.status : "Active",
+        priority: storedStatus ? storedStatus.priority : (
+          a.priority === "EMERGENCY" ? "Emergency" :
+          a.priority === "URGENT" ? "High" :
+          a.priority === "HIGH" ? "High" : "Medium"
+        ),
+        lastVisit: a.appointment_date || a.scheduled_date || a.createdAt?.split("T")[0] || new Date().toISOString().split("T")[0],
+        labTests: storedLab,
+        prescriptions: storedPresc,
+        ipdTransfer: storedTransfer
+      };
+    };
+
+    const fetchPlans = async () => {
+      setIsLoading(true);
+
+      // Load previously cached patients immediately (shows past data right away)
+      const cachedRaw = localStorage.getItem(CACHE_KEY);
+      const cachedPatients = cachedRaw ? JSON.parse(cachedRaw) : [];
+      if (cachedPatients.length > 0) {
+        setPatients(cachedPatients);
+      }
+
+      try {
+        const response = await getTodaysAppointmentTracking();
+        const payload = await response.json().catch(() => ({}));
+
+        if (response.ok) {
+          const data = payload?.data ?? payload ?? {};
+          let appointments = [];
+          if (Array.isArray(data?.appointments)) {
+            appointments = data.appointments;
+          } else if (Array.isArray(data)) {
+            appointments = data;
+          } else if (Array.isArray(data?.items)) {
+            appointments = data.items;
+          }
+
+          // Only today's appointments that are checked in (or in consultation)
+          const todayFiltered = appointments.filter(a => {
+            const s = String(a.tracking_status || a.status || a.appointment_status || "").toUpperCase();
+            return s.includes("CHECKED") || s.includes("CONSULT");
+          });
+
+          const todayMapped = todayFiltered.map(mapAppointment);
+
+          // All IDs from today's API response (including non-checked-in ones)
+          const allTodayIds = new Set(appointments.map((a, idx) => a.appointment_ref || a.id || `APT-${idx}`));
+
+          // Merge: today's checked-in data takes priority.
+          // For past cached data, we ONLY keep ones that are NOT in today's API response at all.
+          // This prevents non-checked-in appointments from today from leaking back in via cache.
+          const pastOnly = cachedPatients.filter(p => !allTodayIds.has(p.id));
+          const merged = [...todayMapped, ...pastOnly];
+
+          // Save merged back to cache for future visits
+          localStorage.setItem(CACHE_KEY, JSON.stringify(merged));
+          setPatients(merged);
+        } else {
+          console.error("Appointment tracking failed:", response.status, payload);
+          // Keep cached data visible, just show a subtle warning
+          if (cachedPatients.length === 0) {
+            toast.error(payload?.message || "Failed to load today's appointments.");
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching appointment tracking:", err);
+        if (cachedPatients.length === 0) {
+          toast.error("Error loading patients. Showing cached data if available.");
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchPlans();
+  }, [doctorName]);
 
   // Search and Filter criteria states
   const [searchQuery, setSearchQuery] = useState("");
@@ -187,10 +286,12 @@ const TreatmentPlans = () => {
 
   const [prescriptionForm, setPrescriptionForm] = useState({
     medications: [
-      { medication: "", dosage: "", frequency: "Once daily", duration: "" }
+      { medication: "", medicine_id: null, dosage: "", frequency: "Once daily", duration: "" }
     ],
     notes: ""
   });
+  const [medSearchResults, setMedSearchResults] = useState({});
+  const [medSearching, setMedSearching] = useState({});
 
   const [editMedicationForm, setEditMedicationForm] = useState({
     medication: "",
@@ -270,26 +371,35 @@ const TreatmentPlans = () => {
   };
 
   // Submit lab tests assignment
-  const handleAssignLabTest = (e) => {
+  const handleAssignLabTest = async (e) => {
     e.preventDefault();
     if (labForm.tests.length === 0) {
       toast.warning("Please select at least one laboratory investigation.");
       return;
     }
 
-    setPatients((prevPatients) =>
-      prevPatients.map((p) => {
-        if (p.id === selectedPatient.id) {
-          return { ...p, labTests: labForm.tests };
-        }
-        return p;
-      })
-    );
+    try {
+      // The backend API for doctor assigning a lab test directly isn't currently available.
+      // Simulating a successful request to update the UI optimally.
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-    toast.success(
-      `Updated lab assignments for patient ${selectedPatient.name}`
-    );
-    setActiveModal(null);
+      setPatients((prevPatients) =>
+        prevPatients.map((p) => {
+          if (p.id === selectedPatient.id) {
+            const updatedP = { ...p, labTests: labForm.tests };
+            localStorage.setItem(`patient_${p.id}_labTests`, JSON.stringify(labForm.tests));
+            return updatedP;
+          }
+          return p;
+        })
+      );
+
+      toast.success(`Assigned lab tests for ${selectedPatient.name} (Saved locally, API pending).`);
+      setActiveModal(null);
+    } catch (error) {
+      console.error(error);
+      toast.error("Error saving lab tests to backend.");
+    }
   };
 
   // Open Edit Lab Assignments modal (pre-fills existing tests)
@@ -360,8 +470,36 @@ const TreatmentPlans = () => {
     });
   };
 
+  // Live search medicines from backend by name
+  const handleMedicineSearch = async (index, query) => {
+    handleMedicationFieldChange(index, "medication", query);
+    handleMedicationFieldChange(index, "medicine_id", null);
+    if (!query || query.length < 2) {
+      setMedSearchResults(prev => ({ ...prev, [index]: [] }));
+      return;
+    }
+    setMedSearching(prev => ({ ...prev, [index]: true }));
+    try {
+      const data = await searchMedicines(query, 10);
+      const results = Array.isArray(data) ? data : (data?.results || data?.medicines || []);
+      setMedSearchResults(prev => ({ ...prev, [index]: results }));
+    } catch {
+      setMedSearchResults(prev => ({ ...prev, [index]: [] }));
+    } finally {
+      setMedSearching(prev => ({ ...prev, [index]: false }));
+    }
+  };
+
+  // Select a medicine from the dropdown
+  const selectMedicineResult = (index, med) => {
+    handleMedicationFieldChange(index, "medication", med.brand_name || med.generic_name || med.medicine_name);
+    handleMedicationFieldChange(index, "medicine_id", med.medicine_id || med.id);
+    handleMedicationFieldChange(index, "dosage", med.strength || "");
+    setMedSearchResults(prev => ({ ...prev, [index]: [] }));
+  };
+
   // Submit prescription send action (adds all medications in the list to the patient)
-  const handleSendPrescription = (e) => {
+  const handleSendPrescription = async (e) => {
     e.preventDefault();
     const { medications } = prescriptionForm;
 
@@ -374,23 +512,56 @@ const TreatmentPlans = () => {
       return;
     }
 
-    setPatients((prevPatients) =>
-      prevPatients.map((p) => {
-        if (p.id === selectedPatient.id) {
-          const existingPrescriptions = p.prescriptions || [];
-          return {
-            ...p,
-            prescriptions: [...existingPrescriptions, ...medications]
-          };
-        }
-        return p;
-      })
-    );
+    try {
+      // Validate that all medicines have been selected from the search (have a medicine_id)
+      const missingId = medications.find(m => !m.medicine_id);
+      if (missingId) {
+        toast.warning(`Please select "${missingId.medication}" from the search suggestions to ensure it exists in pharmacy inventory.`);
+        return;
+      }
 
-    toast.success(
-      `Forwarded ${medications.length} prescription(s) to Pharmacy for ${selectedPatient.name}`
-    );
-    setActiveModal(null);
+      const mappedMedicines = medications.map(m => ({
+        medicine_id: m.medicine_id,
+        medicine_name: m.medication,
+        dosage_text: m.dosage,
+        frequency: m.frequency || "Once daily",
+        duration_days: parseInt(m.duration) || 5,
+        quantity: 1,
+        instructions: "Follow as prescribed"
+      }));
+
+      const prescriptionData = {
+        patient_ref: selectedPatient.patient_ref || selectedPatient.id,
+        diagnosis: selectedPatient.diagnosis || "Consultation",
+        notes: "Prescribed via Treatment Plans Cards",
+        medicines: mappedMedicines
+      };
+
+      const result = await createPrescription(prescriptionData);
+      console.log("Prescription successfully created:", result);
+
+      setPatients((prevPatients) =>
+        prevPatients.map((p) => {
+          if (p.id === selectedPatient.id) {
+            const existingPrescriptions = p.prescriptions || [];
+            const updatedPrescriptions = [...existingPrescriptions, ...medications];
+            localStorage.setItem(`patient_${p.id}_prescriptions`, JSON.stringify(updatedPrescriptions));
+            return {
+              ...p,
+              prescriptions: updatedPrescriptions
+            };
+          }
+          return p;
+        })
+      );
+
+      toast.success(`Forwarded ${medications.length} prescription(s) to Pharmacy and saved to backend.`);
+      setActiveModal(null);
+    } catch (error) {
+      console.error(error);
+      const errorMessage = error.response?.data?.message || error.response?.data?.detail || error.message || "Error saving prescription to backend.";
+      toast.error(errorMessage);
+    }
   };
 
   // Open Edit Single Medication modal
@@ -464,7 +635,7 @@ const TreatmentPlans = () => {
   };
 
   // Submit IPD/Emergency transfer action
-  const handleMoveToIPD = (e) => {
+  const handleMoveToIPD = async (e) => {
     e.preventDefault();
     const { department, ward, reason } = transferForm;
     if (!reason.trim()) {
@@ -472,38 +643,79 @@ const TreatmentPlans = () => {
       return;
     }
 
-    setPatients((prevPatients) =>
-      prevPatients.map((p) => {
-        if (p.id === selectedPatient.id) {
-          // If transferring to Emergency or Critical Care, raise status to Critical and priority to Emergency
-          let updatedStatus = p.treatmentStatus;
-          let updatedPriority = p.priority;
+    try {
+      const admissionType = department === "Emergency Department" || department === "Critical Care"
+        ? "EMERGENCY" : "IPD";
 
-          if (department === "Emergency Department" || department === "Critical Care") {
-            updatedStatus = "Critical";
-            updatedPriority = "Emergency";
-          } else if (department === "IPD Admission") {
-            updatedStatus = "Active";
-            if (p.priority === "Low") {
-              updatedPriority = "Medium";
-            }
-          }
+      const payload = {
+        patient_ref: selectedPatient.patient_ref || selectedPatient.id,
+        admission_type: admissionType,
+        chief_complaint: reason,
+        provisional_diagnosis: selectedPatient.diagnosis || "Under evaluation",
+        ward_name: ward,
+        admission_notes: `Transfer to ${department} — ${reason}`
+      };
 
-          return {
-            ...p,
-            treatmentStatus: updatedStatus,
-            priority: updatedPriority,
-            ipdTransfer: { department, ward, reason }
-          };
+      const response = await apiFetch(IPD_ADMISSIONS, {
+        method: "POST",
+        body: payload
+      });
+
+      const responseData = await response.json().catch(() => ({}));
+      console.log("Transfer payload sent:", payload);
+      console.log("Transfer response:", responseData);
+
+      if (!response.ok) {
+        // Extract detailed field errors if present
+        const details = responseData?.detail;
+        let errMsg = responseData?.message || "Failed to transfer patient to IPD.";
+        if (Array.isArray(details) && details.length > 0) {
+          errMsg = details.map(d => `${d.loc?.join(".")} — ${d.msg}`).join("; ");
+        } else if (typeof details === "string") {
+          errMsg = details;
         }
-        return p;
-      })
-    );
+        console.error("Backend validation errors:", details);
+        toast.error(errMsg, { autoClose: 8000 });
+        return;
+      }
 
-    toast.success(
-      `Transferred ${selectedPatient.name} to ${department} (${ward}) successfully.`
-    );
-    setActiveModal(null);
+      setPatients((prevPatients) =>
+        prevPatients.map((p) => {
+          if (p.id === selectedPatient.id) {
+            let updatedStatus = p.treatmentStatus;
+            let updatedPriority = p.priority;
+
+            if (department === "Emergency Department" || department === "Critical Care") {
+              updatedStatus = "Critical";
+              updatedPriority = "Emergency";
+            } else if (department === "IPD Admission") {
+              updatedStatus = "Active";
+              if (p.priority === "Low") {
+                updatedPriority = "Medium";
+              }
+            }
+
+            const transferData = { department, ward, reason };
+            localStorage.setItem(`patient_${p.id}_ipdTransfer`, JSON.stringify(transferData));
+            localStorage.setItem(`patient_${p.id}_status`, JSON.stringify({ status: updatedStatus, priority: updatedPriority }));
+
+            return {
+              ...p,
+              treatmentStatus: updatedStatus,
+              priority: updatedPriority,
+              ipdTransfer: transferData
+            };
+          }
+          return p;
+        })
+      );
+
+      toast.success(`${selectedPatient.name} successfully referred to ${department}.`);
+      setActiveModal(null);
+    } catch (error) {
+      console.error("Transfer error:", error);
+      toast.error(error?.message || "Error saving transfer order to backend.");
+    }
   };
 
   // Open Edit Transfer modal (pre-fills existing transfer details)
@@ -592,21 +804,13 @@ const TreatmentPlans = () => {
         <div>
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
             <Stethoscope className="text-blue-600 w-8 h-8" />
-            Treatment Plans Management
+            Treatment Plans
           </h2>
           <p className="text-sm text-slate-500 mt-1">
             Overview clinic and ward admissions, assign laboratory tests, write pharmacy prescriptions, and dispatch transfers.
           </p>
         </div>
-        <div>
-          <button
-            onClick={handleOpenAddPatientModal}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all duration-200"
-          >
-            <Plus className="w-5 h-5" />
-            Add New Patient
-          </button>
-        </div>
+
       </div>
 
       {/* ==========================================
@@ -723,7 +927,7 @@ const TreatmentPlans = () => {
         <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-12 text-center shadow-sm">
           <User className="w-12 h-12 text-slate-300 mx-auto" />
           <h3 className="text-base font-bold text-slate-700 mt-4">No Patients Found</h3>
-          <p className="text-sm text-slate-400 mt-1">Try expanding your filter criteria or register a new patient profile.</p>
+          <p className="text-sm text-slate-400 mt-1">No checked-in patients found for today. Patients will appear here once checked in from Appointment Tracking.</p>
           {(searchQuery || statusFilter || priorityFilter) && (
             <button
               onClick={handleResetFilters}
@@ -979,9 +1183,8 @@ const TreatmentPlans = () => {
                   {activeModal === "lab" && "Assign Lab Test"}
                   {activeModal === "prescription" && "Send Prescription"}
                   {activeModal === "transfer" && "Transfer Department"}
-                  {activeModal === "add_patient" && "Register New Patient"}
                 </h3>
-                {selectedPatient && activeModal !== "add_patient" && (
+                {selectedPatient && (
                   <p className="text-xs text-slate-400 font-semibold mt-0.5">
                     Patient: {selectedPatient.name} ({selectedPatient.id})
                   </p>
@@ -1075,20 +1278,36 @@ const TreatmentPlans = () => {
                           Medication #{index + 1}
                         </h4>
                         <div className="grid grid-cols-2 gap-3">
-                          <div>
+                          <div className="relative">
                             <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                              Medication Name *
+                              Medication Name * {med.medicine_id && <span className="text-green-500 ml-1">✓</span>}
                             </label>
                             <input
                               type="text"
-                              placeholder="e.g. Metformin"
+                              placeholder="Search medicine..."
                               value={med.medication}
-                              onChange={(e) =>
-                                handleMedicationFieldChange(index, "medication", e.target.value)
-                              }
+                              onChange={(e) => handleMedicineSearch(index, e.target.value)}
                               required
                               className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-700"
                             />
+                            {medSearching[index] && (
+                              <span className="absolute right-2 top-7 text-slate-400 text-[10px]">searching...</span>
+                            )}
+                            {(medSearchResults[index] || []).length > 0 && (
+                              <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-40 overflow-y-auto">
+                                {(medSearchResults[index] || []).map((m, i) => (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    onClick={() => selectMedicineResult(index, m)}
+                                    className="w-full text-left px-3 py-2 hover:bg-blue-50 text-xs text-slate-700 border-b border-slate-100 last:border-0"
+                                  >
+                                    <div className="font-semibold">{m.brand_name || m.generic_name || m.medicine_name}</div>
+                                    <div className="text-slate-400">{m.generic_name} · {m.strength} · {m.dosage_form}</div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
                           <div>
                             <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
@@ -1358,9 +1577,9 @@ const TreatmentPlans = () => {
                 </form>
               )}
 
-              {/* Form D: Add New Patient */}
-              {activeModal === "add_patient" && (
-                <form onSubmit={handleAddPatient} className="space-y-4">
+              {/* (Add New Patient removed — patients come from Appointment Tracking check-in) */}
+              {activeModal === "__removed__" && (
+                <form className="space-y-4">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
                       Patient Full Name *
