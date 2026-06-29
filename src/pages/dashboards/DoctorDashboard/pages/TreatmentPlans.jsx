@@ -387,6 +387,52 @@ const TreatmentPlans = () => {
       })
     );
 
+    // Save to localStorage for integration with Pharmacy Dashboard
+    try {
+      const localPrescriptionsRaw = localStorage.getItem("hospitalPrescriptions");
+      const localPrescriptions = localPrescriptionsRaw ? JSON.parse(localPrescriptionsRaw) : [];
+      
+      // Generate next sequential prescription ID (e.g. RX-1001, RX-1002...)
+      let nextNum = 1001;
+      if (localPrescriptions.length > 0) {
+        const ids = localPrescriptions.map(p => {
+          const match = p.prescriptionId?.match(/RX-(\d+)/);
+          return match ? parseInt(match[1], 10) : 1000;
+        });
+        nextNum = Math.max(...ids) + 1;
+      }
+      const prescriptionId = `RX-${nextNum}`;
+
+      // Get today's date in YYYY-MM-DD
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const formattedDate = `${yyyy}-${mm}-${dd}`;
+
+      const newPrescriptionObj = {
+        prescriptionId,
+        patientId: selectedPatient.id,
+        patientName: selectedPatient.name,
+        doctorId: "DOC-101", // Mock doctor ID
+        doctorName: doctorName || "Dr. Sharma",
+        date: formattedDate,
+        status: "Pending",
+        notes: prescriptionForm.notes || "",
+        medications: medications.map(med => ({
+          medicineName: med.medication,
+          dosage: med.dosage,
+          frequency: med.frequency,
+          duration: med.duration
+        }))
+      };
+
+      localPrescriptions.push(newPrescriptionObj);
+      localStorage.setItem("hospitalPrescriptions", JSON.stringify(localPrescriptions));
+    } catch (err) {
+      console.error("Error saving prescription to localStorage:", err);
+    }
+
     toast.success(
       `Forwarded ${medications.length} prescription(s) to Pharmacy for ${selectedPatient.name}`
     );
