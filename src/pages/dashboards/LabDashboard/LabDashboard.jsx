@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react'
 import Header from '../../../components/common/Header/Header'
 import Sidebar from '../../../components/common/Sidebar/Sidebar'
 // Import Lab Components
-import TestRegistration from './pages/TestRegistration'
+import TestRequests from './pages/TestRequests'
 import SampleTracking from './pages/SampleTracking'
 import ReportGeneration from './pages/ReportGeneration'
 import ResultAccess from './pages/ResultAccess'
@@ -14,6 +14,7 @@ import LabOverview from './pages/LabOverview'
 import CriticalResults from './pages/CriticalResults'
 import LabProfile from './pages/LabProfile'
 import RaiseticketLab from './pages/RaiseticketLab'
+import TestHistory from './pages/TestHistory'
 
 const LabDashboard = () => {
   const [activePage, setActivePage] = useState('lab-dashboard')
@@ -53,7 +54,7 @@ const LabDashboard = () => {
       case 'lab-dashboard':
         return <LabOverview />
       case 'test-registration':
-        return <TestRegistration />
+        return <TestRequests />
       case 'sample-tracking':
         return <SampleTracking />
       case 'report-generation':
@@ -72,6 +73,8 @@ const LabDashboard = () => {
         return <RaiseticketLab />
       case 'profile':
         return <LabProfile />
+      case 'test-history':
+        return <TestHistory />
       default:
         return <LabOverview />
     }
