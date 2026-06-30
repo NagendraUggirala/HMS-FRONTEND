@@ -23,11 +23,12 @@ const Sidebar = ({ activePage, onPageChange, isOpen = false, onClose }) => {
   const sidebarTitle = getSidebarTitle()
   const labMenu = [
     { id: 'lab-dashboard', label: 'Lab Dashboard', icon: 'fas fa-flask' },
-    { id: 'critical-results', label: 'Critical Results', icon: 'fas fa-exclamation-circle' },
-    { id: 'test-registration', label: 'Test Registration', icon: 'fas fa-vial' },
-    { id: 'sample-tracking', label: 'Sample Tracking', icon: 'fas fa-qrcode' },
-    { id: 'report-generation', label: 'Report Generation', icon: 'fas fa-file-medical' },
-    { id: 'result-access', label: 'Result Access', icon: 'fas fa-shield-alt' },
+    { id: 'test-registration', label: 'Test Requests', icon: 'fas fa-vial' },
+    { id: 'result-access', label: 'Result Uploads', icon: 'fas fa-shield-alt' },
+    { id: 'test-history', label: 'Test History', icon: 'fas fa-history' },
+    //{ id: 'critical-results', label: 'Critical Results', icon: 'fas fa-exclamation-circle' },
+    //{ id: 'sample-tracking', label: 'Sample Tracking', icon: 'fas fa-qrcode' },
+    //{ id: 'report-generation', label: 'Report Generation', icon: 'fas fa-file-medical' },
     { id: 'test-catalogue', label: 'Test Catalogue', icon: 'fas fa-book-medical' },
     { id: 'equipment-tracking', label: 'Equipment Tracking', icon: 'fas fa-microscope' },
     { id: 'quality-control', label: 'Quality Control', icon: 'fas fa-chart-line' },
@@ -65,7 +66,7 @@ const Sidebar = ({ activePage, onPageChange, isOpen = false, onClose }) => {
     { id: 'lab', label: 'Lab Management', icon: 'fa-microscope' },
     { id: 'reports', label: 'Reports', icon: 'fa-chart-bar' },
     { id: 'audit', label: 'Audit Logs', icon: 'fa-clipboard-check' },
-    { id: 'settings', label: 'Settings', icon: 'fa-cog' },{ id: 'raise-ticket', label: 'Raise Ticket', icon: 'fa-envelope-open-text' }
+    { id: 'settings', label: 'Settings', icon: 'fa-cog' }, { id: 'raise-ticket', label: 'Raise Ticket', icon: 'fa-envelope-open-text' }
   ]
 
   const nurseMenu = [
@@ -124,7 +125,7 @@ const Sidebar = ({ activePage, onPageChange, isOpen = false, onClose }) => {
     { id: 'profile', label: 'My Profile', icon: 'fa-user' }
   ]
 
-   const pharmacyMenu = [
+  const pharmacyMenu = [
     { id: "dashboard", label: "Dashboard Overview", icon: "fas fa-tachometer-alt" },
     { id: "patientmedicines", label: "Patient Prescriptions", icon: "fas fa-prescription-bottle-alt" },
     { id: "inventory", label: "Inventory Management", icon: "fas fa-boxes" },
@@ -141,19 +142,19 @@ const Sidebar = ({ activePage, onPageChange, isOpen = false, onClose }) => {
     { id: 'raise-ticket', label: 'Raise Ticket', icon: 'fa-envelope-open-text' }
   ];
 
-const teleMedicineMenu = [
-  { id: "dashboard", label: "Dashboard", icon: "fa-solid fa-chart-line" },
-  { id: "appointments", label: "My Appointments", icon: "fa-solid fa-calendar-check" },
-  { id: "prescriptions", label: "Prescriptions", icon: "fa-solid fa-file-prescription" },
-  { id: "remotepatientmonitoring", label: "Remote Patient Monitoring", icon: "fa-solid fa-heart-pulse" },
-  { id: "labresults", label: "Lab Results", icon: "fa-flask"},
-  { id: "patients", label: "Patient Records", icon: "fa-user-injured"},
-  { id: "inpatient", label: "Inpatient Visits", icon: "fa-procedures"}, 
-  { id: "messages", label: "Messaging", icon: "fa-comments" },
-  { id: "doctoroverview", label: "Doctor Overview", icon: "fa-solid fa-clipboard-list" },
-  { id: "doctorprofile", label: "Doctor Profile", icon: "fa-solid fa-user-doctor" },
-  { id: 'raise-ticket', label: 'Raise Ticket', icon: 'fa-envelope-open-text' }
-];
+  const teleMedicineMenu = [
+    { id: "dashboard", label: "Dashboard", icon: "fa-solid fa-chart-line" },
+    { id: "appointments", label: "My Appointments", icon: "fa-solid fa-calendar-check" },
+    { id: "prescriptions", label: "Prescriptions", icon: "fa-solid fa-file-prescription" },
+    { id: "remotepatientmonitoring", label: "Remote Patient Monitoring", icon: "fa-solid fa-heart-pulse" },
+    { id: "labresults", label: "Lab Results", icon: "fa-flask" },
+    { id: "patients", label: "Patient Records", icon: "fa-user-injured" },
+    { id: "inpatient", label: "Inpatient Visits", icon: "fa-procedures" },
+    { id: "messages", label: "Messaging", icon: "fa-comments" },
+    { id: "doctoroverview", label: "Doctor Overview", icon: "fa-solid fa-clipboard-list" },
+    { id: "doctorprofile", label: "Doctor Profile", icon: "fa-solid fa-user-doctor" },
+    { id: 'raise-ticket', label: 'Raise Ticket', icon: 'fa-envelope-open-text' }
+  ];
 
   const getMenuItems = () => {
     switch (user?.role) {
@@ -180,8 +181,7 @@ const teleMedicineMenu = [
   return (
     <>
       {/* Mobile Sidebar */}
-      <aside className={`fixed left-0 top-16 h-[calc(100vh-4rem)] w-64 bg-white border-r transform transition-transform duration-300 z-40 md:hidden ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+      <aside className={`fixed left-0 top-16 h-[calc(100vh-4rem)] w-64 bg-white border-r transform transition-transform duration-300 z-40 md:hidden ${isOpen ? 'translate-x-0' : '-translate-x-full'
         }`} >
         <div className="h-full flex flex-col">
           {/* Header */}
@@ -195,20 +195,18 @@ const teleMedicineMenu = [
               </button>
             </div>
           </div>
-          
+
           {/* Scrollable Navigation */}
           <nav className="flex-1 overflow-y-auto py-2">
             <div className="space-y-1 px-2">
               {menuItems.map(item => (
                 <button key={item.id} onClick={() => handleItemClick(item.id)}
-                  className={`w-full text-left p-3 rounded-lg flex items-center transition-all duration-200 ${
-                    activePage === item.id
-                      ? 'bg-blue-100 text-blue-700 font-semibold border-l-4 border-l-blue-500'
-                      : 'hover:bg-gray-50 text-gray-700'
-                  }`} >
-                  <span className={`text-lg mr-3 w-6 text-center ${
-                    activePage === item.id ? 'text-blue-600' : 'text-blue-500'
-                  }`}>
+                  className={`w-full text-left p-3 rounded-lg flex items-center transition-all duration-200 ${activePage === item.id
+                    ? 'bg-blue-100 text-blue-700 font-semibold border-l-4 border-l-blue-500'
+                    : 'hover:bg-gray-50 text-gray-700'
+                    }`} >
+                  <span className={`text-lg mr-3 w-6 text-center ${activePage === item.id ? 'text-blue-600' : 'text-blue-500'
+                    }`}>
                     <i className={`fas ${item.icon}`}></i>
                   </span>
                   <span className="text-sm">{item.label}</span>
@@ -233,20 +231,18 @@ const teleMedicineMenu = [
               </button>
             </div>
           </div>
-          
+
           {/* Scrollable Navigation */}
           <nav className="flex-1 overflow-y-auto py-2">
             <div className="space-y-1 px-2">
               {menuItems.map(item => (
                 <button key={item.id} onClick={() => onPageChange(item.id)}
-                  className={`w-full text-left p-3 rounded-lg flex items-center transition-all duration-200 ${
-                    activePage === item.id
-                      ? 'bg-blue-100 text-blue-700 font-semibold border-l-4 border-l-blue-500'
-                      : 'hover:bg-gray-50 text-gray-700'
-                  }`} >
-                  <span className={`text-lg mr-3 w-6 text-center ${
-                    activePage === item.id ? 'text-blue-600' : 'text-blue-500'
-                  }`}>
+                  className={`w-full text-left p-3 rounded-lg flex items-center transition-all duration-200 ${activePage === item.id
+                    ? 'bg-blue-100 text-blue-700 font-semibold border-l-4 border-l-blue-500'
+                    : 'hover:bg-gray-50 text-gray-700'
+                    }`} >
+                  <span className={`text-lg mr-3 w-6 text-center ${activePage === item.id ? 'text-blue-600' : 'text-blue-500'
+                    }`}>
                     <i className={`fas ${item.icon}`}></i>
                   </span>
                   <span className="text-sm">{item.label}</span>
@@ -259,7 +255,7 @@ const teleMedicineMenu = [
 
       {/* Mobile Overlay */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden" onClick={onClose} />
       )}
     </>
