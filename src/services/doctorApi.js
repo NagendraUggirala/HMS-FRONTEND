@@ -75,6 +75,7 @@ function buildAppointmentPaths({ appointmentRef, action = 'list', query = {} } =
     if (action === 'list') return withQuery(`${base}/appointments`, query)
     if (action === 'details') return `${base}/appointments/${encodeURIComponent(appointmentRef)}`
     if (action === 'update') return `${base}/appointments/${encodeURIComponent(appointmentRef)}`
+    if (action === 'delete') return `${base}/appointments/${encodeURIComponent(appointmentRef)}`
     if (action === 'complete') return `${base}/appointments/${encodeURIComponent(appointmentRef)}/complete`
     if (action === 'cancel') return `${base}/appointments/${encodeURIComponent(appointmentRef)}/cancel`
     return ''
@@ -128,6 +129,7 @@ function buildTreatmentPlanPaths({ planId, action = 'list', query = {} } = {}) {
     if (action === 'createFromTemplate') return `${base}/plans/from-template`
     if (action === 'analytics') return withQuery(`${base}/analytics/summary`, query)
     if (action === 'cleanupDates') return `${base}/maintenance/cleanup-dates`
+    if (action === 'checkinPatients') return withQuery(`${base}/checkin-patients`, query)
     return ''
   }).filter(Boolean)
 }
@@ -242,10 +244,23 @@ export function completeDoctorAppointment(appointmentRef) {
   })
 }
 
+export function checkInDoctorAppointment(appointmentRef) {
+  return doctorApiFetchWithFallback(
+    [ `/api/v1/receptionist/appointments/${encodeURIComponent(appointmentRef)}/check-in` ],
+    { method: 'POST', body: {} }
+  )
+}
+
 export function cancelDoctorAppointment(appointmentRef, cancellationReason) {
   return doctorApiFetchWithFallback(buildAppointmentPaths({ action: 'cancel', appointmentRef }), {
     method: 'POST',
     body: { cancellation_reason: cancellationReason },
+  })
+}
+
+export function deleteDoctorAppointment(appointmentRef) {
+  return doctorApiFetchWithFallback(buildAppointmentPaths({ action: 'delete', appointmentRef }), {
+    method: 'DELETE'
   })
 }
 
@@ -565,6 +580,12 @@ export function cleanupDoctorTreatmentPlanDates() {
     {
       method: 'POST',
     }
+  )
+}
+
+export function getDoctorCheckinPatients(filters = {}) {
+  return doctorApiFetchWithFallback(
+    buildTreatmentPlanPaths({ action: 'checkinPatients', query: filters })
   )
 }
 
