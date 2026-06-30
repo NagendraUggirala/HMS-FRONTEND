@@ -40,11 +40,23 @@ export function patientAppointmentErrorMessage(payload) {
 
 // --- APPOINTMENTS ---
 export function getPatientDepartments() {
-  return patientApiFetch(`${PAB}/departments`)
+  // Use global departments list as the PAB endpoint might return empty for some hospitals
+  return patientApiFetch(`/api/v1/departments`)
 }
 
-export function getPatientDepartmentDoctors(departmentName) {
-  return patientApiFetch(`${PAB}/departments/${encodeURIComponent(departmentName)}/doctors`)
+export async function getPatientDepartmentDoctors(departmentName) {
+  const res = await patientApiFetch(`/api/v1/doctors`);
+  if (!res.ok) return res;
+  const data = await res.json().catch(() => ({}));
+  const list = data?.data?.doctors || data?.data?.staff || data?.doctors || data?.staff || data?.data || data || [];
+  const filtered = Array.isArray(list) 
+    ? list.filter(d => d.department === departmentName || d.department?.name === departmentName)
+    : [];
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({ doctors: filtered })
+  };
 }
 
 export function getDoctorAvailableSlots(doctorName, date) {
