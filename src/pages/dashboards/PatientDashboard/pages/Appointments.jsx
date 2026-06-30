@@ -141,14 +141,11 @@ const Appointments = () => {
       }
       console.log('[Appointments] Departments payload:', payload)
       // Handle multiple response shapes: array, { departments: [] }, { data: [] }
-      const list =
-        Array.isArray(payload) ? payload
-        : Array.isArray(payload?.departments) ? payload.departments
-        : Array.isArray(payload?.data) ? payload.data
-        : []
+      const rawList = payload?.data?.departments || payload?.departments || payload?.data || payload
+      const list = Array.isArray(rawList) ? rawList : []
       setDepartments(list)
       if (list.length === 0) {
-        toast.info('No departments found. Contact your hospital administrator.')
+        toast.info(`No depts. Payload: ${JSON.stringify(payload).substring(0, 100)}`)
       }
     } catch (err) {
       console.error('[Appointments] loadDepartments exception:', err)
@@ -176,12 +173,8 @@ const Appointments = () => {
       }
       console.log('[Appointments] Doctors payload:', payload)
       // Handle multiple response shapes: { doctors: [] }, array, { data: [] }, { staff: [] }
-      const list =
-        Array.isArray(payload) ? payload
-        : Array.isArray(payload?.doctors) ? payload.doctors
-        : Array.isArray(payload?.data) ? payload.data
-        : Array.isArray(payload?.staff) ? payload.staff
-        : []
+      const rawList = payload?.data?.doctors || payload?.data?.staff || payload?.doctors || payload?.staff || payload?.data || payload
+      const list = Array.isArray(rawList) ? rawList : []
       setDoctors(list)
       if (list.length === 0) {
         toast.info(`No doctors found in ${departmentName}.`)
@@ -212,12 +205,8 @@ const Appointments = () => {
       }
       console.log('[Appointments] Slots payload:', payload)
       // Handle multiple response shapes
-      const list =
-        Array.isArray(payload) ? payload
-        : Array.isArray(payload?.available_slots) ? payload.available_slots
-        : Array.isArray(payload?.slots) ? payload.slots
-        : Array.isArray(payload?.data) ? payload.data
-        : []
+      const rawList = payload?.data?.available_slots || payload?.data?.slots || payload?.available_slots || payload?.slots || payload?.data || payload
+      const list = Array.isArray(rawList) ? rawList : []
       setSlots(list)
     } catch (err) {
       console.error('[Appointments] loadSlots exception:', err)

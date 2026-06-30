@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import LoadingSpinner from '../../../../components/common/LoadingSpinner/LoadingSpinner'
 import { apiFetch } from '../../../../services/apiClient'
-import { getDoctorAppointments } from '../../../../services/doctorApi'
+import { getTodaysAppointmentTracking } from '../../../../services/doctorApi'
 
 /* ===========================
    DoctorOverview component
@@ -24,52 +24,61 @@ const DoctorOverview = ({ onPageChange }) => {
     setLoading(true)
     try {
       const todayDate = new Date().toISOString().split('T')[0];
-      const [overviewRes, appointmentsRes, recentPatientsRes, admittedPatientsRes, tasksRes, quickStatsRes] = await Promise.all([
-        apiFetch('/api/v1/doctor-dashboard/overview'),
-        getDoctorAppointments({ date_from: todayDate, date_to: todayDate }),
-        apiFetch('/api/v1/doctor-dashboard/patients/recent?limit=10'),
-        apiFetch('/api/v1/doctor-dashboard/patients/admitted'),
-        apiFetch('/api/v1/doctor-dashboard/tasks/pending'),
-        apiFetch('/api/v1/doctor-dashboard/stats/quick?period=week')
+      
+      const safeFetchJson = async (fetchPromise) => {
+        try {
+          const res = await fetchPromise;
+          if (!res || !res.ok) return {};
+          return await res.json().catch(() => ({}));
+        } catch (err) {
+          return {};
+        }
+      };
+
+      const [overviewResult, appointmentsResult, recentPatientsResult, admittedPatientsResult, tasksResult, quickStatsResult] = await Promise.all([
+        safeFetchJson(apiFetch('/api/v1/doctor-dashboard/overview')),
+        safeFetchJson(getTodaysAppointmentTracking()),
+        safeFetchJson(apiFetch('/api/v1/doctor-dashboard/patients/recent?limit=10')),
+        safeFetchJson(apiFetch('/api/v1/doctor-dashboard/patients/admitted')),
+        safeFetchJson(apiFetch('/api/v1/doctor-dashboard/tasks/pending')),
+        safeFetchJson(apiFetch('/api/v1/doctor-dashboard/stats/quick?period=week'))
       ])
 
-      const overviewResult = await overviewRes.json()
-      const apiData = overviewResult.data || overviewResult || {}
-      const statsObj = apiData.statistics || {}
+      const apiData = overviewResult?.data || overviewResult || {}
+      const statsObj = apiData?.statistics || {}
 
-      const appointmentsResult = await appointmentsRes.json()
-      const appointmentsData = appointmentsResult.data || appointmentsResult || {}
-      const todayAppointments = appointmentsData.appointments || appointmentsData || []
+      const extractArray = (data, key) => {
+        if (Array.isArray(data)) return data;
+        if (Array.isArray(data?.[key])) return data[key];
+        if (Array.isArray(data?.data?.[key])) return data.data[key];
+        if (Array.isArray(data?.items)) return data.items;
+        if (Array.isArray(data?.data)) return data.data;
+        return [];
+      };
 
-      const recentPatientsResult = await recentPatientsRes.json()
-      const recentPatientsData = recentPatientsResult.data || recentPatientsResult || {}
-      const recentPatients = recentPatientsData.patients || []
+      const todayAppointments = extractArray(appointmentsResult, 'appointments');
 
-      const admittedPatientsResult = await admittedPatientsRes.json()
-      const admittedPatientsData = admittedPatientsResult.data || admittedPatientsResult || {}
-      const admittedPatients = admittedPatientsData.patients || []
+      const recentPatients = extractArray(recentPatientsResult, 'patients');
+      const admittedPatients = extractArray(admittedPatientsResult, 'patients');
+      const pendingTasks = extractArray(tasksResult, 'tasks');
 
-      const tasksResult = await tasksRes.json()
-      const tasksData = tasksResult.data || tasksResult || {}
-      const pendingTasks = tasksData.tasks || []
-
-      const quickStatsResult = await quickStatsRes.json()
-      const quickStatsData = quickStatsResult.data || quickStatsResult || {}
+      const quickStatsData = quickStatsResult?.data || quickStatsResult || {}
 
       setDashboardData({
         overview: apiData,
         stats: {
-          todaysAppointments: statsObj.todays_appointments || 0,
+          todaysAppointments: todayAppointments.length || statsObj.todays_appointments || 0,
           completedToday: statsObj.completed_today || 0,
           pendingAppointments: statsObj.pending_appointments || 0,
-          admittedPatients: statsObj.admitted_patients || 0,
+          admittedPatients: admittedPatients.length || statsObj.admitted_patients || 0,
           totalPatientsLifetime: statsObj.total_patients_lifetime || 0,
           pendingDischargeSummaries: statsObj.pending_discharge_summaries || 0,
           weekAppointments: statsObj.week_appointments || 0,
         },
-         appointments: todayAppointments,
+        appointments: todayAppointments,
         recentPatients: recentPatients,
         admittedPatients: admittedPatients,
+        todos: pendingTasks,
         quickStats: quickStatsData
       })
     } catch (err) {
@@ -81,7 +90,7 @@ const DoctorOverview = ({ onPageChange }) => {
   }
 
   const handleViewAllAppointments = () => {
-    onPageChange && onPageChange('appointments')
+    onPageChange && onPageChange('appointment-tracking')
   }
 
   if (loading) return <LoadingSpinner />
@@ -189,7 +198,7 @@ const DoctorOverview = ({ onPageChange }) => {
           <h3 className="text-lg font-semibold mb-3">Today's Appointments</h3>
 
           <div className="flex-1 overflow-y-auto pr-1 divide-y divide-gray-200">
-            {dashboardData.appointments && dashboardData.appointments.length > 0 ? dashboardData.appointments.map((apt, index) => (
+            {dashboardData.appointments && dashboardData.appointments.length > 0 ? dashboardData.appointments.slice(0, 5).map((apt, index) => (
               <div
                 key={apt.id || apt._id || index}
                 className="flex items-center justify-between py-3 px-2 hover:bg-gray-50"
@@ -239,7 +248,7 @@ const DoctorOverview = ({ onPageChange }) => {
           </div>
 
           <div className="flex-1 overflow-y-auto pr-1 divide-y divide-gray-200 min-h-[180px]">
-            {dashboardData.admittedPatients && dashboardData.admittedPatients.length > 0 ? dashboardData.admittedPatients.map((patient, index) => (
+            {dashboardData.admittedPatients && dashboardData.admittedPatients.length > 0 ? dashboardData.admittedPatients.slice(0, 5).map((patient, index) => (
               <div
                 key={patient.id || patient._id || index}
                 className="flex items-center justify-between py-3 px-2 hover:bg-gray-50"
@@ -284,7 +293,7 @@ const DoctorOverview = ({ onPageChange }) => {
           </div>
 
           <div className="flex-1 overflow-y-auto divide-y divide-gray-100 pr-1 min-h-[180px]">
-            {dashboardData.todos && dashboardData.todos.length > 0 ? dashboardData.todos.map((todo, index) => (
+            {dashboardData.todos && dashboardData.todos.length > 0 ? dashboardData.todos.slice(0, 5).map((todo, index) => (
               <div key={todo.id || todo._id || index} className="flex items-center justify-between px-2 py-3">
                 <div className="flex items-center gap-3">
                   <div className="drag-handle text-gray-300">⋮⋮</div>
@@ -331,7 +340,7 @@ const DoctorOverview = ({ onPageChange }) => {
           </div>
 
           <div className="flex-1 overflow-y-auto divide-y divide-gray-100 pr-1 min-h-[180px]">
-            {dashboardData.recentPatients && dashboardData.recentPatients.length > 0 ? dashboardData.recentPatients.map((patient, index) => (
+            {dashboardData.recentPatients && dashboardData.recentPatients.length > 0 ? dashboardData.recentPatients.slice(0, 5).map((patient, index) => (
               <div key={patient.id || patient._id || index} className="flex items-center justify-between py-3 hover:bg-gray-50">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-700 font-medium">

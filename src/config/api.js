@@ -3,7 +3,7 @@ export const API_BASE_URL = import.meta.env.DEV
   ? ''
   : (import.meta.env.VITE_API_BASE_URL || 'https://hms-backend-2av4.onrender.com').replace(/\/$/, '');
 
-export const PUBLIC_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://hms-backend-2av.onrender.com';
+export const PUBLIC_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://hms-backend-2av4.onrender.com';
 /** When using ngrok, skip browser warning so API returns JSON instead of HTML interstitial. Empty object when not ngrok = no impact. */
 export const API_HEADERS = (API_BASE_URL && API_BASE_URL.includes('ngrok')) ? { 'ngrok-skip-browser-warning': 'true' } : {};
 

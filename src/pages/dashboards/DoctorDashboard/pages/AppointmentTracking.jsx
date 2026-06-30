@@ -17,6 +17,7 @@ import {
   sendBulkAppointmentNotifications,
   updateAppointmentDelay,
   completeDoctorAppointment,
+  checkInDoctorAppointment,
   cancelDoctorAppointment,
 } from '../../../../services/doctorApi'
 
@@ -319,7 +320,7 @@ const AppointmentTracking = () => {
     if (!window.confirm('Mark this appointment as checked in?')) return
     setActionLoadingRef(row.appointment_ref)
     try {
-      const response = await completeDoctorAppointment(row.appointment_ref)
+      const response = await checkInDoctorAppointment(row.appointment_ref)
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
         toast.error(doctorAppointmentErrorMessage(data))

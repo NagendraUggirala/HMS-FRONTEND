@@ -14,7 +14,6 @@ import Return from './pages/Return'
 import GRN from './pages/GRN'
 import Report from './pages/Report'
 import RaiseticketPharma from './pages/RaiseticketPharma'
-import PatientMedicines from './pages/PatientMedicines'
 
 const PharmacyDashboard = () => {
   const [activePage, setActivePage] = useState('dashboard')
@@ -26,8 +25,6 @@ const PharmacyDashboard = () => {
     switch (activePage) {
       case 'dashboard':
         return <Dashboard onPageChange={setActivePage} />
-      case 'patientmedicines':
-        return <PatientMedicines />
       case 'inventory':
         return <Inventory />
       case 'purchaseorders':
