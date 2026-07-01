@@ -14,74 +14,16 @@ import {
   CalendarToday,
   Person,
 } from "@mui/icons-material";
+import { 
+  getLabTestRegistrations, 
+  updateTestRegistrationStatus,
+  createDoctorLabTest,
+  updateDoctorLabTest,
+  getDoctorLabTests
+} from "../../../../services/labApi";
 
 
-const DUMMY_TESTS = [
-  {
-    id: "LAB-1021",
-    patientId: "PAT-1001",
-    patientName: "Ramesh Kumar",
-    age: 45,
-    gender: "Male",
-    phoneNumber: "9876543210",
-    email: "ramesh@example.com",
-    registeredDate: new Date().toISOString().split("T")[0],
-    testType: "Blood Test",
-    sampleType: "Blood",
-    status: "PENDING",
-    referringDoctor: "Dr. Sharma",
-    department: "OPD",
-    instructions: "Fasting required for 12 hours before test",
-  },
-  {
-    id: "LAB-1022",
-    patientId: "PAT-1002",
-    patientName: "Sita Devi",
-    age: 32,
-    gender: "Female",
-    phoneNumber: "9876543211",
-    email: "sita@example.com",
-    registeredDate: new Date().toISOString().split("T")[0],
-    testType: "HbA1c Test",
-    sampleType: "Blood",
-    status: "IN_PROGRESS",
-    referringDoctor: "Dr. Priya",
-    department: "OPD",
-    instructions: "Routine checkup",
-  },
-  {
-    id: "LAB-1023",
-    patientId: "PAT-1003",
-    patientName: "Mohan Rao",
-    age: 58,
-    gender: "Male",
-    phoneNumber: "9876543212",
-    email: "mohan@example.com",
-    registeredDate: new Date().toISOString().split("T")[0],
-    testType: "Urine Culture",
-    sampleType: "Urine",
-    status: "PENDING",
-    referringDoctor: "Dr. Rajesh",
-    department: "OPD",
-    instructions: "Morning sample preferred",
-  },
-  {
-    id: "LAB-1024",
-    patientId: "PAT-1004",
-    patientName: "Anjali Gupta",
-    age: 27,
-    gender: "Female",
-    phoneNumber: "9876543213",
-    email: "anjali@example.com",
-    registeredDate: new Date().toISOString().split("T")[0],
-    testType: "CBC, Lipid Profile",
-    sampleType: "Blood",
-    status: "COMPLETED",
-    referringDoctor: "Dr. Neha",
-    department: "OPD",
-    instructions: "None",
-  }
-];
+const DUMMY_TESTS = [];
 
 const testTypes = [
   "CBC",
@@ -149,6 +91,29 @@ const TestRegistration = () => {
     urgent_tests: 0,
   });
 
+  const fetchInitialData = async () => {
+    try {
+      setLoading(true);
+      const [labResponse, doctorResponse] = await Promise.all([
+        getLabTestRegistrations(),
+        getDoctorLabTests().catch(() => ({ data: [] })) // Fallback if doctor tests fail
+      ]);
+      const testsArray = labResponse?.data || labResponse?.tests || labResponse || [];
+      const docTestsArray = doctorResponse?.data || doctorResponse?.tests || doctorResponse || [];
+      
+      const combined = [...(Array.isArray(testsArray) ? testsArray : []), ...(Array.isArray(docTestsArray) ? docTestsArray : [])];
+      setAllTests(combined);
+    } catch (error) {
+      console.error("Failed to fetch test registrations:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInitialData();
+  }, []);
+
   useEffect(() => {
     loadTestData();
     // eslint-disable-next-line
@@ -200,8 +165,9 @@ const TestRegistration = () => {
     loadTestData();
   };
 
-  const handleStatusChange = (testId, newStatus) => {
+  const handleStatusChange = async (testId, newStatus) => {
     try {
+      await updateTestRegistrationStatus(testId, { status: newStatus });
       setAllTests((prevTests) =>
         prevTests.map((t) =>
           t.id === testId ? { ...t, status: newStatus } : t
@@ -209,44 +175,81 @@ const TestRegistration = () => {
       );
     } catch (error) {
       console.error("Error updating status:", error);
+      alert("Failed to update status.");
     }
   };
 
   const handleRegisterTest = async () => {
     if (isEditing) {
-      setAllTests((prevTests) =>
-        prevTests.map((t) =>
-          t.id === editingTestId
-            ? {
-              ...t,
-              ...newTest,
-              registeredDate: t.registeredDate, // Preserve original date
-            }
-            : t,
-        ),
-      );
-      alert(`Test updated successfully! ID: ${editingTestId}`);
+      try {
+        await updateDoctorLabTest(editingTestId, newTest);
+        setAllTests((prevTests) =>
+          prevTests.map((t) =>
+            t.id === editingTestId
+              ? {
+                ...t,
+                ...newTest,
+                registeredDate: t.registeredDate, // Preserve original date
+              }
+              : t,
+          ),
+        );
+        alert(`Test updated successfully! ID: ${editingTestId}`);
+      } catch (err) {
+        console.error("Failed to update test via API:", err);
+        alert("Failed to update test. Continuing with local data.");
+        setAllTests((prevTests) =>
+          prevTests.map((t) =>
+            t.id === editingTestId
+              ? {
+                ...t,
+                ...newTest,
+                registeredDate: t.registeredDate,
+              }
+              : t,
+          ),
+        );
+      }
     } else {
-      const newTestEntry = {
-        id: newTest.patientId ? `LAB-${newTest.patientId.replace("PAT-", "")}-${(allTests.length + 1021)}` : `LAB-${Math.floor(1000 + Math.random() * 9000)}`,
-        patientName: newTest.patientName,
-        patientId: newTest.patientId || `PAT-${Math.floor(1000 + Math.random() * 9000)}`,
-        age: newTest.age,
-        gender: newTest.gender,
-        phoneNumber: newTest.phoneNumber,
-        email: newTest.email,
-        testType: newTest.testType,
-        sampleType: newTest.sampleType,
-        registeredDate: newTest.registrationDate,
-        status: "PENDING",
-        priority: newTest.priority || "routine",
-        referringDoctor: newTest.referringDoctor,
-        department: newTest.department,
-        instructions: newTest.instructions,
-      };
+      try {
+        const newTestEntry = {
+          patientName: newTest.patientName,
+          patientId: newTest.patientId || `PAT-${Math.floor(1000 + Math.random() * 9000)}`,
+          age: newTest.age,
+          gender: newTest.gender,
+          phoneNumber: newTest.phoneNumber,
+          email: newTest.email,
+          testType: newTest.testType,
+          sampleType: newTest.sampleType,
+          registeredDate: newTest.registrationDate,
+          status: "PENDING",
+          priority: newTest.priority || "routine",
+          referringDoctor: newTest.referringDoctor,
+          department: newTest.department,
+          instructions: newTest.instructions,
+        };
 
-      setAllTests([newTestEntry, ...allTests]);
-      alert(`Test registered successfully! ID: ${newTestEntry.id}`);
+        const response = await createDoctorLabTest(newTestEntry);
+        const createdTest = response?.data || response || newTestEntry;
+        
+        // Use generated ID if available, else mock
+        if (!createdTest.id) {
+          createdTest.id = `LAB-${Math.floor(1000 + Math.random() * 9000)}`;
+        }
+
+        setAllTests([createdTest, ...allTests]);
+        alert(`Test registered successfully!`);
+      } catch (err) {
+        console.error("Failed to register test:", err);
+        alert("Failed to register test via API. Will continue with local data temporarily.");
+        // Fallback for local tests if API fails during dev
+        const mockTest = {
+          ...newTest,
+          id: `LAB-${Math.floor(1000 + Math.random() * 9000)}`,
+          status: "PENDING"
+        };
+        setAllTests([mockTest, ...allTests]);
+      }
     }
 
     setShowEditModal(false);
@@ -267,7 +270,6 @@ const TestRegistration = () => {
       department: "",
       instructions: "",
     });
-
   };
 
 
@@ -286,24 +288,30 @@ const TestRegistration = () => {
     setShowRejectModal(true);
   };
 
-  const submitRejection = () => {
+  const submitRejection = async () => {
     if (!rejectReason.trim()) {
       alert("Please enter a reason for rejection.");
       return;
     }
-    setAllTests((prevTests) =>
-      prevTests.map((t) =>
-        t.id === rejectingTestId
-          ? {
-              ...t,
-              status: "REJECTED",
-              rejectionReason: rejectReason,
-            }
-          : t
-      )
-    );
-    setShowRejectModal(false);
-    alert("Test request rejected successfully.");
+    try {
+      await updateTestRegistrationStatus(rejectingTestId, { status: "REJECTED", rejectionReason: rejectReason });
+      setAllTests((prevTests) =>
+        prevTests.map((t) =>
+          t.id === rejectingTestId
+            ? {
+                ...t,
+                status: "REJECTED",
+                rejectionReason: rejectReason,
+              }
+            : t
+        )
+      );
+      setShowRejectModal(false);
+      alert("Test request rejected successfully.");
+    } catch (err) {
+      console.error("Failed to reject test:", err);
+      alert("Failed to reject test request.");
+    }
   };
 
   const handleEditTest = (test) => {
@@ -329,7 +337,7 @@ const TestRegistration = () => {
     setShowEditModal(true);
   };
 
-  const handleViewTest = (test) => {
+  const handleViewTest = async (test) => {
     setSelectedTestData(test);
     setShowViewModal(true);
   };

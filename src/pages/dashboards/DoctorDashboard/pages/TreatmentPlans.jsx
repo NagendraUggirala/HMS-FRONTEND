@@ -81,10 +81,10 @@ const TreatmentPlans = () => {
 
     const mapAppointment = (a, idx) => {
       const pid = a.appointment_ref || a.patient_ref || a.id || `APT-${idx}`;
-      const storedLab = JSON.parse(localStorage.getItem(`patient_${pid}_labTests`)) || [];
-      const storedPresc = JSON.parse(localStorage.getItem(`patient_${pid}_prescriptions`)) || [];
-      const storedTransfer = JSON.parse(localStorage.getItem(`patient_${pid}_ipdTransfer`)) || null;
-      const storedStatus = JSON.parse(localStorage.getItem(`patient_${pid}_status`)) || null;
+      const storedLab = a.labTests || [];
+      const storedPresc = a.prescriptions || [];
+      const storedTransfer = a.ipdTransfer || null;
+      const storedStatus = a.treatmentStatus || null;
       return {
         id: pid,
         patient_ref: a.patient_ref || a.patient_id || a.patient_profile_id || pid,
@@ -111,8 +111,8 @@ const TreatmentPlans = () => {
       setIsLoading(true);
 
       // Load previously cached patients immediately (shows past data right away)
-      const cachedRaw = localStorage.getItem(CACHE_KEY);
-      const cachedPatients = cachedRaw ? JSON.parse(cachedRaw) : [];
+      // Cached patients removed
+      const cachedPatients = [];
       if (cachedPatients.length > 0) {
         setPatients(cachedPatients);
       }
@@ -149,8 +149,7 @@ const TreatmentPlans = () => {
           const pastOnly = cachedPatients.filter(p => !allTodayIds.has(p.id));
           const merged = [...todayMapped, ...pastOnly];
 
-          // Save merged back to cache for future visits
-          localStorage.setItem(CACHE_KEY, JSON.stringify(merged));
+          // Cache merged to state (localStorage removed)
           setPatients(merged);
         } else {
           console.error("Appointment tracking failed:", response.status, payload);
@@ -311,7 +310,7 @@ const TreatmentPlans = () => {
         prevPatients.map((p) => {
           if (p.id === selectedPatient.id) {
             const updatedP = { ...p, labTests: labForm.tests };
-            localStorage.setItem(`patient_${p.id}_labTests`, JSON.stringify(labForm.tests));
+            // localStorage.setItem(`patient_${p.id}_labTests`, JSON.stringify(labForm.tests));
             return updatedP;
           }
           return p;
@@ -469,7 +468,7 @@ const TreatmentPlans = () => {
           if (p.id === selectedPatient.id) {
             const existingPrescriptions = p.prescriptions || [];
             const updatedPrescriptions = [...existingPrescriptions, ...medications];
-            localStorage.setItem(`patient_${p.id}_prescriptions`, JSON.stringify(updatedPrescriptions));
+            // localStorage.setItem(`patient_${p.id}_prescriptions`, JSON.stringify(updatedPrescriptions));
             return {
               ...p,
               prescriptions: updatedPrescriptions
@@ -619,8 +618,8 @@ const TreatmentPlans = () => {
             }
 
             const transferData = { department, ward, reason };
-            localStorage.setItem(`patient_${p.id}_ipdTransfer`, JSON.stringify(transferData));
-            localStorage.setItem(`patient_${p.id}_status`, JSON.stringify({ status: updatedStatus, priority: updatedPriority }));
+            // localStorage.setItem(`patient_${p.id}_ipdTransfer`, JSON.stringify(transferData));
+            // localStorage.setItem(`patient_${p.id}_status`, JSON.stringify({ status: updatedStatus, priority: updatedPriority }));
 
             return {
               ...p,
