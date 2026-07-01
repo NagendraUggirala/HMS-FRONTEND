@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { toast } from "react-toastify";
 import { apiFetch } from "../../../../services/apiClient";
 import { DOCTOR_PROFILE, IPD_ADMISSIONS } from "../../../../config/api";
-import { getTodaysAppointmentTracking } from "../../../../services/doctorApi";
+import { getTodaysAppointmentTracking, completeDoctorAppointment } from "../../../../services/doctorApi";
 import { createPrescription, searchMedicines } from "../../../../services/prescriptionService";
 import {
   Users,
@@ -20,7 +20,8 @@ import {
   Plus,
   RefreshCw,
   Edit,
-  Trash2
+  Trash2,
+  CheckCircle
 } from "lucide-react";
 
 // Available lab tests options for Quick Action
@@ -640,6 +641,25 @@ const TreatmentPlans = () => {
     }
   };
 
+  // Complete Appointment
+  const handleCompleteAppointment = async (patient) => {
+    const loadingToast = toast.loading(`Completing appointment for ${patient.name}...`);
+    try {
+      const response = await completeDoctorAppointment(patient.appointment_ref);
+      const payload = await response.json().catch(() => ({}));
+      
+      if (response.ok) {
+        toast.update(loadingToast, { render: `Successfully completed ${patient.name}'s appointment`, type: "success", isLoading: false, autoClose: 3000 });
+        setPatients((prev) => prev.filter((p) => p.id !== patient.id));
+      } else {
+        toast.update(loadingToast, { render: payload?.message || payload?.detail || "Failed to complete appointment", type: "error", isLoading: false, autoClose: 3000 });
+      }
+    } catch (err) {
+      console.error("Error completing appointment:", err);
+      toast.update(loadingToast, { render: "Error completing appointment.", type: "error", isLoading: false, autoClose: 3000 });
+    }
+  };
+
   // Open Edit Transfer modal (pre-fills existing transfer details)
   const handleOpenEditTransferModal = (patient) => {
     setSelectedPatient(patient);
@@ -1053,8 +1073,18 @@ const TreatmentPlans = () => {
               </div>
 
               {/* Card Footer: Quick Actions Section */}
-              <div className="bg-slate-50/50 px-5 py-4 border-t border-slate-100 grid grid-cols-3 gap-2">
+              <div className="bg-slate-50/50 px-5 py-4 border-t border-slate-100 grid grid-cols-4 gap-2">
                 
+                {/* Button 0: Complete Appointment */}
+                <button
+                  onClick={() => handleCompleteAppointment(patient)}
+                  title="Mark appointment as completed"
+                  className="flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl bg-white hover:bg-green-50 text-green-600 hover:text-green-700 border border-slate-200 hover:border-green-200 shadow-sm hover:shadow transition-all duration-200 text-[10px] font-bold"
+                >
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span>Complete</span>
+                </button>
+
                 {/* Button 1: Assign Lab Test */}
                 <button
                   onClick={() => handleOpenLabModal(patient)}
