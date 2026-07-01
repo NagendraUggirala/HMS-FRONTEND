@@ -292,15 +292,20 @@ const IPDManagement = () => {
 
   // Wards, Rooms, and Beds addition modals and forms
   const [showAddWardModal, setShowAddWardModal] = useState(false);
-  const [addWardForm, setAddWardForm] = useState({ ward_name: "", ward_type: "General Ward", floor: "1st Floor", capacity: 10, daily_price: 1500 });
+  const [addWardForm, setAddWardForm] = useState({ ward_name: "", floor: "1st Floor", capacity: 10, status: "Active" });
   const [showAddRoomModal, setShowAddRoomModal] = useState(false);
-  const [addRoomForm, setAddRoomForm] = useState({ room_number: "", ward_id: "", daily_price: 1500 });
+  const [addRoomForm, setAddRoomForm] = useState({ room_number: "", ward_id: "", daily_price: 1500, status: "Available" });
   const [showAddBedModal, setShowAddBedModal] = useState(false);
-  const [addBedForm, setAddBedForm] = useState({ bed_number: "", ward_id: "", room_id: "", is_oxygen_available: true, ventilator_available: false });
+  const [addBedForm, setAddBedForm] = useState({ bed_number: "", ward_id: "", room_id: "", daily_price: 0, is_oxygen_available: true, ventilator_available: false });
 
-  // Ward editing states
+  // Infrastructure editing states
   const [showEditWardModal, setShowEditWardModal] = useState(false);
-  const [editWardForm, setEditWardForm] = useState({ ward_id: "", ward_name: "", ward_type: "General Ward", floor: "1st Floor", capacity: 10, daily_price: 1500 });
+  const [editWardForm, setEditWardForm] = useState({ ward_id: "", ward_name: "", floor: "1st Floor", capacity: 10, status: "Active" });
+  const [showEditRoomModal, setShowEditRoomModal] = useState(false);
+  const [editRoomForm, setEditRoomForm] = useState({ room_id: "", room_number: "", ward_id: "", daily_price: 1500, status: "Available" });
+  const [showEditBedModal, setShowEditBedModal] = useState(false);
+  const [editBedForm, setEditBedForm] = useState({ bed_id: "", bed_number: "", ward_id: "", room_id: "", daily_price: 0, is_oxygen_available: true, ventilator_available: false, status: "Available" });
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: "", id: null, title: "", message: "" });
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState("");
@@ -414,8 +419,14 @@ const IPDManagement = () => {
           if (adm.daysStayed !== days) {
             changed = true;
             const ward = wards.find(w => w.ward_id === adm.ward_id);
-            const wardRate = pricingConfig.wardCharges[ward?.ward_name] || 1000;
-            const newRoomRent = wardRate * days;
+            const room = rooms.find(r => r.room_id === adm.room_id);
+            const bed = beds.find(b => b.bed_id === adm.bed_id);
+            const rate = (bed?.daily_price && bed.daily_price > 0)
+              ? bed.daily_price
+              : (room?.daily_price && room.daily_price > 0)
+                ? room.daily_price
+                : (pricingConfig.wardCharges[ward?.ward_name] || 1000);
+            const newRoomRent = rate * days;
             const nursingRent = pricingConfig.nursingChargesPerDay * days;
 
             setBilling(prevBilling => {
@@ -467,7 +478,7 @@ const IPDManagement = () => {
       });
     }, 3000);
     return () => clearTimeout(interval);
-  }, [admissions, wards, pricingConfig]);
+  }, [admissions, wards, rooms, beds, pricingConfig]);
 
   // Synchronized dropdowns
   const handleWardChangeInForm = (wardId) => {
@@ -542,7 +553,13 @@ const IPDManagement = () => {
     };
 
     const ward = wards.find(w => w.ward_id === selectedWardId);
-    const roomRent = pricingConfig.wardCharges[ward?.ward_name] || 1000;
+    const room = rooms.find(r => r.room_id === selectedRoomId);
+    const bed = beds.find(b => b.bed_id === selectedBedId);
+    const roomRent = (bed?.daily_price && bed.daily_price > 0)
+      ? bed.daily_price
+      : (room?.daily_price && room.daily_price > 0)
+        ? room.daily_price
+        : (pricingConfig.wardCharges[ward?.ward_name] || 1000);
     const nurseFee = pricingConfig.nursingChargesPerDay;
 
     setAdmissions(prev => [newAdmission, ...prev]);
@@ -617,7 +634,12 @@ const IPDManagement = () => {
       readmission: false
     };
 
-    const roomRent = pricingConfig.wardCharges[ward?.ward_name] || 1500;
+    const room = rooms.find(r => r.room_id === emergencyForm.room_id);
+    const roomRent = (bed?.daily_price && bed.daily_price > 0)
+      ? bed.daily_price
+      : (room?.daily_price && room.daily_price > 0)
+        ? room.daily_price
+        : (pricingConfig.wardCharges[ward?.ward_name] || 1500);
     const nurseFee = pricingConfig.nursingChargesPerDay;
 
     setAdmissions(prev => [newAdmission, ...prev]);
@@ -721,26 +743,16 @@ const IPDManagement = () => {
     const newWardObj = {
       ward_id: newId,
       ward_name: addWardForm.ward_name,
-      ward_type: addWardForm.ward_type,
+      ward_type: addWardForm.ward_name,
       floor: addWardForm.floor,
       capacity: parseInt(addWardForm.capacity) || 10,
-      status: "Active"
+      status: addWardForm.status || "Active"
     };
-
-    if (addWardForm.daily_price) {
-      setPricingConfig(prev => ({
-        ...prev,
-        wardCharges: {
-          ...prev.wardCharges,
-          [addWardForm.ward_name]: parseFloat(addWardForm.daily_price)
-        }
-      }));
-    }
 
     setWards(prev => [...prev, newWardObj]);
     logActivity("Infrastructure Creation", `Created new Ward: ${newWardObj.ward_name} (${newWardObj.floor}) with capacity of ${newWardObj.capacity} beds.`);
     setShowAddWardModal(false);
-    setAddWardForm({ ward_name: "", ward_type: "General Ward", floor: "1st Floor", capacity: 10, daily_price: 1500 });
+    setAddWardForm({ ward_name: "", floor: "1st Floor", capacity: 10, status: "Active" });
   };
 
   const handleCreateRoom = (e) => {
@@ -755,15 +767,15 @@ const IPDManagement = () => {
       room_id: newId,
       room_number: addRoomForm.room_number,
       ward_id: addRoomForm.ward_id,
-      room_type: selectedWard ? selectedWard.ward_type : "General Ward",
+      room_type: selectedWard ? selectedWard.ward_name : "General Room",
       daily_price: parseFloat(addRoomForm.daily_price) || 1500,
-      status: "Available"
+      status: addRoomForm.status || "Available"
     };
 
     setRooms(prev => [...prev, newRoomObj]);
     logActivity("Infrastructure Creation", `Created new Room ${newRoomObj.room_number} in Ward: ${selectedWard?.ward_name || "Unknown"}.`);
     setShowAddRoomModal(false);
-    setAddRoomForm({ room_number: "", ward_id: "", daily_price: 1500 });
+    setAddRoomForm({ room_number: "", ward_id: "", daily_price: 1500, status: "Available" });
   };
 
   const handleCreateBed = (e) => {
@@ -779,8 +791,8 @@ const IPDManagement = () => {
       bed_number: addBedForm.bed_number,
       room_id: addBedForm.room_id,
       ward_id: addBedForm.ward_id,
-      bed_type: selectedWard ? selectedWard.ward_type.replace(" Ward", "") : "General",
-      daily_price: 0,
+      bed_type: selectedWard ? selectedWard.ward_name : "General",
+      daily_price: parseFloat(addBedForm.daily_price) || 0,
       status: "Available",
       is_oxygen_available: addBedForm.is_oxygen_available,
       ventilator_available: addBedForm.ventilator_available,
@@ -790,18 +802,16 @@ const IPDManagement = () => {
     setBeds(prev => [...prev, newBedObj]);
     logActivity("Infrastructure Creation", `Created new Bed ${newBedObj.bed_number} in Room ${rooms.find(r => r.room_id === addBedForm.room_id)?.room_number || "Unknown"}.`);
     setShowAddBedModal(false);
-    setAddBedForm({ bed_number: "", ward_id: "", room_id: "", is_oxygen_available: true, ventilator_available: false });
+    setAddBedForm({ bed_number: "", ward_id: "", room_id: "", daily_price: 0, is_oxygen_available: true, ventilator_available: false });
   };
 
   const handleOpenEditWard = (ward) => {
-    const currentPrice = pricingConfig.wardCharges[ward.ward_name] || 1500;
     setEditWardForm({
       ward_id: ward.ward_id,
       ward_name: ward.ward_name,
-      ward_type: ward.ward_type,
       floor: ward.floor,
       capacity: ward.capacity,
-      daily_price: currentPrice
+      status: ward.status || "Active"
     });
     setShowEditWardModal(true);
   };
@@ -816,41 +826,157 @@ const IPDManagement = () => {
         return {
           ...w,
           ward_name: editWardForm.ward_name,
-          ward_type: editWardForm.ward_type,
           floor: editWardForm.floor,
-          capacity: parseInt(editWardForm.capacity) || 10
+          capacity: parseInt(editWardForm.capacity) || 10,
+          status: editWardForm.status
         };
       }
       return w;
     }));
 
-    // Update pricing config
-    setPricingConfig(prev => {
-      const updatedCharges = { ...prev.wardCharges };
-      if (oldWard.ward_name !== editWardForm.ward_name) {
-        delete updatedCharges[oldWard.ward_name];
-      }
-      updatedCharges[editWardForm.ward_name] = parseFloat(editWardForm.daily_price);
-      return {
-        ...prev,
-        wardCharges: updatedCharges
-      };
-    });
-
     logActivity("Infrastructure Update", `Updated Ward: ${oldWard.ward_name} -> ${editWardForm.ward_name}.`);
     setShowEditWardModal(false);
   };
 
-  const handleDeleteWard = (wardId) => {
+  const triggerDeleteWard = (wardId) => {
     const ward = wards.find(w => w.ward_id === wardId);
     if (!ward) return;
 
-    if (window.confirm(`Are you sure you want to delete the ward "${ward.ward_name}"? This will also remove all associated rooms and beds.`)) {
-      setWards(prev => prev.filter(w => w.ward_id !== wardId));
-      setRooms(prev => prev.filter(r => r.ward_id !== wardId));
-      setBeds(prev => prev.filter(b => b.ward_id !== wardId));
-      logActivity("Infrastructure Deletion", `Deleted Ward: ${ward.ward_name} along with its rooms and beds.`);
+    setDeleteConfirm({
+      isOpen: true,
+      type: "ward",
+      id: wardId,
+      title: "Delete Ward/Floor Confirmation",
+      message: `Are you sure you want to delete the ward/floor "${ward.ward_name}"? This will also remove all associated rooms and beds.`
+    });
+  };
+  // ROOM EDIT & DELETE HANDLERS
+  const handleOpenEditRoom = (room) => {
+    setEditRoomForm({
+      room_id: room.room_id,
+      room_number: room.room_number,
+      ward_id: room.ward_id,
+      daily_price: room.daily_price,
+      status: room.status || "Available"
+    });
+    setShowEditRoomModal(true);
+  };
+
+  const handleUpdateRoom = (e) => {
+    e.preventDefault();
+    const oldRoom = rooms.find(r => r.room_id === editRoomForm.room_id);
+    if (!oldRoom) return;
+
+    setRooms(prev => prev.map(r => {
+      if (r.room_id === editRoomForm.room_id) {
+        return {
+          ...r,
+          room_number: editRoomForm.room_number,
+          ward_id: editRoomForm.ward_id,
+          daily_price: parseFloat(editRoomForm.daily_price) || 0,
+          status: editRoomForm.status
+        };
+      }
+      return r;
+    }));
+
+    logActivity("Infrastructure Update", `Updated Room: ${oldRoom.room_number} -> ${editRoomForm.room_number}.`);
+    setShowEditRoomModal(false);
+  };
+
+  const triggerDeleteRoom = (roomId) => {
+    const room = rooms.find(r => r.room_id === roomId);
+    if (!room) return;
+
+    setDeleteConfirm({
+      isOpen: true,
+      type: "room",
+      id: roomId,
+      title: "Delete Room Confirmation",
+      message: `Are you sure you want to delete room "Room ${room.room_number}"? This will also remove all associated beds.`
+    });
+  };
+
+  // BED EDIT & DELETE HANDLERS
+  const handleOpenEditBed = (bed) => {
+    setEditBedForm({
+      bed_id: bed.bed_id,
+      bed_number: bed.bed_number,
+      ward_id: bed.ward_id,
+      room_id: bed.room_id,
+      daily_price: bed.daily_price || 0,
+      is_oxygen_available: bed.is_oxygen_available,
+      ventilator_available: bed.ventilator_available,
+      status: bed.status
+    });
+    setShowEditBedModal(true);
+  };
+
+  const handleUpdateBed = (e) => {
+    e.preventDefault();
+    const oldBed = beds.find(b => b.bed_id === editBedForm.bed_id);
+    if (!oldBed) return;
+
+    setBeds(prev => prev.map(b => {
+      if (b.bed_id === editBedForm.bed_id) {
+        const selectedWard = wards.find(w => w.ward_id === editBedForm.ward_id);
+        return {
+          ...b,
+          bed_number: editBedForm.bed_number,
+          ward_id: editBedForm.ward_id,
+          room_id: editBedForm.room_id,
+          bed_type: selectedWard ? selectedWard.ward_type.replace(" Ward", "") : b.bed_type,
+          daily_price: parseFloat(editBedForm.daily_price) || 0,
+          is_oxygen_available: editBedForm.is_oxygen_available,
+          ventilator_available: editBedForm.ventilator_available
+        };
+      }
+      return b;
+    }));
+
+    logActivity("Infrastructure Update", `Updated Bed: ${oldBed.bed_number} -> ${editBedForm.bed_number}.`);
+    setShowEditBedModal(false);
+  };
+
+  const triggerDeleteBed = (bedId) => {
+    const bed = beds.find(b => b.bed_id === bedId);
+    if (!bed) return;
+
+    setDeleteConfirm({
+      isOpen: true,
+      type: "bed",
+      id: bedId,
+      title: "Delete Bed Confirmation",
+      message: `Are you sure you want to delete bed "Bed ${bed.bed_number}"?`
+    });
+  };
+
+  const executeDelete = () => {
+    const { type, id } = deleteConfirm;
+    if (type === "ward") {
+      const ward = wards.find(w => w.ward_id === id);
+      if (ward) {
+        setWards(prev => prev.filter(w => w.ward_id !== id));
+        setRooms(prev => prev.filter(r => r.ward_id !== id));
+        setBeds(prev => prev.filter(b => b.ward_id !== id));
+        logActivity("Infrastructure Deletion", `Deleted Ward: ${ward.ward_name} along with its rooms and beds.`);
+      }
+    } else if (type === "room") {
+      const room = rooms.find(r => r.room_id === id);
+      if (room) {
+        setRooms(prev => prev.filter(r => r.room_id !== id));
+        setBeds(prev => prev.filter(b => b.room_id !== id));
+        logActivity("Infrastructure Deletion", `Deleted Room: ${room.room_number} along with its beds.`);
+      }
+    } else if (type === "bed") {
+      const bed = beds.find(b => b.bed_id === id);
+      if (bed) {
+        setBeds(prev => prev.filter(b => b.bed_id !== id));
+        logActivity("Infrastructure Deletion", `Deleted Bed: ${bed.bed_number}.`);
+        setShowEditBedModal(false);
+      }
     }
+    setDeleteConfirm({ isOpen: false, type: "", id: null, title: "", message: "" });
   };
 
   // SIMULATE DOCTOR & NURSE EVENTS (Clinical JSON states simulation helper)
@@ -1860,12 +1986,15 @@ const IPDManagement = () => {
                     {wards.map(ward => {
                       const wardRooms = rooms.filter(r => r.ward_id === ward.ward_id);
                       return (
-                        <div key={ward.ward_id} className="border rounded-xl overflow-hidden bg-slate-50/50 text-left">
+                        <div key={ward.ward_id} className={`border rounded-xl overflow-hidden text-left ${ward.status !== "Active" ? "opacity-60 bg-slate-200 border-dashed" : "bg-slate-50/50"}`}>
 
                           <div className="bg-slate-100 px-4 py-2 border-b flex justify-between items-center text-xs font-bold">
-                            <span className="text-slate-800 font-extrabold uppercase">{ward.ward_name} ({ward.floor})</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-800 font-extrabold uppercase">{ward.ward_name} ({ward.floor})</span>
+                              {ward.status !== "Active" && <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded text-[8px] font-black uppercase">Not Available</span>}
+                            </div>
                             <div className="flex items-center gap-3">
-                              <span className="text-blue-700">Capacity: {ward.capacity} Beds</span>
+                              <span className="text-blue-700">Rooms Capacity: {ward.capacity}</span>
                               <div className="flex gap-1.5 border-l pl-3 border-slate-300">
                                 <button
                                   onClick={() => handleOpenEditWard(ward)}
@@ -1875,7 +2004,7 @@ const IPDManagement = () => {
                                   <Edit style={{ fontSize: 14 }} />
                                 </button>
                                 <button
-                                  onClick={() => handleDeleteWard(ward.ward_id)}
+                                  onClick={() => triggerDeleteWard(ward.ward_id)}
                                   className="text-red-600 hover:text-red-800 p-0.5"
                                   title="Delete Ward"
                                 >
@@ -1889,33 +2018,68 @@ const IPDManagement = () => {
                             {wardRooms.map(room => {
                               const roomBeds = beds.filter(b => b.room_id === room.room_id);
                               return (
-                                <div key={room.room_id} className="bg-white border border-slate-150 rounded-xl p-3 shadow-sm text-left">
+                                <div key={room.room_id} className={`border rounded-xl p-3 shadow-sm text-left ${room.status !== "Available" ? "bg-slate-100 border-dashed opacity-75" : "bg-white border-slate-150"}`}>
                                   <div className="flex items-center justify-between border-b pb-1.5 mb-2.5 text-xs font-bold">
-                                    <span className="text-slate-700">Room {room.room_number}</span>
-                                    <span className="text-blue-600">₹{room.daily_price}/day</span>
+                                    <span className="text-slate-700 font-extrabold">Room {room.room_number} {room.status !== "Available" && <span className="text-red-600 font-bold ml-1 text-[8px] uppercase">(Maint)</span>}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-blue-600">₹{room.daily_price}/day</span>
+                                      <div className="flex gap-1 border-l pl-2 border-slate-350">
+                                        <button
+                                          onClick={() => {
+                                            setAddBedForm({ bed_number: "", ward_id: room.ward_id, room_id: room.room_id, daily_price: 0, is_oxygen_available: true, ventilator_available: false });
+                                            setShowAddBedModal(true);
+                                          }}
+                                          className="text-emerald-600 hover:text-emerald-800 p-0.5"
+                                          title="Add Bed to Room"
+                                        >
+                                          <Add style={{ fontSize: 13 }} />
+                                        </button>
+                                        <button
+                                          onClick={() => handleOpenEditRoom(room)}
+                                          className="text-blue-600 hover:text-blue-800 p-0.5"
+                                          title="Edit Room"
+                                        >
+                                          <Edit style={{ fontSize: 13 }} />
+                                        </button>
+                                        <button
+                                          onClick={() => triggerDeleteRoom(room.room_id)}
+                                          className="text-red-600 hover:text-red-800 p-0.5"
+                                          title="Delete Room"
+                                        >
+                                          <Delete style={{ fontSize: 13 }} />
+                                        </button>
+                                      </div>
+                                    </div>
                                   </div>
 
                                   <div className="grid grid-cols-4 gap-2">
                                     {roomBeds.map(bed => (
                                       <div
                                         key={bed.bed_id}
-                                        title={`Bed ${bed.bed_number} [O2: ${bed.is_oxygen_available ? "Yes" : "No"}] - Status: ${bed.status}`}
-                                        className={`p-2 rounded-lg border text-center transition-all ${bed.status === "Occupied"
-                                          ? "bg-blue-50 border-blue-200 text-blue-700"
+                                        title={`Bed ${bed.bed_number} [O2: ${bed.is_oxygen_available ? "Yes" : "No"}] [Price: ₹${bed.daily_price || 0}] - Status: ${bed.status}`}
+                                        className={`p-2 rounded-lg border text-center transition-all cursor-pointer ${bed.status === "Occupied"
+                                          ? "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
                                           : bed.status === "Reserved"
-                                            ? "bg-amber-100 border-amber-300 text-amber-800"
-                                            : bed.cleaning_status === "Needs Cleaning"
-                                              ? "bg-yellow-50 border-yellow-200 text-yellow-700 cursor-pointer hover:bg-yellow-100"
-                                              : "bg-emerald-50 border-emerald-200 text-emerald-700"
-                                          }`}
+                                            ? "bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200"
+                                            : bed.status === "Not Available" || bed.status === "Inactive"
+                                              ? "bg-slate-200 border-slate-300 text-slate-500 hover:bg-slate-300"
+                                              : bed.cleaning_status === "Needs Cleaning"
+                                                ? "bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100"
+                                                : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                                        }`}
                                         onClick={() => {
                                           if (bed.cleaning_status === "Needs Cleaning") {
                                             handleMarkBedClean(bed.bed_id);
+                                          } else {
+                                            handleOpenEditBed(bed);
                                           }
                                         }}
                                       >
                                         <Bed style={{ fontSize: 16 }} />
                                         <p className="text-[8px] font-black mt-1 font-mono">{bed.bed_number}</p>
+                                        {bed.daily_price > 0 && (
+                                          <p className="text-[7px] text-slate-500 font-bold">₹{bed.daily_price}</p>
+                                        )}
                                       </div>
                                     ))}
                                   </div>
@@ -2854,7 +3018,7 @@ const IPDManagement = () => {
             <input
               type="text"
               required
-              placeholder="e.g. ICU, General Ward B"
+              placeholder="e.g. Ward A, ICU-Floor-3"
               className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
               value={addWardForm.ward_name}
               onChange={(e) => setAddWardForm(prev => ({ ...prev, ward_name: e.target.value }))}
@@ -2862,23 +3026,6 @@ const IPDManagement = () => {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Ward Type</label>
-              <select
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                value={addWardForm.ward_type}
-                onChange={(e) => setAddWardForm(prev => ({ ...prev, ward_type: e.target.value }))}
-              >
-                <option value="General Ward">General Ward</option>
-                <option value="Semi Private Ward">Semi Private Ward</option>
-                <option value="Private Ward">Private Ward</option>
-                <option value="Deluxe Room">Deluxe Room</option>
-                <option value="ICU">ICU</option>
-                <option value="NICU">NICU</option>
-                <option value="PICU">PICU</option>
-                <option value="Emergency Ward">Emergency Ward</option>
-              </select>
-            </div>
             <div>
               <label className="text-xs font-bold text-slate-500 block mb-1">Floor</label>
               <select
@@ -2895,11 +3042,8 @@ const IPDManagement = () => {
                 <option value="6th Floor">6th Floor</option>
               </select>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Capacity (Beds)</label>
+              <label className="text-xs font-bold text-slate-500 block mb-1">Rooms Capacity</label>
               <input
                 type="number"
                 required
@@ -2909,17 +3053,18 @@ const IPDManagement = () => {
                 onChange={(e) => setAddWardForm(prev => ({ ...prev, capacity: e.target.value }))}
               />
             </div>
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Daily Price / Rate (₹)</label>
-              <input
-                type="number"
-                required
-                min="0"
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-                value={addWardForm.daily_price}
-                onChange={(e) => setAddWardForm(prev => ({ ...prev, daily_price: e.target.value }))}
-              />
-            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 block mb-1">Status</label>
+            <select
+              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+              value={addWardForm.status}
+              onChange={(e) => setAddWardForm(prev => ({ ...prev, status: e.target.value }))}
+            >
+              <option value="Active">Active</option>
+              <option value="Not Available">Not Available (Maintenance)</option>
+            </select>
           </div>
 
           <div className="flex justify-end gap-2 pt-4 border-t">
@@ -2975,16 +3120,29 @@ const IPDManagement = () => {
             </select>
           </div>
 
-          <div>
-            <label className="text-xs font-bold text-slate-500 block mb-1">Daily Price / Rent (₹)</label>
-            <input
-              type="number"
-              required
-              min="0"
-              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-              value={addRoomForm.daily_price}
-              onChange={(e) => setAddRoomForm(prev => ({ ...prev, daily_price: e.target.value }))}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">Daily Price / Rent (₹)</label>
+              <input
+                type="number"
+                required
+                min="0"
+                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
+                value={addRoomForm.daily_price}
+                onChange={(e) => setAddRoomForm(prev => ({ ...prev, daily_price: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">Status</label>
+              <select
+                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                value={addRoomForm.status}
+                onChange={(e) => setAddRoomForm(prev => ({ ...prev, status: e.target.value }))}
+              >
+                <option value="Available">Available</option>
+                <option value="Not Available">Not Available (Maintenance)</option>
+              </select>
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-4 border-t">
@@ -3058,6 +3216,19 @@ const IPDManagement = () => {
             </select>
           </div>
 
+          <div>
+            <label className="text-xs font-bold text-slate-500 block mb-1">Daily Price / Rent (₹)</label>
+            <input
+              type="number"
+              required
+              min="0"
+              placeholder="e.g. 500"
+              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
+              value={addBedForm.daily_price}
+              onChange={(e) => setAddBedForm(prev => ({ ...prev, daily_price: e.target.value }))}
+            />
+          </div>
+
           <div className="space-y-2 pt-2">
             <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-700">
               <input
@@ -3111,7 +3282,7 @@ const IPDManagement = () => {
             <input
               type="text"
               required
-              placeholder="e.g. ICU, General Ward B"
+              placeholder="e.g. Ward A, ICU-Floor-3"
               className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
               value={editWardForm.ward_name}
               onChange={(e) => setEditWardForm(prev => ({ ...prev, ward_name: e.target.value }))}
@@ -3119,23 +3290,6 @@ const IPDManagement = () => {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Ward Type</label>
-              <select
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                value={editWardForm.ward_type}
-                onChange={(e) => setEditWardForm(prev => ({ ...prev, ward_type: e.target.value }))}
-              >
-                <option value="General Ward">General Ward</option>
-                <option value="Semi Private Ward">Semi Private Ward</option>
-                <option value="Private Ward">Private Ward</option>
-                <option value="Deluxe Room">Deluxe Room</option>
-                <option value="ICU">ICU</option>
-                <option value="NICU">NICU</option>
-                <option value="PICU">PICU</option>
-                <option value="Emergency Ward">Emergency Ward</option>
-              </select>
-            </div>
             <div>
               <label className="text-xs font-bold text-slate-500 block mb-1">Floor</label>
               <select
@@ -3152,11 +3306,8 @@ const IPDManagement = () => {
                 <option value="6th Floor">6th Floor</option>
               </select>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Capacity (Beds)</label>
+              <label className="text-xs font-bold text-slate-500 block mb-1">Rooms Capacity</label>
               <input
                 type="number"
                 required
@@ -3166,17 +3317,18 @@ const IPDManagement = () => {
                 onChange={(e) => setEditWardForm(prev => ({ ...prev, capacity: e.target.value }))}
               />
             </div>
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1">Daily Price / Rate (₹)</label>
-              <input
-                type="number"
-                required
-                min="0"
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-                value={editWardForm.daily_price}
-                onChange={(e) => setEditWardForm(prev => ({ ...prev, daily_price: e.target.value }))}
-              />
-            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 block mb-1">Status</label>
+            <select
+              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+              value={editWardForm.status}
+              onChange={(e) => setEditWardForm(prev => ({ ...prev, status: e.target.value }))}
+            >
+              <option value="Active">Active</option>
+              <option value="Not Available">Not Available (Maintenance)</option>
+            </select>
           </div>
 
           <div className="flex justify-end gap-2 pt-4 border-t">
@@ -3195,6 +3347,249 @@ const IPDManagement = () => {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* 13. Edit Room Modal */}
+      <Modal
+        isOpen={showEditRoomModal}
+        onClose={() => setShowEditRoomModal(false)}
+        title="Edit Room Details"
+        size="sm"
+      >
+        <form onSubmit={handleUpdateRoom} className="space-y-4 text-left text-xs">
+          <div>
+            <label className="text-xs font-bold text-slate-500 block mb-1">Room Number / Name</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. 103, ICU-A"
+              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
+              value={editRoomForm.room_number}
+              onChange={(e) => setEditRoomForm(prev => ({ ...prev, room_number: e.target.value }))}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 block mb-1">Assign to Ward</label>
+            <select
+              required
+              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+              value={editRoomForm.ward_id}
+              onChange={(e) => setEditRoomForm(prev => ({ ...prev, ward_id: e.target.value }))}
+            >
+              <option value="">Select Ward...</option>
+              {wards.map(w => (
+                <option key={w.ward_id} value={w.ward_id}>{w.ward_name} ({w.floor})</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">Daily Price / Rent (₹)</label>
+              <input
+                type="number"
+                required
+                min="0"
+                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
+                value={editRoomForm.daily_price}
+                onChange={(e) => setEditRoomForm(prev => ({ ...prev, daily_price: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">Status</label>
+              <select
+                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                value={editRoomForm.status}
+                onChange={(e) => setEditRoomForm(prev => ({ ...prev, status: e.target.value }))}
+              >
+                <option value="Available">Available</option>
+                <option value="Not Available">Not Available (Maintenance)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <button
+              type="button"
+              onClick={() => setShowEditRoomModal(false)}
+              className="bg-slate-100 text-slate-700 text-xs font-bold py-2 px-4 rounded-xl"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm"
+            >
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* 14. Edit Bed Modal */}
+      <Modal
+        isOpen={showEditBedModal}
+        onClose={() => setShowEditBedModal(false)}
+        title="Edit Bed Details"
+        size="sm"
+      >
+        <form onSubmit={handleUpdateBed} className="space-y-4 text-left text-xs">
+          {editBedForm.status === "Occupied" && (
+            <div className="bg-amber-50 border border-amber-200 p-2.5 rounded-lg text-[10px] text-amber-800 font-semibold leading-relaxed">
+              ⚠️ Note: This bed is currently occupied. Relocating it to a different room/ward or deleting it is disabled to prevent database inconsistency.
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 block mb-1">Bed Number / Code</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. 101-C"
+              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
+              value={editBedForm.bed_number}
+              onChange={(e) => setEditBedForm(prev => ({ ...prev, bed_number: e.target.value }))}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 block mb-1">Ward Location</label>
+            <select
+              required
+              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+              value={editBedForm.ward_id}
+              onChange={(e) => setEditBedForm(prev => ({ ...prev, ward_id: e.target.value, room_id: "" }))}
+              disabled={editBedForm.status === "Occupied"}
+            >
+              <option value="">Select Ward...</option>
+              {wards.map(w => (
+                <option key={w.ward_id} value={w.ward_id}>{w.ward_name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 block mb-1">Room Assignment</label>
+            <select
+              required
+              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+              value={editBedForm.room_id}
+              onChange={(e) => setEditBedForm(prev => ({ ...prev, room_id: e.target.value }))}
+              disabled={!editBedForm.ward_id || editBedForm.status === "Occupied"}
+            >
+              <option value="">Select Room...</option>
+              {rooms.filter(r => r.ward_id === editBedForm.ward_id).map(r => (
+                <option key={r.room_id} value={r.room_id}>Room {r.room_number}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 block mb-1">Daily Price / Rent (₹)</label>
+            <input
+              type="number"
+              required
+              min="0"
+              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
+              value={editBedForm.daily_price}
+              onChange={(e) => setEditBedForm(prev => ({ ...prev, daily_price: e.target.value }))}
+            />
+          </div>
+
+          <div className="space-y-2 pt-2">
+            <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                className="rounded text-blue-600 focus:ring-blue-500"
+                checked={editBedForm.is_oxygen_available}
+                onChange={(e) => setEditBedForm(prev => ({ ...prev, is_oxygen_available: e.target.checked }))}
+              />
+              Oxygen Facility Available
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                className="rounded text-blue-600 focus:ring-blue-500"
+                checked={editBedForm.ventilator_available}
+                onChange={(e) => setEditBedForm(prev => ({ ...prev, ventilator_available: e.target.checked }))}
+              />
+              Ventilator Setup Available
+            </label>
+          </div>
+
+          <div className="flex justify-between items-center pt-4 border-t gap-2">
+            <div>
+              <button
+                type="button"
+                onClick={() => triggerDeleteBed(editBedForm.bed_id)}
+                disabled={editBedForm.status === "Occupied"}
+                className={`text-xs font-bold py-2 px-4 rounded-xl text-white ${
+                  editBedForm.status === "Occupied"
+                    ? "bg-slate-300 cursor-not-allowed"
+                    : "bg-red-600 hover:bg-red-700 shadow-sm"
+                }`}
+              >
+                Delete Bed
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowEditBedModal(false)}
+                className="bg-slate-100 text-slate-700 text-xs font-bold py-2 px-4 rounded-xl"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm(prev => ({ ...prev, isOpen: false }))}
+        title={deleteConfirm.title}
+        size="sm"
+      >
+        <div className="space-y-4 text-left text-xs">
+          <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2.5">
+            <span className="p-1 bg-red-100 text-white rounded flex items-center justify-center shrink-0 w-5 h-5 font-bold">
+              !
+            </span>
+            <div>
+              <p className="font-bold text-red-800">Critical Action Required</p>
+              <p className="text-red-700 font-medium mt-1 leading-relaxed">
+                {deleteConfirm.message}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <button
+              type="button"
+              onClick={() => setDeleteConfirm(prev => ({ ...prev, isOpen: false }))}
+              className="bg-slate-100 text-slate-700 text-xs font-bold py-2 px-4 rounded-xl"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={executeDelete}
+              className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2 px-5 rounded-xl shadow-sm"
+            >
+              Confirm Delete
+            </button>
+          </div>
+        </div>
       </Modal>
 
     </div>
